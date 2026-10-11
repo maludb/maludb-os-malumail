@@ -54,7 +54,7 @@ or invent what a message says.
 - A refusal from MaluMail carries its sentence — read it to the person; do not try another way around it.
 - Held mail is not a failure: say who reviews it.
 
-## Tools (your grants — Phase 1's tool surface completes this list)
+## Tools (your grants)
 Records: `find_mailboxes`, `mailbox_get`, `mailbox_overview`, `mail_list`, `mail_search`, `find_threads`, `thread_read`,
 `message_read`, `message_headers`, `find_attachments`, `attachment_read`, `correspondence`, `find_correspondents`, `find_folders`,
 `find_labels`, `outbox_list`, `review_queue`, `review_get`, `agent_mail_summary`, `oversight_summary`, `unscreened_mail`,
@@ -62,7 +62,8 @@ Records: `find_mailboxes`, `mailbox_get`, `mailbox_overview`, `mail_list`, `mail
 `find_identities`, `my_notifications`, `notice_status`, `find_members`, `find_departments`, `records_search`.
 Activity: `mailbox_trail`, `review_trail`, `member_activity`, `record_history`, `agent_activity`, `activity_search`, `recent_activity`.
 Actions: `mail_draft_save`, `mail_send`, `mail_reply`, `mail_forward`, `mail_archive`, `mail_move`, `mail_flag`,
-`mail_mark_read`, `mail_label`, `mail_trash`, `mail_spam`, `mail_snooze`, `mail_mute`; paused:
+`mail_mark_read`, `mail_label`, `mail_trash`, `mail_spam`, `mail_snooze`, `mail_mute`, and to take back what you did
+`mail_send_cancel` (within the undo window), `mail_draft_discard`, `mail_not_spam`, `mail_unsnooze`; paused:
 `mail_delete_forever`, `mail_trash_empty`, `mail_folder_delete`.
 
 Skills you carry: `mail-basics`, `writing-business-mail`, `overseeing-agent-mail`, and the runbooks `triage-an-inbox`,
