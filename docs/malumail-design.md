@@ -1076,6 +1076,7 @@ log, `mail_reviews` and the outbound rows (§6.6); R54's "AI may read" switch is
 | K6 | Texts to a member | **built** — held-mail alerts |
 | K8 | Wake an agent from an application | owed to every sibling; the chat-turn dispatch with the primary overseer as acting member until then |
 | **K46** | The kernel's agent and assistant sends go through this application's outbox (or its policy) once the application serves that mailbox | owed; until then oversight covers what agents send through this application (§5) |
+| **K55** | **The kernel's Actions MCP gives every application's actions ONE flat namespace**: `mcp/application_actions.py` registers the first application's action under a name and skips every later one with a log line — so an agent granted Inventory's `customer_create` is handed the cidery's. Found 2026-10-11 (Phase 0's packaging): on this installation 212 of 1,149 built application actions are skipped and 144 names are registered by more than one application; `message_send` is the kernel's own agent messaging. Wanted: a name per application (`<app_key>.<action>` or a prefix) and grants that name the application | **owed — reported to the owner**; MaluMail names every action `mail_…` (none is taken) until then |
 | **MM1** | **Application passwords per mailbox, bound to the OS server's address**: a table, a second Dovecot SQL passdb with `allow_nets`, Mailbox MCP tools to issue (returned once), list and revoke | **required for people's mailboxes in production**; the development and the agents' mailboxes do without (D3) |
 | **MM2** | **How this server's logins are protected from the mail server's abuse protection** — agreed with the infrastructure side, scoped to the application-password path (detail in the owner's handoff, not here) | **required before the spike** |
 | MM3 | An identity rule at submission: which addresses a login may send as (itself and the aliases that deliver to it) | owed; the webmail restricts identities itself, and §5's wake rule treats internal-looking mail as outside unless this application sent it |
@@ -1220,6 +1221,51 @@ questions in one sitting and changed none:
     7. Health reports the mail service and the image door (`ok` / `down` / `unconfigured`) without failing on them.
     8. The brand: an envelope on teal (`bin/make_brand_images.php`).
 
-  **NEXT:** MM2 and two test mailboxes (MaluMail's infrastructure side) → the mail spike (§10.1) → Phase 0's schema (db/006+ with
-  `db/proof/phase0_proof.sql`), the mail service's skeleton with the fake Mailbox MCP and the IMAP/SMTP fixture, the manifest,
-  agents, skills and deploy → Phase 1 for the owner's approval. **People's existing mailboxes wait on MM1.**
+- **2026-10-11, Phase 0 continued** (the owner's "please continue"; everything that needs no mailbox at MaluMail):
+  - **The schema** — `db/006`–`011`: domains, aliases, mailboxes, sealed credentials, permissions and THE WALL
+    (`ml_mailbox_level`, `ml_level_as` for the Expert in a person's run); the reused tables; the index (message keys, folders,
+    messages, conversations by JWZ's rules across folders, states anchored on message keys, viewer reads, correspondents) with
+    `ml_search` (Gmail's operators); drafts, the outbox with its status machine, `ml_outbound_hold_reasons`, the refusals and the
+    review; people's decisions and THE DISPATCH RULE; the `mcp_*` views, the access log and `correspondence_index`.
+    **`db/proof/phase0_proof.sql` — 230 checks**, every item of §10's list (a mutation that lets a department row admit an agent
+    fails it); `tests/phase0/run.sh` now runs it: **101 checks**.
+  - **The packaging** — `maludb-os.json` (two roles, the two agents with grants matching their job descriptions both ways, the
+    Clerk's duty `10 7 * * 1-5`, eight skills, the share), `os/expert.md`, `os/clerk.md`, the three skills and five runbooks,
+    `deploy/` (the vhost, thirteen units, `kernel-registry-malumail.json`, `ROOT_STEPS.sh`). The installer's `plan` reads clean:
+    35 steps, 7 notes (the endpoints not answering yet, no registry before Phase 1, the agents proposed).
+  - **Decisions taken in building it** (none changes a rule of §3 or §5):
+    1. **`ml_aliases`** (new): the cache of MaluMail's forwarding addresses the internal test needs ("every destination internal");
+       an alias loop or a dead end is outside; an unknown address on the business's domain proves nothing.
+    2. The Expert and the Clerk are **named** in `ml_settings` (`expert_member_id`, `clerk_member_id` — DocCloud db/022's lesson);
+       the person behind an agent's run reaches SQL as `app.on_behalf_of` (the Data Lake's name), set by the records MCP from K38.
+    3. **`mm3_identity_enforced`** (a setting, off): when MaluMail's MM3 is in place a Mail admin turns it on, and an authenticated
+       colleague counts as internal without this application having sent the mail.
+    4. An agent's mail from a **shared** mailbox is held for that mailbox's people (reason `mode`): a shared mailbox has no policy
+       to widen. Its reviewers are the people with `full` on it.
+    5. **Break-glass is a Mail admin's alone** (`access.audit`), names one person, and the owner cannot revoke it (a Mail admin can;
+       it expires). A delegate with `full` on a person's mailbox does not share it further.
+    6. The outbox gains **`sending`** (claimed by the mail service; a row found `sending` after a crash is looked for in Sent by its
+       Message-ID before it is ever submitted again); the design's `next_attempt_at` is the CRM's `retry_at`.
+    7. The warm-up stays at 200 a day after week 4 until bounces are counted (slice 5) — "up half a week while bounces stay under
+       2 %" needs them.
+    8. **Unscreened is an `agent_dispatches` status**, beside `queued` and `skipped`, with `decision` naming why (`wake`,
+       `internal_unproven`, `unknown_sender`, `unauthenticated`, `no_overseer`, `automated`, `muted`, `taken_over`, `sensitive`,
+       `paused`, `wake_off`, `kernel_intake`, `own_mail`, `suspended`). A release makes the releasing person the acting member.
+    9. **The review queue is for people** (and the named Clerk, for its note); the sending agent reads its held mail, and a
+       rejection's note, through `mcp_outbound` and `mcp_mail_reviews`.
+    10. A label's slug is unique **per mailbox** (Help Desk's column-level UNIQUE loosened); labels key on the message key.
+    11. **Every MaluMail action is named `mail_…`** (`mail_send`, `mail_reply`, `mail_draft_save`, `mail_folder_delete`, …): the
+        kernel's Actions MCP has one flat namespace (K55, §12) and `message_send`, `folder_delete`, `mailbox_create` and
+        `settings_save` are already other tools there. Phase 1's manifest names every action so; §5's names are the design's words.
+    12. The image door is **socket-activated** (`malumail-images.socket` + its service): systemd's address filter cannot let one unit
+        both listen on loopback and refuse to dial private ranges, and a socket handed in by socket activation follows the socket
+        unit's list. The mail service and the door are skipped by `ConditionPathExists` until their code exists.
+  - **The sanitiser half of the spike did not run.** `nh3` 0.3.7 installs and runs on this CPU (no AVX) and has the hooks the plan
+    needs (`attribute_filter`, `filter_style_properties`); Playwright with headless Chromium is here. Building the hostile corpus
+    was stopped by a safety check while attack examples were being written — not worked around. **The owner chooses** how the
+    sanitiser's attack testing is sourced (a published sanitiser test suite the owner approves, for slice 3's proof, is the
+    recommendation) — `docs/research/04-mail-spike.md`.
+
+  **NEXT:** the owner — MM2 and two test mailboxes (MaluMail's infrastructure side), the sanitiser corpus's source, K55 → the mail
+  spike's IMAP/SMTP half (§10.1) → the mail service's skeleton with the fake Mailbox MCP and the IMAP/SMTP fixture → Phase 1 for
+  the owner's approval. **People's existing mailboxes wait on MM1.**

@@ -76,11 +76,25 @@ servers' base and the ingest bridge), `tests/`. **PHP never calls the Mailbox MC
 customer key nor the sealing secret** — the proof checks it.
 - `bash tests/setup_dev.sh` — the scratch database `ml_dev0` (`ML_MIGRATIONS_UPTO=005` for the kit alone) and its environment in
   `/tmp/ml-dev0.env` (+ the mail service's stand-in `/tmp/ml-dev0-mailer.env` with a scratch sealing pair).
-- `ML_MIGRATIONS_UPTO=005 bash tests/phase0/run.sh` — the kit without a kernel: **100 checks** (2026-10-11), ports 9201–9203.
-- The schema proof (`db/proof/phase0_proof.sql`, `tests/phase0/schema.sh`) comes with db/006+ after the mail spike.
+- `bash tests/phase0/run.sh` — the kit without a kernel, the schema proof included: **101 checks** (2026-10-11), ports 9201–9203
+  (`ML_MIGRATIONS_UPTO=005` for the kit alone: 100).
+- `bash tests/phase0/schema.sh` — the schema proof alone on a fresh `ml_proof`: `db/proof/phase0_proof.sql`, **230 checks**
+  (2026-10-11). A check that ACTS and then READS splits into two statements: a stable function sees the statement's snapshot.
+
+## The schema (Phase 0, 2026-10-11) — design §16 "Phase 0 continued" for the decisions
+- `db/006` domains, `ml_aliases` (the internal test's cache), mailboxes, sealed credentials, permissions, identities, agent
+  policies, notice acknowledgements — and THE WALL: `ml_mailbox_level(mailbox, member)`; `ml_level_as(…, on_behalf)` for the
+  NAMED Expert in a person's run (`app.on_behalf_of`, set by the records MCP from K38); `ml_my_mailbox_ids(min)` once per statement.
+- `db/007` the reused tables; `db/008` the index (message keys, conversations, states on message keys, `ml_search`); `db/009` drafts,
+  the outbox's status machine, `ml_outbound_hold_reasons`, the refusals, `ml_review_decide`; `db/010` people's decisions and
+  `ml_dispatch_decide`; `db/011` the `mcp_*` views, the access log, `ml_correspondence_index` (K7).
+- **Action names begin with `mail_`** — the kernel's Actions MCP has one flat namespace (K55): `message_send`, `folder_delete`,
+  `mailbox_create`, `settings_save` are other tools there.
+- `maludb-os.json`, `os/`, `skills/`, `deploy/` (Phase 0's packaging): `php /var/www/bin/app_install.php plan /srv/apps/malumail`
+  reads clean (35 steps, 7 notes).
 
 ## Numbers
 Ports `APP_INTERNAL_PORT=8199`, `MCP_RECORDS_PORT=8852`, `MCP_ACTIVITY_PORT=8853`, `ML_MAILER_PORT=8854`, `ML_IMAGES_PORT=8855`;
 scratch 9201 (the app), 9202 (the fake kernel), 9203 (the fake MaluDB + MaluMail REST), 9204–9205 (the MCP servers), 9206 (the
 mail service), 9207 (the image door); prefix `ml_`; scratch databases `ml_*`. Kernel items K43 (the catalog row, db/181 — **built and applied 2026-10-11**), K44 (the overseer link in the feed), K45 (the
-kernel's intake independent of `\Seen`), K46 (the kernel's agent sends through this application's outbox). MaluMail items take the prefix **MM** (MaluDB's and MaluMail's old M numbers collide).
+kernel's intake independent of `\Seen`), K46 (the kernel's agent sends through this application's outbox), K55 (the Actions MCP's flat namespace — found here). MaluMail items take the prefix **MM** (MaluDB's and MaluMail's old M numbers collide).

@@ -11,10 +11,13 @@ and reviews.
 **Phase 0.** The design was written 2026-10-10 and **approved by the owner 2026-10-11** — every decision (D1–D16) as
 recommended. MaluMail's platform, the estate and the field are surveyed. The kernel's catalog row (K43) and **the kit** are built
 (2026-10-11): sign-on, the directory mirror, the two roles, the settings, the activity funnel, tokens, the worker and the ingest
-bridge, proven without a kernel by `tests/phase0/run.sh` (100 checks). No mail schema and no screens yet.
+bridge, proven without a kernel by `tests/phase0/run.sh`. **The schema** (db/006–011: mailboxes and the wall, the message index
+and search, the outbox, people's review of agents' mail, the dispatch rule) is proven by `db/proof/phase0_proof.sql` — **230
+checks** — and the packaging (`maludb-os.json`, the two agents, eight skills, `deploy/`) reads clean in the installer's plan. No
+screens yet.
 
-Next: MaluMail's MM2 (agreed with MaluMail's infrastructure side, design §12) and two test mailboxes → the mail spike → the
-schema (db/006+) and the rest of Phase 0.
+Next: MaluMail's MM2 (agreed with MaluMail's infrastructure side, design §12) and two test mailboxes → the mail spike's IMAP/SMTP
+half → the mail service's skeleton → Phase 1 for the owner's approval.
 
 ## Documents
 
