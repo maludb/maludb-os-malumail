@@ -20,7 +20,10 @@ The mail spike has been run. Its IMAP/SMTP half synced 5,000 messages in about 1
 is `services/mailer/sanitise.py`, proven by `tests/sanitiser/run.sh` against DOMPurify's 223 test cases in headless Chromium:
 nothing runs after it, and nothing runs behind the body's CSP and sandbox either.
 
-Next: the mail service's skeleton → Phase 1 for the owner's approval.
+The mail service's skeleton, `services/mailer/`, has its signed door, the administration plane and the IMAP probe with the
+circuit breaker. `tests/mailer/run.sh` proves it with 62 checks against a fake Mailbox MCP and an IMAP fixture.
+
+Next: Phase 1 for the owner's approval.
 
 ## Documents
 

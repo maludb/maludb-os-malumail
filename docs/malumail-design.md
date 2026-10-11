@@ -1293,5 +1293,45 @@ questions in one sitting and changed none:
     - the `reading-and-rendering` spec naming these rules;
     - a part door that answers only signed URLs (one payload's same-origin image passed the policy's `img-src 'self'`).
 
-  **NEXT:** the mail service's skeleton with the fake Mailbox MCP and the IMAP/SMTP fixture → Phase 1 for the owner's approval.
+- **2026-10-11, the mail service's skeleton BUILT** (`services/mailer/`; `tests/mailer/run.sh` **62 checks**, on a scratch database
+  against two fixtures — `tests/fixtures/fake_mailbox_mcp.py`, MaluMail's admin tools as research 01 records them, and
+  `tests/fixtures/imap_server.py`, a TLS IMAP server under a scratch certificate authority that counts every login attempt). Nothing
+  in it reaches MaluMail. It holds:
+  - **the signed door:** `/health` (unsigned, counts only), `POST /v1/admin/{tool}` and `POST /v1/mailboxes/{id}/probe`, on loopback
+    only;
+  - **the administration plane**, behind the door;
+  - **the IMAP probe** with the circuit breaker;
+  - **the sync and outbox passes, empty** until slices 2 and 4.
+
+  Decided while building (the `mail-service` spec takes these up):
+  1. **The door's signature.**
+     - The header is `X-ML-Mailer: v1.<ts>.<nonce>.<HMAC-SHA256 of "v1.<ts>.<nonce>.<METHOD>.<path>.<sha256(body)>">`.
+     - A call is accepted within 60 s, once.
+     - The body names only the acting member. **The service reads that member's rights and levels from the database itself and
+       never takes a level from the caller.** §6.1 said the call names "their level"; it no longer needs to.
+  2. **The administration plane is an allow-list.** Eleven admin tools, each behind the Mail admin right it needs, so an agent is
+     refused even when it holds the admin role.
+     - The content tools are refused, and so are `set_`/`delete_mailbox_webhook`.
+     - Every target must be on a served domain. `list_hosted_domains` is the one call that names others.
+     - Arguments a tool does not take are refused.
+  3. **A new password never leaves the service.**
+     - `create_mailbox` and `reset_mailbox_password` answer with the sealed box and its `last4`, and their reply is cut to named
+       fields.
+     - A reply whose password the service cannot find is refused (fail closed).
+     - Every other reply loses any `password` or `secret` field.
+     - MaluMail's field name `password` is the survey's reading, not yet checked against the live server: slice 1 confirms it on
+       the test domain.
+     - How a person's new password is shown once on the admin's screen is slice 1's to specify; the skeleton returns only the
+       sealed box.
+  4. **What trips the breaker.** Any refused LOGIN except `[UNAVAILABLE]`, `[INUSE]` or `[LIMIT]` (a busy server, which backs off).
+     - TLS failures and unreachable servers back off without tripping it: 30 s doubling to 30 min, in memory.
+     - The Mail admins told are the people holding `settings.manage`, through `ml_notify(…, 'credential_failed', …)`.
+     - The mail server sees **one** attempt with a refused credential.
+  5. **The new dependencies:** `imapclient==3.0.1`, the version the spike proved (4.1.0 came out 2026-09-18; the `mail-service`
+     spec weighs it), and `pynacl==1.6.2`. PHP's `sodium_crypto_box_seal` opens in PyNaCl on this CPU.
+  6. **The SMTP side of the fixture comes with slice 4** (submission), where its behaviour is specified: the `451 4.7.1` deferral
+     and the size limit.
+  7. **The application's `mcp/venv`** now exists in the clone (built for these proofs), so the installer's `venv` step reads done.
+
+  **NEXT:** Phase 1 for the owner's approval: the tool surface, the action manifest, the three build specs and the ten slice specs.
   **People's existing mailboxes wait on MM1.**

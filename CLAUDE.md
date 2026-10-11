@@ -104,6 +104,16 @@ customer key nor the sealing secret** — the proof checks it.
 - The attack corpus is DOMPurify 3.4.16's, the owner's choice. It is copied unchanged with its licence and `SOURCE.md`, read as
   data and never executed. To update it, replace both files from a newer release at least two weeks old.
 
+## The mail service (Phase 0's skeleton, 2026-10-11) — design §16
+- `services/mailer/` is the ONLY holder of open mailbox credentials, the sealing secret key and MaluMail's customer key. Its parts:
+  `server.py` (Starlette on uvicorn, loopback), `door.py` (the signed header, nonce once, 60 s), `mailbox_mcp.py` (the admin
+  allow-list, the served-domain wall, passwords sealed on arrival and never returned, fail closed), `imap.py` (the TLS probe;
+  what counts as `auth_failed`), `store.py` (rights read for the member a call names, never taken from the caller; the breaker in
+  `mailbox_credentials`), `seal.py` and `config.py` (`ML_DEV_ENV` for the proofs; `ML_TLS_CA_FILE` refused in production).
+- `bash tests/mailer/run.sh` runs **62 checks** in about 15 s on scratch `ml_mailer`, against `tests/fixtures/fake_mailbox_mcp.py`
+  and `tests/fixtures/imap_server.py`; the service listens on 9206 and a second instance on 9207. **Never point a proof at
+  MaluMail's real server with a wrong password**: the fixture exists so the breaker can be proven without that.
+
 ## Numbers
 Ports `APP_INTERNAL_PORT=8199`, `MCP_RECORDS_PORT=8852`, `MCP_ACTIVITY_PORT=8853`, `ML_MAILER_PORT=8854`, `ML_IMAGES_PORT=8855`;
 scratch 9201 (the app), 9202 (the fake kernel), 9203 (the fake MaluDB + MaluMail REST), 9204–9205 (the MCP servers), 9206 (the
