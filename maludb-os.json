@@ -1,0 +1,325 @@
+{
+  "schema": "maludb-os.application/1",
+  "catalog_key": "malumail",
+  "name": "MaluMail",
+  "description": "The business's webmail over its MaluMail mailboxes, for people and for the OS's agents: conversations across folders, search with Gmail's operators, mail shown safely with remote images on request, compose with undo send, schedule send and drafts, labels, stars and snooze, and mailboxes their owners share at view, triage, send or full, every look by another person logged. People oversee their agents' mail: an agent's outgoing mail is held for review by its overseers until they widen its policy, mail from unknown outside senders waits for a person before an agent sees it, and arriving mail reaches an agent as fenced, untrusted text. The super-admins create mailboxes and forwarding addresses without leaving the OS. The Mail Expert answers and drafts from the command bar; the Mail Clerk sends the overseers a morning note.",
+  "business_area": "",
+  "category": "email",
+  "icon": "feather-mail",
+  "version": "0.1.0",
+  "criticality": "high",
+  "vhost": {
+    "label": "webmail",
+    "document_root": "html",
+    "internal_port_env": "APP_INTERNAL_PORT"
+  },
+  "database": {
+    "suffix": "malumail",
+    "migrations": "db",
+    "roles": {
+      "rw": "malumail_rw",
+      "records_ro": "malumail_records_ro",
+      "activity_ro": "malumail_activity_ro"
+    }
+  },
+  "env": {
+    "required": [
+      "APP_NAME",
+      "APP_URL",
+      "DB_HOST",
+      "DB_PORT",
+      "DB_NAME",
+      "DB_USER",
+      "DB_PASSWORD",
+      "MCP_RECORDS_DB_USER",
+      "MCP_RECORDS_DB_PASSWORD",
+      "MCP_ACTIVITY_DB_USER",
+      "MCP_ACTIVITY_DB_PASSWORD",
+      "APP_INTERNAL_PORT",
+      "MCP_RECORDS_PORT",
+      "MCP_ACTIVITY_PORT",
+      "ML_MAILER_PORT",
+      "ML_IMAGES_PORT",
+      "ML_MAILER_KEY",
+      "ML_SEAL_PUBLIC_KEY",
+      "MALUMAIL_MCP_URL",
+      "ML_IMAP_HOST",
+      "ML_IMAP_PORT",
+      "ML_SMTP_HOST",
+      "ML_SMTP_PORT",
+      "ACTION_TOKEN_KEY",
+      "ACTIONS_RELAY_KEY",
+      "OS_APPLICATION_TOKEN",
+      "OS_INTERNAL_URL",
+      "OS_LAUNCHER_URL",
+      "APP_KEY",
+      "MALUDB_API_URL",
+      "MALUDB_API_TOKEN"
+    ],
+    "optional": [
+      "MALUMAIL_API_URL",
+      "MALUMAIL_API_KEY",
+      "MAIL_FROM",
+      "MAIL_FROM_NAME",
+      "ML_STORAGE_DIR",
+      "API_CORS_ORIGINS"
+    ]
+  },
+  "services": [
+    "deploy/malumail-records-mcp.service",
+    "deploy/malumail-activity-mcp.service",
+    "deploy/malumail-mailer.service",
+    "deploy/malumail-images.socket",
+    "deploy/malumail-images.service",
+    "deploy/malumail-activity-ingest.service",
+    "deploy/malumail-activity-ingest.timer",
+    "deploy/malumail-directory-sync.service",
+    "deploy/malumail-directory-sync.timer",
+    "deploy/malumail-worker.service",
+    "deploy/malumail-worker.timer"
+  ],
+  "endpoints": [
+    {
+      "name": "Web UI",
+      "kind": "ui",
+      "path": "/",
+      "auth_kind": "none",
+      "agent_reachable": false
+    },
+    {
+      "name": "Health",
+      "kind": "http_api",
+      "path": "/api/v1/health",
+      "auth_kind": "none",
+      "agent_reachable": false
+    },
+    {
+      "name": "Records MCP",
+      "kind": "mcp",
+      "path": "/mcp/records",
+      "port_env": "MCP_RECORDS_PORT",
+      "auth_kind": "bearer",
+      "agent_reachable": true,
+      "mcp_surface_version": 1
+    },
+    {
+      "name": "Activity MCP",
+      "kind": "mcp",
+      "path": "/mcp/activity",
+      "port_env": "MCP_ACTIVITY_PORT",
+      "auth_kind": "bearer",
+      "agent_reachable": true,
+      "mcp_surface_version": 1
+    }
+  ],
+  "actions": {
+    "manifest": "docs/malumail-action-manifest.md",
+    "registry": "mcp/action_registry.json",
+    "base_url_env": "APP_INTERNAL_PORT"
+  },
+  "skills": [
+    "skills/mail-basics",
+    "skills/writing-business-mail",
+    "skills/overseeing-agent-mail",
+    "skills/triage-an-inbox",
+    "skills/reply-in-a-conversation",
+    "skills/find-a-document-in-mail",
+    "skills/prepare-a-mailbox-for-a-new-hire",
+    "skills/explain-a-held-message"
+  ],
+  "sso": {
+    "path": "/sso",
+    "logout_path": "/sso/logout"
+  },
+  "directory": {
+    "reads": true,
+    "writes": false
+  },
+  "assistant": {
+    "command_bar": true,
+    "agent": "expert"
+  },
+  "roles": [
+    {
+      "key": "user",
+      "name": "Mail user",
+      "description": "Reads and writes their own mailbox and the mailboxes shared with them at the level given — view, triage, send or full — and oversees the agent mailboxes they hold full on.",
+      "capability": "write",
+      "is_admin": false,
+      "rights": [
+        "mail.oversee",
+        "mail.use",
+        "tokens.own"
+      ]
+    },
+    {
+      "key": "admin",
+      "name": "Mail admin",
+      "description": "Administers the business's mail: domains, mailboxes, forwarding addresses, access, sync and settings. Works only for a super-admin of the OS, and never opens a person's mailbox by holding it.",
+      "capability": "admin",
+      "is_admin": true,
+      "rights": [
+        "access.audit",
+        "agents.manage",
+        "aliases.manage",
+        "domains.manage",
+        "mail.oversee",
+        "mail.use",
+        "mailboxes.manage",
+        "settings.manage",
+        "tokens.own"
+      ]
+    }
+  ],
+  "shares": [
+    {
+      "tool": "correspondence_index",
+      "description": "Conversations with an address or a domain over the mailboxes marked shared with applications (agents' and shared mailboxes by default; a person's only if its owner opts in): subject, participants, dates, mailbox, message count, a 200-character snippet, the URL — every answer in the mailbox's access log (os.malumail-correspondence/1)",
+      "scoped": false,
+      "timeout_seconds": 15
+    }
+  ],
+  "reads": [],
+  "agents": [
+    {
+      "key": "expert",
+      "name": "Mail Expert",
+      "job_description": "os/expert.md",
+      "access_capability": "write",
+      "hired_on_install": true,
+      "roles": [
+        "user"
+      ],
+      "tool_grants": {
+        "Records MCP": [
+          "find_mailboxes",
+          "mailbox_get",
+          "mailbox_overview",
+          "mail_list",
+          "mail_search",
+          "find_threads",
+          "thread_read",
+          "message_read",
+          "message_headers",
+          "find_attachments",
+          "attachment_read",
+          "correspondence",
+          "find_correspondents",
+          "find_folders",
+          "find_labels",
+          "outbox_list",
+          "review_queue",
+          "review_get",
+          "agent_mail_summary",
+          "oversight_summary",
+          "unscreened_mail",
+          "agent_mail_policy_get",
+          "mailbox_access",
+          "mailbox_access_log",
+          "find_aliases",
+          "mailbox_health",
+          "find_templates",
+          "find_identities",
+          "my_notifications",
+          "notice_status",
+          "find_members",
+          "find_departments",
+          "records_search"
+        ],
+        "Activity MCP": [
+          "mailbox_trail",
+          "review_trail",
+          "member_activity",
+          "record_history",
+          "agent_activity",
+          "activity_search",
+          "recent_activity"
+        ],
+        "Actions MCP": [
+          "mail_draft_save",
+          "mail_send",
+          "mail_reply",
+          "mail_forward",
+          "mail_archive",
+          "mail_move",
+          "mail_flag",
+          "mail_mark_read",
+          "mail_label",
+          "mail_trash",
+          "mail_spam",
+          "mail_snooze",
+          "mail_mute",
+          "mail_delete_forever",
+          "mail_trash_empty",
+          "mail_folder_delete"
+        ]
+      },
+      "skills": [
+        "skills/mail-basics",
+        "skills/writing-business-mail",
+        "skills/overseeing-agent-mail",
+        "skills/triage-an-inbox",
+        "skills/reply-in-a-conversation",
+        "skills/find-a-document-in-mail",
+        "skills/prepare-a-mailbox-for-a-new-hire",
+        "skills/explain-a-held-message"
+      ]
+    },
+    {
+      "key": "clerk",
+      "name": "Mail Clerk",
+      "job_description": "os/clerk.md",
+      "access_capability": "write",
+      "hired_on_install": true,
+      "roles": [
+        "user"
+      ],
+      "tool_grants": {
+        "Records MCP": [
+          "find_mailboxes",
+          "find_threads",
+          "find_labels",
+          "review_queue",
+          "review_get",
+          "oversight_summary",
+          "agent_mail_summary",
+          "agent_mail_policy_get",
+          "unscreened_mail",
+          "mailbox_health"
+        ],
+        "Activity MCP": [
+          "review_trail",
+          "agent_activity"
+        ],
+        "Actions MCP": [
+          "mail_label",
+          "mail_mute"
+        ]
+      },
+      "skills": [
+        "skills/mail-basics",
+        "skills/overseeing-agent-mail",
+        "skills/explain-a-held-message"
+      ],
+      "duty": {
+        "name": "The overseers' morning note",
+        "schedule_cron": "10 7 * * 1-5",
+        "instructions": "Weekdays at 07:10: for the agent mailboxes you hold triage on, read review_queue (held mail older than a day), unscreened_mail, mailbox_health (near quota, failing to sync) and oversight_summary, and write ONE short note per overseer covering only their mailboxes: counts first, then at most five items with links. Ids, counts, addresses and subjects of agent mailboxes only — never a body. Propose, never decide: you approve, reject, release, mark known, pause or change a policy for nobody."
+      }
+    }
+  ],
+  "approvals": [
+    {
+      "action": "mail_folder_delete",
+      "category": "deletion"
+    },
+    {
+      "action": "mail_delete_forever",
+      "category": "deletion"
+    },
+    {
+      "action": "mail_trash_empty",
+      "category": "deletion"
+    }
+  ]
+}

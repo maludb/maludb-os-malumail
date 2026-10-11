@@ -1,0 +1,71 @@
+{
+  "schema": "maludb-os.registry/1",
+  "app_key": "malumail",
+  "name": "MaluMail",
+  "note": "The installer (bin/app_install.php, step 'registry') writes mcp/registries/malumail.json in the kernel from this file's `resolve` block plus mcp/action_registry.json (Phase 1). Each resolve tool answers a plain LIST of rows carrying id_field and label_field when given `q` alone (design §8; docs/malumail-mcp-tool-surface.md, 'The resolvers', Phase 1 — which confirms these parameter names). A mailbox resolves by its address or display name among the mailboxes the caller may open; a folder and a label only within the mailbox the call names; a thread by its subject within that mailbox. A message is never resolved by name: an agent finds it with mail_search and passes its id.",
+  "resolve": {
+    "mailbox": {
+      "tool": "find_mailboxes",
+      "query_param": "q",
+      "id_field": "mailbox_id",
+      "label_field": "address",
+      "params": ["mailbox"]
+    },
+    "folder": {
+      "tool": "find_folders",
+      "query_param": "q",
+      "id_field": "folder_id",
+      "label_field": "name",
+      "params": ["folder", "to_folder"]
+    },
+    "label": {
+      "tool": "find_labels",
+      "query_param": "q",
+      "id_field": "label_id",
+      "label_field": "label",
+      "params": ["label"]
+    },
+    "thread": {
+      "tool": "find_threads",
+      "query_param": "q",
+      "id_field": "thread_id",
+      "label_field": "subject",
+      "params": ["thread"]
+    },
+    "correspondent": {
+      "tool": "find_correspondents",
+      "query_param": "q",
+      "id_field": "address",
+      "label_field": "name",
+      "params": ["correspondent"]
+    },
+    "template": {
+      "tool": "find_templates",
+      "query_param": "q",
+      "id_field": "template_id",
+      "label_field": "name",
+      "params": ["template"]
+    },
+    "identity": {
+      "tool": "find_identities",
+      "query_param": "q",
+      "id_field": "identity_id",
+      "label_field": "address",
+      "params": ["identity"]
+    },
+    "member": {
+      "tool": "find_members",
+      "query_param": "q",
+      "id_field": "member_id",
+      "label_field": "display_name",
+      "params": ["member", "person", "agent", "owner"]
+    },
+    "department": {
+      "tool": "find_departments",
+      "query_param": "q",
+      "id_field": "department_id",
+      "label_field": "name",
+      "params": ["department"]
+    }
+  }
+}

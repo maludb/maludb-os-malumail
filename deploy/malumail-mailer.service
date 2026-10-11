@@ -1,0 +1,63 @@
+# The MAIL SERVICE (design §6.1): the only process that holds an open mailbox credential and the MaluMail customer key, and the only one
+# that speaks IMAP and SMTP. It listens on 127.0.0.1:{{ML_MAILER_PORT}} (never proxied); PHP and the records MCP call it with requests
+# HMAC-signed by ML_MAILER_KEY naming the acting member and their level. It writes the index as malumail_rw (D1's three roles).
+#
+# NOT BUILT YET: services/mailer/ is written after the mail spike (§10.1) — Phase 0's skeleton with the fake Mailbox MCP and the IMAP/SMTP
+# fixture, then slice 2. Until server.py exists, ConditionPathExists skips this unit cleanly (no crash loop), and the health check says
+# "mailer: down".
+#
+# Two environment files, read by systemd (as root) before the user changes: the application's config/.env (the database login, the ports,
+# MaluMail's hosts, ML_MAILER_KEY) and /etc/malumail/mailer.env — 0400, owned by malumail-mailer, written by deploy/ROOT_STEPS.sh — with
+# the sealing SECRET key (ML_SEAL_SECRET_KEY) and the customer key (MALUMAIL_MAILBOX_API_KEY). The second file wins where both name a key.
+# Neither secret is ever in config/.env, which the web server's user reads.
+#
+# It reaches outward — MaluMail's IMAP (993), submission (587) and the Mailbox MCP (443) — and PostgreSQL on loopback, so it carries no IP
+# filter; the sandbox below is the rest. It reads draft attachments from the application's storage/ by group malumail-mailer (the
+# directory is setgid; ROOT_STEPS.sh step 4) and writes nothing on disk.
+[Unit]
+Description=MaluMail mail service — sync, fetch, mutate, the outbox and administration over IMAP, SMTP and the Mailbox MCP (loopback :{{ML_MAILER_PORT}})
+After=network-online.target postgresql.service
+Wants=network-online.target
+ConditionPathExists={{APP_DIR}}/services/mailer/server.py
+ConditionPathExists=/etc/malumail/mailer.env
+
+[Service]
+Type=simple
+User=malumail-mailer
+Group=malumail-mailer
+WorkingDirectory={{APP_DIR}}
+EnvironmentFile={{APP_DIR}}/config/.env
+EnvironmentFile=/etc/malumail/mailer.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart={{APP_DIR}}/mcp/venv/bin/python -I {{APP_DIR}}/services/mailer/server.py
+Restart=on-failure
+RestartSec=5
+UMask=0077
+# one long-lived IMAP connection per mailbox plus a pool of at most three per mailbox for fetches (design §6.1)
+TasksMax=1024
+MemoryMax=1024M
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadOnlyPaths={{APP_DIR}}
+
+[Install]
+WantedBy=multi-user.target

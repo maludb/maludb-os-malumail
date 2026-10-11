@@ -1,0 +1,23 @@
+# The IMAGE DOOR's listening socket (design §6.4 layer 3). systemd holds it on 127.0.0.1:{{ML_IMAGES_PORT}} and passes it to
+# malumail-images.service (socket activation, Accept=no: the door receives the listening socket as fd 3 — LISTEN_FDS — and accepts on it).
+#
+# WHY A SOCKET UNIT: the door must be reachable from PHP on loopback yet must never DIAL loopback or any private range. systemd's
+# IPAddressAllow=/IPAddressDeny= filter both directions by address only (ingress by source, egress by destination; no ports), so one unit
+# cannot both answer 127.0.0.1 and refuse to dial it. systemd.resource-control(5): "the IP access list configured for the service is not
+# applied to any sockets passed into the service via socket activation" — so THIS unit's list (loopback only) governs the listening socket
+# and the connections accepted on it, and the SERVICE's list (private ranges denied) governs every connection the door opens itself.
+# Proven at slice 3 (the door built): a request for http://127.0.0.1:5432/ or a name resolving to 10.x is refused by the door's own check
+# AND, with that check disabled in a test build, by the kernel.
+[Unit]
+Description=MaluMail image door — listening socket (loopback :{{ML_IMAGES_PORT}})
+ConditionPathExists={{APP_DIR}}/services/images/door.py
+
+[Socket]
+ListenStream=127.0.0.1:{{ML_IMAGES_PORT}}
+Accept=no
+NoDelay=yes
+IPAddressDeny=any
+IPAddressAllow=localhost
+
+[Install]
+WantedBy=sockets.target

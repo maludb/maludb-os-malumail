@@ -1,0 +1,10 @@
+[Unit]
+Description=MaluMail worker — one pass: the index's catch-up checks, agents' mail turns (dispatches), held mail expiring, snoozes waking, break-glass rows expiring, the notification outbox, the Mail Clerk's inputs, key-usage pruning (design §6.5)
+After=network.target postgresql.service
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+WorkingDirectory={{APP_DIR}}
+ExecStart=/usr/bin/php {{APP_DIR}}/bin/worker.php

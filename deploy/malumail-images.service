@@ -1,0 +1,64 @@
+# The IMAGE DOOR (design §6.4 layer 3): fetches a remote image of a message for a person who asked ("Show images"), and nothing else. Its
+# own user, no credentials, no environment file (it never reads config/.env), no database. The door's own rules: resolve a name once and
+# pin the address; only ipaddress.is_global addresses, http or https on 80 and 443; at most three redirects, each re-checked; proxy
+# variables ignored; no cookies, no referrer; size and type limited.
+#
+# NOT BUILT YET: services/images/door.py is slice 3's (reading). Until it exists, ConditionPathExists skips this unit and its socket.
+#
+# The kernel's layer under the door's own check (the socket unit says why it is a pair): every private, loopback, link-local, shared,
+# documentation, multicast and reserved range is denied for the connections the door OPENS. The one exception is 127.0.0.53, the host's
+# stub resolver (systemd-resolved): the door resolves names through it. A host whose /etc/resolv.conf names another resolver adds that
+# address to IPAddressAllow= here — a private resolver address is then reachable on port 53 only by what the door's code dials (it dials
+# 80 and 443 to global addresses alone).
+[Unit]
+Description=MaluMail image door — remote images on request, global addresses only (socket-activated, loopback :{{ML_IMAGES_PORT}})
+Requires=malumail-images.socket
+After=malumail-images.socket network-online.target
+Wants=network-online.target
+ConditionPathExists={{APP_DIR}}/services/images/door.py
+
+[Service]
+Type=simple
+User=malumail-images
+Group=malumail-images
+Sockets=malumail-images.socket
+WorkingDirectory={{APP_DIR}}
+Environment=PYTHONUNBUFFERED=1
+UnsetEnvironment=http_proxy https_proxy HTTP_PROXY HTTPS_PROXY all_proxy ALL_PROXY no_proxy NO_PROXY
+ExecStart={{APP_DIR}}/mcp/venv/bin/python -I {{APP_DIR}}/services/images/door.py
+Restart=on-failure
+RestartSec=3
+UMask=0077
+MemoryMax=256M
+TasksMax=64
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadOnlyPaths={{APP_DIR}}
+InaccessiblePaths=-{{APP_DIR}}/config -{{APP_DIR}}/storage -/etc/malumail
+# Egress: never loopback (but the stub resolver), never a private, shared, link-local, documentation, benchmark, multicast or reserved range.
+IPAddressAllow=127.0.0.53/32
+IPAddressDeny=localhost link-local multicast
+IPAddressDeny=0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 172.16.0.0/12 192.0.0.0/24 192.0.2.0/24 192.88.99.0/24 192.168.0.0/16 198.18.0.0/15 198.51.100.0/24 203.0.113.0/24 240.0.0.0/4
+IPAddressDeny=::/128 ::ffff:0:0/96 64:ff9b::/96 100::/64 2001:db8::/32 fc00::/7 fe80::/10
+
+[Install]
+WantedBy=multi-user.target
