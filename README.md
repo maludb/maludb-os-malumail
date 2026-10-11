@@ -12,12 +12,15 @@ and reviews.
 recommended. MaluMail's platform, the estate and the field are surveyed. The kernel's catalog row (K43) and **the kit** are built
 (2026-10-11): sign-on, the directory mirror, the two roles, the settings, the activity funnel, tokens, the worker and the ingest
 bridge, proven without a kernel by `tests/phase0/run.sh`. **The schema** (db/006–011: mailboxes and the wall, the message index
-and search, the outbox, people's review of agents' mail, the dispatch rule) is proven by `db/proof/phase0_proof.sql` — **230
+and search, the outbox, people's review of agents' mail, the dispatch rule) is proven by `db/proof/phase0_proof.sql` — **232
 checks** — and the packaging (`maludb-os.json`, the two agents, eight skills, `deploy/`) reads clean in the installer's plan. No
 screens yet.
 
-Next: MaluMail's MM2 (agreed with MaluMail's infrastructure side, design §12) and two test mailboxes → the mail spike's IMAP/SMTP
-half → the mail service's skeleton → Phase 1 for the owner's approval.
+The mail spike has been run. Its IMAP/SMTP half synced 5,000 messages in about 10 s against two test mailboxes. Its sanitiser half
+is `services/mailer/sanitise.py`, proven by `tests/sanitiser/run.sh` against DOMPurify's 223 test cases in headless Chromium:
+nothing runs after it, and nothing runs behind the body's CSP and sandbox either.
+
+Next: the mail service's skeleton → Phase 1 for the owner's approval.
 
 ## Documents
 

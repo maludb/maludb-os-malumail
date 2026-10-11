@@ -47,13 +47,15 @@ agents' email; super-admins create mailboxes and forwarding accounts through the
   owner is break-glass; department rows admit people, never agents; `view` never changes a mailbox and every fetch is a `PEEK`;
   every view by anyone but the owner (lists, conversations, files, MCP and K7 reads) is in the mailbox's access log; an intake
   mailbox (the kernel's, Help Desk's, the CRM's) is never marked `\Seen` and its INBOX is never moved by this application.
-- **Agents' mail is governed, and agents never decide**: every agent `message_send` passes `ml_outbound_hold_reasons()`; held mail
+- **Agents' mail is governed, and agents never decide**: every agent `mail_send` (and reply, forward) passes `ml_outbound_hold_reasons()`; held mail
   waits for people (the agent mailbox's overseers, or the person whose mailbox an agent wrote from); review decisions, releases,
   pauses, policies, grants and all administration are refused to agents in SQL and the manifest; arriving mail reaches an agent
   only as fenced extracted text by id in one chat turn, only if DMARC-authenticated and admitted by its policy (internal-looking
   mail counts only if this application sent it, until MM3). Never loosen a default to make a test pass.
-- **HTML mail is hostile**: sanitised by allow-list in the mail service, served on its own sandboxed response, framed without
-  scripts, remote images only on request through the image door.
+- **HTML mail is hostile**: sanitised by allow-list in the mail service (`services/mailer/sanitise.py`), served on its own
+  sandboxed response, framed without scripts, remote images only on request through the image door. Never widen an allow-list
+  (a tag, an attribute, a CSS property, a URL scheme) without re-running `tests/sanitiser/run.sh`, and never make it pass by
+  editing the corpus.
 - **The activity log records what people and agents do, never what mail says** (subject excerpts only for agent and shared
   mailboxes; nothing of a person's mailbox's content in the tenant's memory).
 - **This repository is public.** No credential, credential location, internal address, privileged account name or detail of
@@ -78,7 +80,7 @@ customer key nor the sealing secret** — the proof checks it.
   `/tmp/ml-dev0.env` (+ the mail service's stand-in `/tmp/ml-dev0-mailer.env` with a scratch sealing pair).
 - `bash tests/phase0/run.sh` — the kit without a kernel, the schema proof included: **101 checks** (2026-10-11), ports 9201–9203
   (`ML_MIGRATIONS_UPTO=005` for the kit alone: 100).
-- `bash tests/phase0/schema.sh` — the schema proof alone on a fresh `ml_proof`: `db/proof/phase0_proof.sql`, **230 checks**
+- `bash tests/phase0/schema.sh` — the schema proof alone on a fresh `ml_proof`: `db/proof/phase0_proof.sql`, **232 checks**
   (2026-10-11). A check that ACTS and then READS splits into two statements: a stable function sees the statement's snapshot.
 
 ## The schema (Phase 0, 2026-10-11) — design §16 "Phase 0 continued" for the decisions
@@ -92,6 +94,15 @@ customer key nor the sealing secret** — the proof checks it.
   `mailbox_create`, `settings_save` are other tools there.
 - `maludb-os.json`, `os/`, `skills/`, `deploy/` (Phase 0's packaging): `php /var/www/bin/app_install.php plan /srv/apps/malumail`
   reads clean (35 steps, 7 notes).
+
+## The sanitiser (2026-10-11) — `research/04` §A, design §16
+- `services/mailer/sanitise.py` is the mail service's first module and design §6.4's first layer: nh3 0.3.7 (pinned in
+  `mcp/requirements.txt`) with our attribute filter, our pass, then nh3 again until the output is a fixed point. It returns the
+  HTML plus what it removed: hidden elements, remote images (their URLs in order), pixels and Content-IDs.
+- `tests/sanitiser/run.sh` runs **50 checks** in about five minutes with no network and no database. It needs `mcp/venv` built
+  from `mcp/requirements.txt`, plus the kernel's Playwright.
+- The attack corpus is DOMPurify 3.4.16's, the owner's choice. It is copied unchanged with its licence and `SOURCE.md`, read as
+  data and never executed. To update it, replace both files from a newer release at least two weeks old.
 
 ## Numbers
 Ports `APP_INTERNAL_PORT=8199`, `MCP_RECORDS_PORT=8852`, `MCP_ACTIVITY_PORT=8853`, `ML_MAILER_PORT=8854`, `ML_IMAGES_PORT=8855`;

@@ -1274,5 +1274,24 @@ questions in one sitting and changed none:
   record (or, with MM3, by `local_submission`) and asks DMARC of outside mail only (`db/010`); the rebuild of conversations is set-based
   at the end (16.7 s → 3.5 s for 5,000). The proof: 232 checks. Both test mailboxes are empty again.
 
-  **NEXT:** the owner — the sanitiser corpus's source (K55 applied 2026-10-11) → the mail service's skeleton with the fake Mailbox MCP and the
-  IMAP/SMTP fixture → Phase 1 for the owner's approval. **People's existing mailboxes wait on MM1.**
+- **2026-10-11, the spike's sanitiser half RUN** (`research/04` §A). The owner chose the attack corpus: **DOMPurify's test suite**
+  — 3.4.16's 223 cases, copied unchanged under Apache-2.0 into `tests/sanitiser/corpus/dompurify/` and read as data.
+  - The sanitiser is the mail service's first module, `services/mailer/sanitise.py` (nh3 0.3.7, pinned). It makes three passes:
+    nh3 with our attribute filter, our pass for hidden content and images, and nh3 again to a fixed point.
+  - `tests/sanitiser/run.sh` runs **50 checks**:
+    - **unprotected:** 38 raw payloads run script in an unprotected page;
+    - **after the sanitiser:** none of the 228 bodies compiles a script, makes a stray request or builds a DOM outside the
+      allow-lists, by Chromium's own parser;
+    - **behind §6.4's exact CSP in the sandboxed frame:** no raw payload's script runs.
+  - It takes 16 ms at 20 kB, 162 ms at 200 kB and about 1.5 s at 2 MB.
+  - Decided while building (each in line with §6.4):
+    - a raster `data:` image is shown, in an image only, never a link;
+    - `<style>` goes with its content, and so do `svg`, `math`, `noscript`, `template`, `textarea` and `select`;
+    - "hidden" is defined as `research/04` §A lists, and includes a colour equal to its background;
+    - a tracking pixel is a remote image of 2 px or less, dropped even when images are asked for.
+  - The reading slice owes:
+    - the `reading-and-rendering` spec naming these rules;
+    - a part door that answers only signed URLs (one payload's same-origin image passed the policy's `img-src 'self'`).
+
+  **NEXT:** the mail service's skeleton with the fake Mailbox MCP and the IMAP/SMTP fixture → Phase 1 for the owner's approval.
+  **People's existing mailboxes wait on MM1.**

@@ -4,7 +4,7 @@ The spike proves the estate's first IMAP/SMTP client and the first sanitiser of 
 path are specified. It runs from this server, in a scratch directory outside the repository, on MaluMail's scratch ports 9201–9207;
 its code is deleted afterwards and its results land here and in the `mail-service` and `reading-and-rendering` specs.
 
-## A. The sanitiser, on this server (2026-10-11) — partly run
+## A. The sanitiser, on this server (2026-10-11) — run
 
 **Confirmed:**
 
@@ -19,14 +19,88 @@ its code is deleted afterwards and its results land here and in the `mail-servic
   second and third layers — the sandboxed, opaque-origin frame and the image door — can be proven in a real browser: a rendered body
   that makes any network request, opens a dialog, writes to the console or navigates fails.
 
-**Not run:** the hostile-mail corpus and its browser proof, and the timings at 20 kB / 200 kB / 2 MB. Writing the corpus's attack
-examples was stopped by a safety check and was not worked around. **The owner decides how the attack testing is sourced.** The
-recommendation: slice 3's proof (reading — the second exemplar) uses **a published sanitiser test suite the owner approves**, taken
-as data under its own licence, alongside a benign corpus of ordinary business mail (tables, inline styles, a newsletter, an
-Outlook-style reply with quoted history, a long message generated at test time). The `reading-and-rendering` spec names the attack
-families the suite must cover — script and event attributes, dangerous URL schemes, CSS that loads or executes, embedded documents
-and SVG, form and base elements, parser-differential (mXSS) cases, hidden text and tracking pixels — without carrying payloads of
-its own.
+**First not run, then run the same day.** Writing the corpus's attack examples was stopped by a safety check and was not worked
+around; the owner chose the source: **DOMPurify's own test suite** (2026-10-11, "Yes"). Release 3.4.16 (2026-09-23),
+`test/fixtures/expect.mjs` — 223 cases — and its licence are copied unchanged into `tests/sanitiser/corpus/dompurify/` and taken
+under Apache-2.0 (DOMPurify is MPL-2.0 OR Apache-2.0; `SOURCE.md` there gives the tag, the commit and both files' sha256). The file
+is read as data, never executed. DOMPurify's `expected` outputs are not compared — they follow its own, wider allow-list.
+
+**The sanitiser is kept, not thrown away with the spike:** `services/mailer/sanitise.py` is the mail service's first module
+(nh3 0.3.7, pinned in `mcp/requirements.txt`). Three passes:
+
+1. nh3 with the allow-lists. Our attribute filter decides every attribute:
+   - URLs by attribute: a link may be http, https or mailto; an image may be cid, http, https or a raster data URI;
+   - CSS by property and by value. **nh3's own style filter checks names only, so `background:url(…)` passes it**;
+   - an element that hides itself is marked.
+2. Our pass over nh3's output:
+   - hidden elements are removed and counted;
+   - `cid:` images are sent to the part door;
+   - remote images become what the caller says (the placeholder, or the image door once asked);
+   - pixels of 2 px or less are dropped.
+3. nh3 again, admitting only the image URLs pass 2 wrote, repeated until the output is a **fixed point**.
+
+**Results** (`tests/sanitiser/run.sh`, 50 checks, about five minutes):
+
+- **Static (40 checks).** All 223 cases sanitise. An independent walk of every output finds only allowed elements, attributes,
+  link schemes, image sources and CSS. Every output is a fixed point: none fell back to text. The corpus covers every family the
+  reading spec must name:
+
+  | Family | Cases |
+  |---|---|
+  | script elements | 29 |
+  | event attributes | 77 |
+  | dangerous URL schemes | 39 |
+  | CSS that loads or executes | 29 |
+  | embedded documents | 18 |
+  | SVG | 43 |
+  | MathML | 14 |
+  | forms | 41 |
+  | base and meta | 4 |
+  | parser differentials (noscript, template, style, CDATA, comments) | 51 |
+
+  Hidden text and tracking pixels are covered by the benign corpus, which is ours: an invoice, a newsletter, an Outlook reply, a
+  Gmail thread and an inline image. What a person should see survives: tables, colours, the button, the quoted history and the
+  11 px footer. What should go goes: the newsletter's hidden preheader (counted), its `<style>` block, the 1×1 pixel and Word's
+  `o:p` and `mso-` debris. Remote images are listed in order behind placeholders, and the `cid:` logo goes through the part door.
+- **Headless Chromium (10 checks).** Every request is answered by a route on a made-up origin, so nothing reached the network.
+  - **The control:** 38 of the 223 raw payloads run script in an unprotected page, detected by DevTools' `Debugger.scriptParsed`
+    or a dialog. The corpus is live and the detector sees it.
+  - **The sanitiser's output, with no CSP or sandbox to help:** no script compiled in any of the 228 bodies. There was no dialog,
+    no request except the page and the image URLs the sanitiser wrote, no navigation and no popup. The DOM Chromium's own parser
+    builds holds only allowed elements and attributes, with nothing positioned and nothing loading through CSS. The walk's control
+    shows it catches a foreign element, a stray attribute, a fixed position and a link scheme.
+  - **The raw payloads behind design §6.4's exact Content-Security-Policy, in `<iframe sandbox>` without `allow-same-origin`:** no
+    payload's script ran in any of the 223. A nonce'd hook turns `alert`/`confirm`/`prompt`/`print` into a message to the parent,
+    and a nonce'd control proves the hook reports. Nothing loaded from another origin. The policy reported a refusal in 57. The
+    nonce'd height script ran in 213; a payload that swallows the rest of its document stops it.
+  - **One same-origin image request** passed the policy (`img-src 'self'`). The sanitiser removes those; the reading slice's part
+    door must answer only signed URLs.
+- **Timings** (medians on this VM):
+
+  | Size | Time |
+  |---|---|
+  | 20 kB | 16 ms |
+  | 200 kB | 162 ms |
+  | 2 MB | 1.4–1.8 s |
+
+  At 2 MB the time splits roughly evenly across the passes: nh3 ~0.6 s, our pass ~0.7 s, the final pass ~0.5 s (twice, to confirm
+  the fixed point). That is the mail service's work as a message is indexed, never a person's wait.
+
+**Decided while building** (design §16):
+
+- A raster `data:` image is shown as it came, in an image only, never a link. The body's CSP already admits `data:` images.
+- `<style>` elements go with their content: a newsletter keeps its inline styles and loses its stylesheet. `svg`, `math`,
+  `noscript`, `template`, `textarea` and `select` also go with their content.
+- **Hidden** means any of these:
+  - `display:none`;
+  - `visibility:hidden` or `collapse`;
+  - `mso-hide:all`;
+  - opacity under 0.1;
+  - a font size of 0 or under 2 px;
+  - a zero height, width or line-height clipped by `overflow:hidden`;
+  - a colour equal to its background;
+  - the `hidden` attribute.
+- **A tracking pixel** is a remote image of 2 px or less in either dimension. It is dropped even when a person asks for images.
 
 ## B. The IMAP/SMTP half, run 2026-10-11 against two test mailboxes
 
