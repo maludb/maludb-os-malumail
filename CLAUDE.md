@@ -60,11 +60,27 @@ agents' email; super-admins create mailboxes and forwarding accounts through the
   MaluMail's abuse protection is ever written here; those stay in the owner's handoff.
 - Checkpoint gate: no feature PHP until the owner approves the schema, the MCP tool surface and the action manifest together.
 - Commit each finished step on `main` in the repository's message style; never push unless the owner says so.
-- The user runs every `sudo` command; ask for them. Changes on MaluMail's production hosts are the infrastructure side's — write
-  the request (§12's MM rows), never make them.
+- The user runs every `sudo` command; ask for them — except `sudo -n -u postgres` for **scratch `ml_*` databases and the three
+  `malumail_*` roles** (the proofs), as Boards has it; used 2026-10-11 for K43 and the kit's proof under the owner's "go ahead with
+  K43 and the kit" — **the owner to confirm it as standing**. Changes on MaluMail's production hosts are the infrastructure side's
+  — write the request (§12's MM rows), never make them.
+
+## The kit (Phase 0, built 2026-10-11) and its proof
+The kit is Boards' Phase 0 kit (itself the Data Lake's) with its later fixes, renamed `bd_` → `ml_` and fitted: `db/001`–`005`
+(identity mirror, activity log with `mailbox_id`, tokens, **two roles with `ml_rights.held_by`** — `people` for oversight,
+`super_admins` for every admin right (D2) —, `ml_settings` from design §6.5), `app/` (sign-on, the mirror, the gates —
+`require_admin()` and `require_right()` say *why* through `ml_right_refusal()` —, handlers, the activity funnel, notification mail
+only), `bin/` (the directory sync, the worker with MaluMail's eight passes as stubs naming their slice, the registry builder for
+`docs/malumail-action-manifest.md`), `html/` (`/sso`, `/sso/logout`, `/logout.php`, health, the Phase 0 home), `mcp/` (the read
+servers' base and the ingest bridge), `tests/`. **PHP never calls the Mailbox MCP, takes no webhook, and holds neither the
+customer key nor the sealing secret** — the proof checks it.
+- `bash tests/setup_dev.sh` — the scratch database `ml_dev0` (`ML_MIGRATIONS_UPTO=005` for the kit alone) and its environment in
+  `/tmp/ml-dev0.env` (+ the mail service's stand-in `/tmp/ml-dev0-mailer.env` with a scratch sealing pair).
+- `ML_MIGRATIONS_UPTO=005 bash tests/phase0/run.sh` — the kit without a kernel: **100 checks** (2026-10-11), ports 9201–9203.
+- The schema proof (`db/proof/phase0_proof.sql`, `tests/phase0/schema.sh`) comes with db/006+ after the mail spike.
 
 ## Numbers
 Ports `APP_INTERNAL_PORT=8199`, `MCP_RECORDS_PORT=8852`, `MCP_ACTIVITY_PORT=8853`, `ML_MAILER_PORT=8854`, `ML_IMAGES_PORT=8855`;
-scratch 9201–9207;
-prefix `ml_`; scratch databases `ml_*`. Kernel items K43 (the catalog row, db/181), K44 (the overseer link in the feed), K45 (the
+scratch 9201 (the app), 9202 (the fake kernel), 9203 (the fake MaluDB + MaluMail REST), 9204–9205 (the MCP servers), 9206 (the
+mail service), 9207 (the image door); prefix `ml_`; scratch databases `ml_*`. Kernel items K43 (the catalog row, db/181 — **built and applied 2026-10-11**), K44 (the overseer link in the feed), K45 (the
 kernel's intake independent of `\Seen`), K46 (the kernel's agent sends through this application's outbox). MaluMail items take the prefix **MM** (MaluDB's and MaluMail's old M numbers collide).

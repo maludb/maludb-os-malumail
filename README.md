@@ -8,11 +8,13 @@ and reviews.
 
 ## Status
 
-**Planning (Phase 0).** The design was written 2026-10-10 and **approved by the owner 2026-10-11** — every decision
-(D1–D16) as recommended. MaluMail's platform, the estate and the field are surveyed. No schema and no screens yet.
+**Phase 0.** The design was written 2026-10-10 and **approved by the owner 2026-10-11** — every decision (D1–D16) as
+recommended. MaluMail's platform, the estate and the field are surveyed. The kernel's catalog row (K43) and **the kit** are built
+(2026-10-11): sign-on, the directory mirror, the two roles, the settings, the activity funnel, tokens, the worker and the ingest
+bridge, proven without a kernel by `tests/phase0/run.sh` (100 checks). No mail schema and no screens yet.
 
-Next: MaluMail's MM2 (agreed with MaluMail's infrastructure side, design §12) and two test mailboxes → the mail spike →
-the kernel's catalog row (K43) → the rest of Phase 0.
+Next: MaluMail's MM2 (agreed with MaluMail's infrastructure side, design §12) and two test mailboxes → the mail spike → the
+schema (db/006+) and the rest of Phase 0.
 
 ## Documents
 

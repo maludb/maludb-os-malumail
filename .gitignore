@@ -1,0 +1,11 @@
+config/.env
+config/local.php
+mcp/.venv/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+storage/
+mcp/venv/
+var/
+*.swp

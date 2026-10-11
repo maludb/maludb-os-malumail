@@ -795,7 +795,7 @@ mail. It covers research R47 without a separate `mail_events` table.
 | `members`, `departments`, `department_members`, `sso_nonces`, `member_sessions`, `directory_sync_state` | **reuse** | the Data Lake's kit `db/001` (with the mirror fix and the generated `is_agent`) |
 | `activity_log`, `activity_ingest_state` | **reuse** | `memory.md`; **appends** `mailbox_id` |
 | `mcp_access_tokens` | **reuse** | HR `db/003` |
-| `ml_rights`, `ml_roles`, `ml_role_rights`, `mcp_app_roles` | **reuse** (shape) | Consultant Tracking `db/004` (`ct_` → `ml_`) |
+| `ml_rights`, `ml_roles`, `ml_role_rights`, `mcp_app_roles` | **reuse** (shape) | Consultant Tracking `db/004` (`ct_` → `ml_`); `ml_rights` **appends** `held_by` (`anyone` / `people` / `super_admins` — oversight a person's, every admin right a super-admin's, D2) |
 | `ml_settings` | **reuse** (skeleton) | Help Desk `db/005` |
 | `mailboxes` | **reuse** | Help Desk `db/012`, the queue link loosened as the CRM did; **appends** §6.2's columns |
 | `outbound_email` | **reuse** | Help Desk `db/012` + Sales CRM `db/011`'s appended columns; `to_address` = the first recipient, `subject` may be empty; the CRM's `contact_id`/`deal_id` kept without references; **appends** §6.3's; `status` widened |
@@ -1068,7 +1068,7 @@ log, `mail_reviews` and the outbound rows (§6.6); R54's "AI may read" switch is
 
 | # | Item | State |
 |---|---|---|
-| **K43** | **Catalog entry `malumail`** (kind `ours`, the unnamed top area beside Google Workspace and Microsoft 365, category `email` — already admitted —, `feather-mail`); on request, not a default (D15) | owed: kernel `db/181`, after the owner's go |
+| **K43** | **Catalog entry `malumail`** (kind `ours`, the unnamed top area beside Google Workspace and Microsoft 365, category `email` — already admitted —, `feather-mail`); on request, not a default (D15) | **built and applied** — kernel `db/181` (1c3bfd5), 2026-10-11 |
 | **K44** | The directory feed and the claims carry an agent's `manager_member_id` and `principal_member_id`, so an agent mailbox's overseers default to its manager and an assistant's mailbox to its principal | owed; a Mail admin names overseers until then |
 | **K45** | The kernel's email intake keeps its own record of handled mail (by `Message-ID`) and never reads `\Seen` as "handled" | owed; D13's rule keeps the webmail from setting `\Seen` on the kernel's intake mailboxes meanwhile |
 | K38 | Run facts say who an agent's run acts for | **built** (8c9b6fa) |
@@ -1200,6 +1200,26 @@ questions in one sitting and changed none:
 - **2026-10-11.** **The design APPROVED** — the owner took every recommendation, D1–D16 and (a)–(c) (§15); MaluMail's MM
   rows go to the infrastructure side from the owner.
 
-  **NEXT:** MM2 and two test mailboxes (MaluMail's infrastructure side) → the mail spike (§10.1) → K43 (db/181) → Phase 0's
-  schema, kit, manifest, agents, skills and deploy → Phase 1 for the owner's approval. **People's existing mailboxes wait on
-  MM1.**
+- **2026-10-11, later.** At the owner's word ("go ahead with K43 and the kit"):
+  - **K43 built and applied** — kernel `db/181` (1c3bfd5): the `malumail` row, kind `ours`, the unnamed top area, `email`.
+  - **The kit built and proven** — Boards' Phase 0 kit with its later fixes (the five refusal codes plus 42501/22023, `one_row()`,
+    the flash's link, the message page's action), renamed and fitted: `db/001`–`005`, `app/`, `bin/`, `html/`, `mcp/`, `tests/`;
+    `tests/phase0/run.sh` **100 checks** without a kernel. Decisions taken in building it (none changes the design):
+    1. **Two roles, no read-only role** (D2): a grant the kernel has sent no roles for reads `write` as Mail user and `read` as
+       *no role* — a read grant never sends mail; the person is admitted by the kernel and told why the home refuses them.
+    2. **`ml_rights.held_by`** (appended): `people` for `mail.oversee` (§3: an agent never decides, whatever role it holds) and
+       `super_admins` for the six admin rights (D2: a non-super-admin given the Mail admin role is refused them, told why by
+       `ml_right_refusal()`). The schema's own functions (db/006+) refuse the same decisions again at the act.
+    3. **PHP never speaks to the Mailbox MCP and takes no webhook**: the kit's `malumail_mcp_call()` and webhook check were
+       removed; `app/mail.php` is notification mail through MaluMail's REST send only; the proof greps `app/`, `html/`, `bin/` for
+       the customer key, the sealing secret and `tools/call`.
+    4. **The mail service connects as `malumail_rw`** (D1's three roles; it writes the index).
+    5. `ml_settings` carries §6.5 with the D4–D10 defaults; a new notice text bumps its version by trigger.
+    6. The worker's eight passes are stubs naming their slice (`index_catch_up` 2, `dispatches`/`held_expiry` 5, `snoozes` 6,
+       `break_glass_expiry` 7, `notify_outbox`/`clerk_inputs` 9); `key_usage_prune` is real.
+    7. Health reports the mail service and the image door (`ok` / `down` / `unconfigured`) without failing on them.
+    8. The brand: an envelope on teal (`bin/make_brand_images.php`).
+
+  **NEXT:** MM2 and two test mailboxes (MaluMail's infrastructure side) → the mail spike (§10.1) → Phase 0's schema (db/006+ with
+  `db/proof/phase0_proof.sql`), the mail service's skeleton with the fake Mailbox MCP and the IMAP/SMTP fixture, the manifest,
+  agents, skills and deploy → Phase 1 for the owner's approval. **People's existing mailboxes wait on MM1.**
