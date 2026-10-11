@@ -1351,4 +1351,9 @@ questions in one sitting and changed none:
     - the Clerk's morning note is the worker's deterministic `digest`, not a model's duty.
   - **K56** is new (§12). **Three questions are for the owner**, each with a recommendation.
 
-  **NEXT:** the owner's approval of Phase 1 → Phase 2, the shell. **People's existing mailboxes wait on MM1.**
+- **2026-10-11, PHASE 1 APPROVED by the owner as written** ("Yes"): the four changes from the design (`phase1-consistency.md`
+  decisions 2, 5, 10, 16) and the three recommendations — the live proofs use a customer key the infrastructure side scopes to the
+  test domain (MM7, asked early); a partly refused agent message counts as sent for the conversation cap, only accepted recipients
+  becoming known; "reply to the agent" keeps the draft held.
+
+  **NEXT:** Phase 2, the shell (`docs/build-specs/sso-shell.md`). **People's existing mailboxes wait on MM1.**

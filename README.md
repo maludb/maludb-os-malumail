@@ -31,7 +31,7 @@ circuit breaker. `tests/mailer/run.sh` proves it with 62 checks against a fake M
 
 `tests/phase1/check_specs.sh` shows the documents agree, and `tests/phase0/schema.sh` passes 514 checks over db/001–015.
 
-Next: the owner's approval of Phase 1 → Phase 2.
+Phase 1 was approved by the owner as written on 2026-10-11. Next: Phase 2, the shell.
 
 ## Documents
 

@@ -1,4 +1,4 @@
-# MaluMail — Phase 1 consistency (2026-10-11)
+# MaluMail — Phase 1 consistency (2026-10-11 · APPROVED by the owner the same day)
 
 What Phase 1 decided beyond the approved design, what it changed in the shared documents, and what it leaves to the owner.
 `tests/phase1/check_specs.sh` proves the documents agree with each other: every screen and action of the registry claimed by exactly
@@ -81,7 +81,7 @@ Each spec's "Decisions taken here" holds the reasons; these are the ones that ch
 
 ## For the owner
 
-**Three questions** (each spec recommends an answer; Phase 3 builds the recommendation unless told otherwise):
+**Three questions** — **the owner took every recommendation (2026-10-11)**:
 1. **Which MaluMail customer key may the live proofs use?** Recommended: a key the infrastructure side scopes to `mboxtest.example`
    (MaluMail item MM7's domain-scoped key, asked early), kept in a mode-600 file outside the repositories (`domains-mailboxes.md`).
 2. **When an agent's message is partly refused** (some recipients `550`), does it count as sent? Recommended: yes for the

@@ -114,7 +114,7 @@ customer key nor the sealing secret** — the proof checks it.
   and `tests/fixtures/imap_server.py`; the service listens on 9206 and a second instance on 9207. **Never point a proof at
   MaluMail's real server with a wrong password**: the fixture exists so the breaker can be proven without that.
 
-## Phase 1 (2026-10-11, written — awaiting the owner's approval) — `docs/phase1-consistency.md`
+## Phase 1 (2026-10-11, APPROVED by the owner as written) — `docs/phase1-consistency.md`
 - `docs/malumail-mcp-tool-surface.md` (36 + 7 tools), `docs/malumail-action-manifest.md` (45 screens, 67 actions) →
   `php bin/build_action_registry.php` (`--check` in every proof); three build specs and eleven slice specs in `docs/build-specs/`.
 - `bash tests/phase1/check_specs.sh` — the documents agree (98 checks). `bash tests/phase0/schema.sh` — db/001–015 and every proof
