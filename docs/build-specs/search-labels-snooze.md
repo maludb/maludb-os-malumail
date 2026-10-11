@@ -70,19 +70,26 @@ Next week (Mon 08:00), Pick a date and time* in the person's time zone (`members
 
 ## Query functions and mail-service calls (signatures fixed)
 
-SQL (db/008, extended by db/012):
+SQL (db/008, extended by **`db/014_reading_search.sql`** — built, proven by `db/proof/phase1_reading.sql`):
 
-- `ml_search(p_q text, p_mailbox bigint DEFAULT NULL, p_limit integer DEFAULT 50, p_before timestamptz DEFAULT NULL)` — db/012 replaces
-  the offset with a cursor (`received_at < p_before`), and adds `is:snoozed`, `is:muted`, `has:label`/`has:nolabel` and a per-person
-  `is:unread`/`is:read` (for a `viewer_read` reader the person's `mail_viewer_reads`, not the server's `\Seen`).
-- `ml_search_unknown(p_q text) RETURNS text[]` — the operators the parser did not know.
+- **`ml_search(p_q text, p_mailbox bigint, p_limit integer, p_before timestamptz, p_before_id bigint DEFAULT NULL)`** — the cursor:
+  `(received_at, id) < (p_before, p_before_id)` (`received_at < p_before` without the tie-breaker); the first page passes
+  `NULL::timestamptz`. Every argument but the tie-breaker is required, so it is never ambiguous with **db/008's offset form,
+  `ml_search(p_q, p_mailbox DEFAULT NULL, p_limit DEFAULT 50, p_offset DEFAULT 0)`, kept** for its callers. Both run one body,
+  `ml_search_core()` (executable only through them). New terms: `is:snoozed`, `is:muted`, `has:label`, `has:nolabel`, and a
+  **per-person** `is:unread`/`is:read` for a `viewer_read` reader (their `mail_viewer_reads`; the mailbox's own Sent and Drafts are
+  never unread to anyone). Fixed on the way: a negated term is `NOT COALESCE(…, false)` — db/008's `-from:x` dropped every message
+  with no display name.
+- `ml_search_unknown(p_q text) RETURNS text[]` — the unknown operators (`foo:`) and unknown `is:`/`has:` values (`is:weird`) a query used.
 - `ml_label_apply(p_mailbox bigint, p_keys bigint[], p_tag bigint, p_by bigint, p_remove boolean) RETURNS integer` — level `triage`
   via `ml_mutation_refusal(…, 'label')`, the tag in the same mailbox; inserts or deletes `record_tags` for every key; answers the count.
 - `ml_label_save(p_mailbox bigint, p_tag bigint, p_name text, p_colour text, p_by bigint) RETURNS bigint` — create (p_tag NULL) or
-  update; the slug from the name (`lower`, spaces to `-`, `/` kept); unique per mailbox.
+  update; the slug from the name (`lower`, accents off, spaces to `-`, `/` kept); unique per mailbox; colour `#rrggbb`. An agent never
+  labels a conversation marked sensitive (`ml_label_apply` answers *no such message*).
 - `ml_label_delete(p_mailbox bigint, p_tag bigint, p_by bigint) RETURNS integer` — the conversations it was on.
 - `ml_template_save(p_template bigint, p_name text, p_subject text, p_body text, p_shared boolean, p_by bigint) RETURNS bigint` and
-  `ml_template_delete(p_template bigint, p_by bigint)` — the owner, or a Mail admin for a shared one; `ml_require_person(p_by)`.
+  `ml_template_delete(p_template bigint, p_by bigint)` — the owner, or a Mail admin for a shared one; `ml_require_person(p_by)`;
+  delete archives. They are read through db/012's `mcp_templates` (the caller's own and the shared ones).
 - `ml_thread_snooze()` and `ml_snoozes_due()` (db/010) as they are; `ml_thread_keys()` (slice 3).
 
 PHP:
@@ -96,7 +103,7 @@ absent and recorded `special_use = 'snoozed'`), `move` (unsnooze and the wake: S
 then `unseen` on the latest message), `folder_create`, `folder_rename`, `folder_delete` (refused unless the folder is empty).
 
 **The worker's `snooze_wake` pass** (every minute, `worker_passes`): `ml_snoozes_due()` → for each, the mail service's `mutate move`
-back and `unseen` on the latest message; a notice `snooze_back` to the person who snoozed it when they chose one (slice 9's kinds);
+back and `unseen` on the latest message; a notice of the existing kind `snooze_woke` to the person who snoozed it (slice 9's preferences decide whether it mails);
 **on an agent's mailbox, an `agent_dispatches` row** so the agent gets its follow-up turn (design §5 (b), §Changes).
 
 ## MCP tools this slice makes real
@@ -170,23 +177,9 @@ Saved searches; labels mirrored to IMAP keywords (Extended, §11); filters that 
 - **Manifest**: `mail_label` — `**thread[]**` becomes `thread[]` and it gains `matching` (as slice 3's bulk actions).
 - **The tool surface**: `mail_search` — `bad_query` only for a malformed date, period or size; the answer carries `unknown_operators`;
   the operator list gains `has:label`, `has:nolabel`, `is:muted`, `is:read`, `is:answered`, `bcc:`, `filename:`.
-- **db/012**:
-  ```sql
-  -- ml_search: p_offset → p_before timestamptz (the cursor); new terms
-  --   is:snoozed  → EXISTS (SELECT 1 FROM ml_thread_state(m.thread_id) s WHERE s.snoozed_until IS NOT NULL)
-  --   is:muted    → (SELECT s.muted FROM ml_thread_state(m.thread_id) s)
-  --   has:label / has:nolabel → [NOT] EXISTS (SELECT 1 FROM record_tags rt WHERE rt.record_type = 'mail_message' AND rt.record_id = m.message_key_id)
-  --   is:unread / is:read when ml_read_mode(m.mailbox_id, me, on_behalf) = 'viewer_read'
-  --       → [NOT] EXISTS (SELECT 1 FROM mail_viewer_reads r WHERE r.member_id = me AND r.message_key_id = m.message_key_id)
-  CREATE FUNCTION ml_search_unknown(p_q text) RETURNS text[] ...;  -- the ops ml_search falls back to words for
-  CREATE FUNCTION ml_label_apply(...), ml_label_save(...), ml_label_delete(...), ml_template_save(...), ml_template_delete(...);  -- as above
-  CREATE VIEW mcp_templates WITH (security_barrier = true) AS
-      SELECT t.id, t.name, t.subject, t.body, t.is_shared, t.owner_member_id, t.usage_count, t.updated_at FROM email_templates t
-       WHERE t.archived_at IS NULL AND (t.is_shared OR t.owner_member_id = app_current_member_id()) AND (SELECT ml_is_member_here());
-  ALTER TABLE agent_dispatches DROP CONSTRAINT agent_dispatches_kind_check,
-      ADD CONSTRAINT agent_dispatches_kind_check CHECK (kind IN ('mention', 'dm', 'duty_proposal', 'ask', 'mail', 'release', 'snooze'));
-  ```
-  (`mcp_templates` is the tool surface's own ask; the `snooze` dispatch kind is reconciled with sending-and-oversight.)
-- **Slice 9 (notifications)**: a notice kind `snooze_back` (off by default — a person may switch it on).
+- **`db/014_reading_search.sql`** — BUILT and proven (`db/proof/phase1_reading.sql`): the cursor form of `ml_search` beside the
+  offset form, the new terms, the negation fix, `ml_search_unknown()`, `ml_label_apply/_save/_delete()`,
+  `ml_template_save/_delete()`. db/012 already holds `mcp_templates` and the `snooze` dispatch kind; a wake's notice is the existing
+  `snooze_woke`.
 - **The IMAP fixture**: `CREATE`, `RENAME`, `DELETE` (deleting the folder's mail with it, as Dovecot does — the mail service refuses a
   non-empty folder before it asks).

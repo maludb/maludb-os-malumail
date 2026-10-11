@@ -22,7 +22,7 @@ PyNaCl (R62). It writes the index as `malumail_rw` and writes nothing on disk.
 |---|---|---|
 | `server.py` | `/health`; `POST /v1/admin/{tool}`; `POST /v1/mailboxes/{id}/probe`; the sync and outbox passes, empty | each call below in its slice |
 | `door.py` | `X-ML-Mailer: v1.<ts>.<nonce>.<hmac>`, 60 s, once | `on_behalf` read from the body (slice 2) |
-| `config.py` | the environment; `ML_DEV_ENV`; `ML_TLS_CA_FILE` refused in production | `ML_PART_KEY`, `ML_MAILER_MAX_CONNECTIONS` (slices 2–3) |
+| `config.py` | the environment; `ML_DEV_ENV`; `ML_TLS_CA_FILE` refused in production | `ML_PART_KEY` (3), `ML_MAILER_MAX_CONNECTIONS` (2) |
 | `store.py` | rights read for the named member; the breaker's writes; health counts | the index writes (2), mutations (3, 6), drafts (4) |
 | `seal.py` | sealed boxes (PyNaCl = PHP's `sodium_crypto_box_seal`) | — |
 | `mailbox_mcp.py` | the admin allow-list, the served-domain wall, passwords sealed on arrival, fail closed | — (slice 1 confirms MaluMail's `password` field on the test domain) |
@@ -50,13 +50,18 @@ by anyone without the key. **The service computes the caller's level itself**: `
 | `sync` | `/v1/mailboxes/{id}/sync` | `folder` (an id, optional), `full` (bool), `text` (bool: re-run the text pass) | `{queued: true}` — the watcher runs it | `settings.manage`, or `full` on the mailbox | 2 (Re-sync, Re-index: 10) |
 | `status` | `/v1/mailboxes/{id}/status` | — | §9's answer | `view` on it, or `settings.manage` | 2 (shown in 10) |
 | `status` (all) | `/v1/status` | — | `{mailboxes: [{mailbox_id, watcher, backoff_seconds, pool_connections, text_due}]}` — every mailbox the service knows, counts only | `settings.manage` | 10 |
-| `fetch` | `/v1/mailboxes/{id}/fetch` | `message` (a key id) or `ref` (`folder.uidvalidity.uid`), `what` (`body` · `headers` · `structure`), `images` (`ask` · `show`) | §4 | `view` | 3 |
+| `fetch` | `/v1/mailboxes/{id}/fetch` | `message` (a key id) or `ref` (`folder.uidvalidity.uid`), `form` (`html` · `text` · `headers`), `images` (`ask` · `show`), `profile` (`reading` · `compose`; default `reading`) | §4: the sanitiser's fields, the header summary, the part list | `view` | 3 (`profile=compose`: 4) |
 | `part` | `/v1/mailboxes/{id}/part` | `ref`, `part` (a section like `2` or `1.2`), `range` (`start-end`, optional) | the bytes, streamed, with `Content-Type`, `Content-Length` and the decoded size | `view` | 3 |
 | `raw` | `/v1/mailboxes/{id}/raw` | `ref` | the message's bytes, streamed | `view` | 3 |
+| `sanitise` | `/v1/sanitise` | `html`, `profile` (`compose` · `signature`) | `{html, text}` — the cleaned HTML and the text derived from it | `mail.use` | 4 |
+| `identity_check` | `/v1/mailboxes/{id}/identity_check` | `address` | `{delivers: bool}` — whether that alias delivers to this mailbox (`list_aliases` under the customer key; the alias list itself never returned) | `full` | 4 |
 | `mutate` | `/v1/mailboxes/{id}/mutate` | `op`, `messages` (key ids) or `threads` (ids), `to_folder` (an id), `name`, `parent` | `{done, count, moved: [{key, ref}], refused: [{key, why}]}` | `ml_mutation_refusal()` | 3, 6 |
-| `append_draft` | `/v1/mailboxes/{id}/append_draft` | `draft` (a `mail_drafts` id) | `{ref}` of the new version | `ml_mutation_refusal(…, 'draft')` | 4 |
-| `submit_now` | `/v1/outbox/{id}/submit_now` | — | see `sending-and-oversight.md` | that spec's | 4 |
+| `append_draft` | `/v1/mailboxes/{id}/append_draft` | `draft` (a `mail_drafts` id), `discard` (bool: the delete half alone — expunge the draft's current copy) | `{ref}` of the new version (none after a discard) | `ml_mutation_refusal(…, 'draft')` | 4 |
 | `quota` | `/v1/mailboxes/{id}/quota` | — | `{used_bytes, limit_bytes, read_at}` | `view` | 2 (shown in 10) |
+
+**Internal to the service, never door routes** (the outbox loop calls them; `sending-and-oversight.md` §5.2): `submit_now` (SMTP
+submission of one claimed row), `append_sent` (the Sent copy, with `Bcc`, `\Seen` and the submission time; then `filed_at`),
+`store_flags` (`+\Answered` on the message answered — never `\Seen`), and the startup's **crash search** (§7).
 
 A refusal answers as Phase 0's do, plus `409 moved` (a stale UIDVALIDITY or a message no longer where the request said: "this message
 moved"; the folder is queued for a re-read) and `423 intake` (`ml_mutation_refusal`'s intake sentence). A mailbox the caller may not
@@ -130,9 +135,13 @@ connection fails mid-stream; the PHP door turns it into a 502 for the browser.
   (uidvalidity modseq))` → `VANISHED (EARLIER)` rows deleted (their keys and the application's state stay), changed flags applied
   (one `UPDATE … FROM (VALUES …)`), new UIDs above the known `uidnext` fetched as §3.1's envelope pass. The selected INBOX takes the
   same path from the watcher's own untagged responses.
-- **A `UIDVALIDITY` change** deletes the folder's `mail_messages` rows and re-reads the folder as §3.1 does; labels, viewer reads,
+- **A `UIDVALIDITY` change** calls **`ml_folder_reset(folder, new_uidvalidity)`** (db/013: the folder's rows go, their keys stay) and
+  re-reads the folder as §3.1 does; labels, viewer reads,
   thread states, drafts' replies and dispatches find their messages again by message key (R31's rebuild rule; Phase 0's proof).
-- Each write that changes what a list shows **bumps the mailbox's change counter** (§11's db/012), which the browser's poll reads.
+- Each write that changes what a list shows **moves the mailbox's change counter** (db/013 — its triggers on conversations, their
+  states, labels, read marks, outbound rows and folders), which the browser's poll reads. After a bulk write (`app.ml_bulk = 'on'`) and
+  after `ml_threads_rebuild()`, the service calls **`ml_mailbox_touch(mailbox, '{}')`** once; after a live batch,
+  `ml_mailbox_touch(mailbox, <the conversations it touched>)` is not needed (the triggers did it).
 - Our own mutations are applied to the index in the same request (§5); when the watcher then sees their `MODSEQ` it finds nothing to
   change.
 
@@ -148,24 +157,37 @@ arriving late adopts its replies), and `ml_threads_rebuild` after a bulk write. 
 
 ## 4. Fetch, parts and the raw message
 
-- **`fetch what=structure`**: `BODYSTRUCTURE` and `BINARY.SIZE` of each leaf → `[{part, type, name, disposition, size (decoded),
-  content_id}]`.
-- **`fetch what=headers`**: `BODY.PEEK[HEADER]` → the headers `message_headers` lists (tool surface), as parsed values.
-- **`fetch what=body`**: the structure, then `BINARY.PEEK` of the text parts. The HTML part goes through **`sanitise.sanitise()`**
-  with two callbacks: `cid_url(content_id)` mints a **part token** for the leaf whose `Content-ID` matches (below), and
-  `remote_image_url(url)` answers the placeholder when `images=ask`, or an **image-door token** when `images=show`
-  (`reading-and-rendering.md` fixes the placeholder and the image door). The answer: `{headers, text, html, hidden_removed,
-  remote_images, pixels_dropped, parts}`. A message whose HTML is over 2 MB answers its text alone with `html_too_large: true`.
-  Sanitised bodies are kept in an in-memory LRU of 64 MB keyed by `(folder, uidvalidity, uid, images)`; nothing on disk.
+- **`fetch`** answers, for `form`:
+  - **`headers`**: the header summary — From, Sender, Reply-To, To, Cc, Date, Message-ID, In-Reply-To, References, the DMARC result
+    and spam score as Rspamd reported them, List-*, Auto-Submitted, Precedence, `X-OS-Agent` — as parsed values (`BODY.PEEK[HEADER]`),
+    and **the part list**: `BODYSTRUCTURE` and `BINARY.SIZE` of each leaf → `[{part, type, name, disposition, size (decoded),
+    content_id}]`.
+  - **`text`**: the summary and the part list, plus the first `text/plain` part (else the HTML part turned to text), whole up to
+    100,000 characters — what `thread_read` and `message_read` fence for an agent.
+  - **`html`**: the summary and the part list, plus the HTML part through **`sanitise.sanitise()`**, answering its fields: `html`,
+    `hidden_removed`, `remote_images`, `pixels_dropped`, `cid_refs`, `unstable`. With **`profile=reading`** the two callbacks are
+    `cid_url(content_id)` → a **part link** for the leaf whose `Content-ID` matches, and `remote_image_url(url)` → the placeholder when
+    `images=ask` or an **image link** when `images=show` (the placeholder and the image door are `reading-and-rendering.md`'s). With
+    **`profile=compose`** (the quote of a reply or a forward, `writing.md`) `cid:` and data images are dropped and remote images too —
+    links are kept. A message whose HTML is over 2 MB answers its text alone with `html_too_large: true`.
+  - Sanitised bodies are kept in an in-memory LRU of 64 MB keyed by `(folder, uidvalidity, uid, images, profile)`; nothing on disk.
+  - Every form refuses a stale UIDVALIDITY with **`409 moved`**.
+- **`sanitise`**: HTML a person or a reviewer wrote (`writing.md`, `sending-and-oversight.md` §4.1), cleaned with the **compose**
+  profile (the reading allow-lists; `cid:`, data and remote images refused; links kept) or the **signature** profile (the same, and no
+  heading or table larger than a signature needs); answers `{html, text}` — the text derived from the cleaned HTML (block elements to
+  lines, links as `text <url>`, quotes as `> `).
 - **`part`**: `BINARY.PEEK[<part>]<start.len>` in 1 MB chunks, streamed; `Content-Type` from the structure. The mail service never
   decides inline or attachment — the door does.
 - **`raw`**: `BODY.PEEK[]`, streamed in 1 MB chunks.
-- **Part and image tokens** — the shape both sides use (the doors are `reading-and-rendering.md`'s): `base64url(JSON) "." hex HMAC-SHA256
-  (ML_PART_KEY, the base64url text)`, the JSON `{"k": "part" | "img", "m": mailbox, "r": "folder.uidvalidity.uid", "p": part or the
-  image's index, "a": actor, "e": expiry unix}`, expiring **15 minutes** after the body was rendered. The token is bound to the
-  actor; the door checks the session's member equals `a` (a token copied out of the page opens nothing for anyone else) and **the
-  mail service re-checks the actor's level** when the door asks for the part. `ML_PART_KEY` (32 random bytes, hex) is in
-  `config/.env`: PHP verifies tokens, the mail service mints them; it reaches only what the bound actor may open anyway.
+- **Part and image links — ONE key, `ML_PART_KEY`** (decided by the coordinator, 2026-10-11; `reading-and-rendering.md` owns the
+  doors). A link is `base64url(JSON) "." hex HMAC-SHA256(ML_PART_KEY, the base64url text)`, the JSON `{"k": "part" | "img", "m":
+  mailbox, "r": "folder.uidvalidity.uid", "p": part or the image's index, "a": member, "e": expiry unix}`, **valid one hour**. **The mail
+  service mints them** when it sanitises (`cid:` images, part links); **PHP mints them** for the links it renders itself (attachment
+  rows, Show original); **PHP's `/p/` and `/img/` doors verify them**. A link is **bound to the member and the message**: the door
+  checks the session's member equals `a`, and **the member's level on the mailbox is re-checked on every use** (the door asks the mail
+  service, which runs `ml_level_as()` for `a`) — a link copied out of a page opens nothing for anyone else, and a revoked row shuts it at
+  once. `ML_PART_KEY` (32 random bytes, hex) is in `config/.env`, which both read; it reaches only what the bound member may open
+  anyway. (`reading-and-rendering.md`'s `ML_LINK_KEY` is dropped.)
 - **Every read by anyone but the owner** is logged by the PHP door that asked (`message.open`, `message.part`, `message.raw`) through
   `ml_access_should_log()`; the mail service logs nothing about content.
 
@@ -179,10 +201,10 @@ names the messages it held back and the rest proceed.
 |---|---|---|
 | `seen` / `unseen` | `UID STORE +FLAGS.SILENT (\Seen)` / `-FLAGS` — **only when `ml_read_mode()` is `store_seen`**; otherwise nothing on the server | `seen`; or `ml_viewer_read(member, key, on)` for a `view` holder and every intake mailbox (D13) |
 | `flag` / `unflag` | `UID STORE ±FLAGS.SILENT (\Flagged)` | `flagged` |
-| `move` | `UID MOVE set "folder"` → `COPYUID` | the rows' `folder_id`, `uidvalidity`, `uid` updated in place (ids and keys kept) |
-| `archive` | `move` to `archive` (created if missing) | as `move` |
+| `move` | `UID MOVE set "folder"` → `COPYUID` | **`ml_message_moved(message, folder, uidvalidity, uid)`** per row (db/013: ids and keys kept) |
+| `archive` | `move` to `archive` (**`CREATE "Archive"`** first when missing) | as `move` |
 | `trash` / `spam` / `not_spam` | `move` to `trash` / `junk` / `inbox` | as `move` |
-| `snooze` | `move` to `snoozed`, after `ml_thread_snooze()` per conversation | as `move` |
+| `snooze` | `move` to `snoozed` (**`CREATE "Snoozed"`** first when missing), after `ml_thread_snooze()` per conversation | as `move` |
 | `unsnooze` | `move` back to the folder `ml_snoozes_due()` names (the worker calls it for due snoozes; a person's Unsnooze calls it at once) | as `move` |
 | `delete_forever` | `UID STORE +FLAGS.SILENT (\Deleted)` then `UID EXPUNGE set` — only from `trash` or `junk` | rows deleted |
 | `trash_empty` | the same over every UID of `trash` (or `junk`) | rows deleted |
@@ -201,12 +223,24 @@ From the `mail_drafts` row: the MIME is built by the outbox's builder (`sending-
 `APPEND "Drafts" (\Draft \Seen)` → `APPENDUID`; the row's `folder_id`, `uidvalidity`, `uid` set; then the previous version
 `UID STORE \Deleted` + `UID EXPUNGE` (UIDPLUS) — the Drafts folder holds one copy, so a phone sees the latest (research 04 §B: 0.14 s
 the replacement). A failed APPEND leaves the row and the previous version untouched and answers 502; the composer keeps its text.
+**The delete half** (`discard: true`): `UID STORE \Deleted` + `UID EXPUNGE` of the draft's current copy alone, used when the draft is
+sent (`sending-and-oversight.md` §5.2 step 7) or discarded; the row's `folder_id`, `uidvalidity`, `uid` cleared. **A draft written on a
+phone** is found by the sync in Drafts; the composer makes its row when it is opened (`writing.md`). The `\Draft \Seen` flags are the
+draft's only flags.
 
 ## 7. Submission
 
-`submit_now` and the outbox pass (claiming due rows `FOR UPDATE SKIP LOCKED`, MIME, 587 with STARTTLS and certificates checked,
-`APPEND` to `\Sent` with `\Seen`, `\Answered` on the original, the `451 4.7.1` deferral) are **`sending-and-oversight.md`'s**. They use
-this spec's pool, `imap.login()` and its breaker; a refused SMTP `AUTH` trips the same breaker as a refused IMAP login.
+`submit_now` and the outbox loop (claiming due rows `FOR UPDATE SKIP LOCKED`, the MIME, 587 with STARTTLS and certificates checked,
+the `451 4.7.1` deferral) are **`sending-and-oversight.md`'s**. This service gives them the pool, `imap.login()` and its breaker (a
+refused SMTP `AUTH`, `535`, trips the same breaker as a refused IMAP login) and three internal calls:
+
+- **`append_sent`**: `APPEND "Sent" (\Seen) "<submission time>"` of the message as submitted, **with its `Bcc`** (the mailbox's own
+  copy), then `outbound_email.filed_at` (`sending-and-oversight.md`). MaluMail files no copy itself (research 04 §B).
+- **`store_flags`**: `UID STORE +FLAGS.SILENT (\Answered)` on the answered message's current location (`reply_to_key_id` → its row);
+  **never `\Seen`**, so an intake mailbox stays as its reader expects.
+- **The crash search at startup**: a row found `sending` for more than ten minutes was claimed before a crash and may have gone. It is
+  **never submitted again automatically**: `SELECT "Sent"`, `UID SEARCH HEADER Message-ID "<its id>"` — found → `ml_outbound_sent()`;
+  not found → `ml_outbound_failed()` with `sending-and-oversight.md`'s sentence.
 
 ## 8. Quota
 
@@ -253,8 +287,8 @@ and advertises only what it answers:
 | Slice | Adds |
 |---|---|
 | 2 | `ENABLE QRESYNC`; `SELECT … (QRESYNC (v m))` with `VANISHED (EARLIER)`; `UID FETCH` of the envelope items (`FLAGS`, `INTERNALDATE`, `RFC822.SIZE`, `BODYSTRUCTURE` for single-part and `multipart/mixed` / `alternative` messages, `MODSEQ`, `PREVIEW`, `BODY.PEEK[HEADER.FIELDS (…)]`), `CHANGEDSINCE`; `BINARY.PEEK[n]<o.l>`; `IDLE`; `NOTIFY SET` with `MessageNew`/`MessageExpunge`/`FlagChange` and `STATUS` events; `LIST … RETURN (SPECIAL-USE STATUS (…))`; `GETQUOTAROOT`; `CREATE`; a control file to deliver a message, expunge one, change a flag from "another client", reset a folder's `UIDVALIDITY`, refuse `NOTIFY`, and drop a connection |
-| 3 | `BINARY.SIZE`, `BODY.PEEK[HEADER]`, `BODY.PEEK[]`; `UID STORE`; `UID MOVE` with `COPYUID`; `UID EXPUNGE`; parts of a corpus message with `cid:` images and attachments (the sanitiser's benign corpus) |
-| 4 | `APPEND` with `APPENDUID`; the SMTP side (aiosmtpd, `sending-and-oversight.md`) |
+| 3 | `BINARY.SIZE`, `BODY.PEEK[HEADER]`, `BODY.PEEK[]`, `BINARY.PEEK` of any part; `UID STORE`; `UID MOVE` with `COPYUID`; `UID EXPUNGE`; `CREATE` of `Archive` and `Snoozed` on first use; parts of a corpus message with `cid:` images and attachments (the sanitiser's benign corpus) |
+| 4 | `APPEND` with `APPENDUID` (Drafts with `\Draft \Seen`, Sent with `\Seen` and a date); `UID STORE` (`\Deleted`, `\Answered`); `UID EXPUNGE`; `UID SEARCH HEADER Message-ID`; the SMTP side (aiosmtpd, `sending-and-oversight.md` §11) |
 | 6 | `RENAME`, `DELETE` |
 
 ## 13. The proof
@@ -275,18 +309,26 @@ breaker's proof stays on the fixture). Slice 2 proves at least:
 - PHP's `mailer_call()` signature accepted by the Python door; the 62 Phase 0 checks still green;
 - against MaluMail's test mailbox: a first sync of what the spike left, a submission seen through `NOTIFY` in under 2 s.
 
+**Slices 3, 4 and 6 prove their calls the same way** (their specs list the checks): `fetch` in each form and profile, its links (one
+hour, bound to the member and the message, the level re-checked on every use, refused to another member), `part` and `raw` streaming
+and `409 moved` on a stale UIDVALIDITY (3); every `mutate` op against the fixture's command log, `Archive` and `Snoozed` created on
+first use, nothing but the named ops reaching the server, no `\Seen` on an intake mailbox (3, 6); `sanitise` with both profiles and
+`identity_check` against the fake Mailbox MCP (4); `append_draft` and its delete half leaving one copy in Drafts, `append_sent` with its
+`Bcc`, `store_flags` never `\Seen`, and the crash search marking a found message `sent` and a missing one `failed`, never submitted
+twice (4).
+
 ## Requirements claimed
 MUSTs (6): `R29`, `R30`, `R31`, `R32`, `R33`, `R62`
 
 ## Decisions taken here
 
-1. **IMAPClient moves to 4.1.0 at slice 2.** It fixes the TLS timeout (#664 — Phase 0's probe passes a timeout that 3.x did not honour
+1. **IMAPClient moves to 4.1.0 at slice 2** (accepted; the coordinator bumps `mcp/requirements.txt` and re-runs the mailer proof). It fixes the TLS timeout (#664 — Phase 0's probe passes a timeout that 3.x did not honour
    for TLS) and unsolicited responses during `FETCH` (#647 — what `NOTIFY` sends); 4.0's only breaking change is the project's build
    tooling. Slice 2's proof re-runs Phase 0's 62 checks on it.
 2. **The door carries `on_behalf`.** The records MCP must read as "the Expert for this person" (`ml_level_as`), and the service never
    takes a level from a caller; the person, signed into the body, lets the service compute the same answer the views give.
-3. **The mail service mints part and image tokens; PHP verifies them.** The service knows the parts while it sanitises; one key
-   (`ML_PART_KEY`) in `config/.env` serves both, bound to the actor, re-checked at use, 15 minutes.
+3. **One link key, `ML_PART_KEY`** (the coordinator's decision): the mail service mints links while it sanitises, PHP mints the
+   links it renders, PHP's doors verify; one hour; bound to the member and the message; the level re-checked on every use.
 4. **The `STATUS` round runs every minute even with `NOTIFY`.** A first `NOTIFY` took 28 s; a missed event must cost at most a minute.
 5. **Two thread rebuilds in a first sync** — after INBOX and at the end — so a new mailbox's Inbox is usable at once without threading
    per row.
@@ -303,18 +345,12 @@ MUSTs (6): `R29`, `R30`, `R31`, `R32`, `R33`, `R62`
 
 ## Changes this spec asks of the shared documents
 
-- **db/012**:
-  - the poll's change counter — `CREATE TABLE mail_mailbox_changes (mailbox_id bigint PRIMARY KEY REFERENCES mailboxes ON DELETE
-    CASCADE, seq bigint NOT NULL DEFAULT 0, changed_at timestamptz NOT NULL DEFAULT now())`; `mail_threads.change_seq bigint NOT NULL
-    DEFAULT 0` with an index `(mailbox_id, change_seq)`; `ml_mailbox_touch(p_mailbox bigint, p_threads bigint[]) RETURNS bigint`
-    (bumps the mailbox's `seq`, stamps those threads, answers the new `seq`), called by the mail service after every batch and by
-    `ml_messages_after()` when `app.ml_bulk` is not on; `mail_thread_tombstones (mailbox_id, thread_id, change_seq, at)` written when
-    `ml_thread_refresh` deletes an emptied conversation, pruned after a day by the worker's `index_catch_up` pass;
-  - `ml_folder_reset(p_folder bigint, p_uidvalidity bigint) RETURNS integer` — deletes the folder's message rows (keys kept) and sets
-    the new `uidvalidity`, `uidnext = NULL`, `highestmodseq = NULL`;
-  - `ml_message_moved(p_message bigint, p_folder bigint, p_uidvalidity bigint, p_uid bigint)` — the in-place move (id and key kept);
-  - GRANT EXECUTE on these to `malumail_rw` only.
-- **mcp/requirements.txt**: `imapclient==4.1.0` (slice 2).
+- **db/013_list_and_sync.sql** — BUILT and proven (`db/proof/phase1_list.sql`, 75 checks; Phase 0's 232 still green):
+  `mail_mailbox_changes`, `mail_threads.change_seq` and its index, `mail_thread_tombstones`, the change triggers (conversations,
+  their states, `record_tags`, `mail_viewer_reads`, `outbound_email`, `mail_folders`), `ml_mailbox_touch()`, `ml_mailbox_seq()`,
+  `ml_mailbox_changed()`, `ml_tombstones_prune()`, `ml_folder_reset()`, `ml_message_moved()`; the list's and the admin's functions
+  (`mail-list.md`, `home-admin.md`). Nothing of db/001–012 replaced.
+- **mcp/requirements.txt**: `imapclient==4.1.0` (accepted; the coordinator bumps it).
 - **config/.env.example, tests/setup_dev.sh, deploy/ROOT_STEPS.sh**: `ML_PART_KEY` (32 random bytes, hex; written once, never printed)
   and `ML_MAILER_MAX_CONNECTIONS=400`.
 - **deploy/malumail-mailer.service**: `TasksMax` stays 1024 (watchers + pools + the loop fit under it at 400 connections).

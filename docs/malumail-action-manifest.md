@@ -25,8 +25,9 @@
 - **Canonical URLs** need the rewrites in `deploy/apache-malumail.conf` (and `tests/dev_router.php`), Phase 2: `/m/{mailbox}/{rest}`
   → `m/{rest-as-file}.php?mailbox=` (`v/{view}` → `m/view.php?view=`, `f/{folder}` → `m/folder.php?folder=`, `label/{label}` →
   `m/label.php`, `t/{thread}` → `m/thread.php`, `msg/{message}/original` → `m/original.php`, `msg/{message}/body` → `m/body.php`,
-  `msg/{message}/raw` → `m/raw.php`, `drafts/{draft}` → `m/compose.php?draft=`, `people/{correspondent}` → `m/person.php`), and the
-  estate's `/{x}/new` → `form.php`, `/{x}/{id}` → `view.php?id=`, `/{x}/{id}/edit` → `form.php?id=`.
+  `msg/{message}/raw` → `m/raw.php`, `drafts/{draft}` → `m/compose.php?draft=`, `people/{correspondent}` → `m/person.php`, `compose` → `m/compose.php`, `identities/{identity}/edit` → `m/identity-form.php`,
+  `policy` → `m/policy.php`), `/oversight/review/{outbound}` → `oversight/view.php?id=` (`/edit` → `form.php?id=`, `/body` →
+  `body.php?id=`), and the estate's `/{x}/new` → `form.php`, `/{x}/{id}` → `view.php?id=`, `/{x}/{id}/edit` → `form.php?id=`.
 - **Reading and replying are designed at 375 px first**: the lists, the conversation, compose, the review page. The admin and the
   settings work at 375 and are laid out for 1280. No screen is a modal: the record picker and `hx-confirm` are the two exemptions.
 - **Prefill params** become query-string values the GET controller reads.
@@ -162,13 +163,13 @@ Actions:
 
 | Action | Endpoint | Params | Undo | Confirm | Agent approval | Log event | Who | Agent | record_id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `mail_archive` | `/mail/archive.php` | **mailbox**, **thread[]** | mail_move |  |  | `message.archive` | `mail.use` · triage | yes | the first conversation |
-| `mail_move` | `/mail/move.php` | **mailbox**, **thread[]**, **to_folder** | mail_move |  |  | `message.move` | `mail.use` · triage | yes | the first conversation |
-| `mail_trash` | `/mail/trash.php` | **mailbox**, **thread[]** | mail_move |  |  | `message.trash` | `mail.use` · triage | yes | the first conversation |
-| `mail_spam` | `/mail/spam.php` | **mailbox**, **thread[]** | mail_not_spam |  |  | `message.spam` | `mail.use` · triage | yes | the first conversation |
-| `mail_not_spam` | `/mail/not-spam.php` | **mailbox**, **thread[]** | mail_spam |  |  | `message.not_spam` | `mail.use` · triage | yes | the first conversation |
-| `mail_flag` | `/mail/flag.php` | **mailbox**, **thread[]**, message (one message of it), flagged (yes or no) | restore prior |  |  | `message.flag` | `mail.use` · triage | yes | the first conversation |
-| `mail_mark_read` | `/mail/mark-read.php` | **mailbox**, **thread[]**, read (yes or no) | restore prior |  |  | `message.mark_read` | `mail.use` · view | yes | the first conversation |
+| `mail_archive` | `/mail/archive.php` | **mailbox**, thread[], matching (a search query — every conversation it finds up to 1000 instead of thread) | mail_move |  |  | `message.archive` | `mail.use` · triage | yes | the first conversation |
+| `mail_move` | `/mail/move.php` | **mailbox**, thread[], **to_folder**, matching (a search query — every conversation it finds up to 1000 instead of thread) | mail_move |  |  | `message.move` | `mail.use` · triage | yes | the first conversation |
+| `mail_trash` | `/mail/trash.php` | **mailbox**, thread[], matching (a search query — every conversation it finds up to 1000 instead of thread) | mail_move |  |  | `message.trash` | `mail.use` · triage | yes | the first conversation |
+| `mail_spam` | `/mail/spam.php` | **mailbox**, thread[], matching (a search query — every conversation it finds up to 1000 instead of thread) | mail_not_spam |  |  | `message.spam` | `mail.use` · triage | yes | the first conversation |
+| `mail_not_spam` | `/mail/not-spam.php` | **mailbox**, thread[], matching (a search query — every conversation it finds up to 1000 instead of thread) | mail_spam |  |  | `message.not_spam` | `mail.use` · triage | yes | the first conversation |
+| `mail_flag` | `/mail/flag.php` | **mailbox**, thread[], message (one message of it), flagged (yes or no), matching (a search query — every conversation it finds up to 1000 instead of thread) | restore prior |  |  | `message.flag` | `mail.use` · triage | yes | the first conversation |
+| `mail_mark_read` | `/mail/mark-read.php` | **mailbox**, thread[], read (yes or no), matching (a search query — every conversation it finds up to 1000 instead of thread) | restore prior |  |  | `message.mark_read` | `mail.use` · view | yes | the first conversation |
 | `mail_delete_forever` | `/mail/delete-forever.php` | **mailbox**, **thread[]** (from Trash or Spam only) | — | ✔ | deletion | `message.delete_forever` | `mail.use` · triage | yes | the first conversation |
 | `mail_trash_empty` | `/mail/trash-empty.php` | **mailbox**, which (trash or spam) | — | ✔ | deletion | `trash.empty` | `mail.use` · triage | yes | the mailbox |
 | `mail_images_allow` | `/mail/images-allow.php` | **mailbox**, **sender** (an address whose remote images always show) | restore prior |  |  | `sender.images_allow` | `mail.use` · full | people | the mailbox |
@@ -217,13 +218,13 @@ Actions:
 | Action | Endpoint | Params | Undo | Confirm | Agent approval | Log event | Who | Agent | record_id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `mail_review_approve` | `/oversight/approve.php` | **outbound** | — |  |  | `review.approve` | `mail.oversee` · decider | people | the outbound message |
-| `mail_review_edit` | `/oversight/edit.php` | **outbound**, subject, **body**, body_format, to[], cc[], bcc[] | — |  |  | `review.edit` | `mail.oversee` · decider | people | the outbound message |
+| `mail_review_edit` | `/oversight/edit.php` | **outbound**, subject, **body**, body_format (text or html) | — |  |  | `review.edit` | `mail.oversee` · decider | people | the outbound message |
 | `mail_review_reject` | `/oversight/reject.php` | **outbound**, **note** (reaches the agent in its next turn) | — |  |  | `review.reject` | `mail.oversee` · decider | people | the outbound message |
 | `mail_review_reply` | `/oversight/reply.php` | **outbound**, **note** (a question to the agent — the draft is kept) | — |  |  | `review.reply` | `mail.oversee` · decider | people | the outbound message |
 | `mail_thread_take_over` | `/oversight/take-over.php` | **mailbox**, **thread** | restore prior |  |  | `thread.take_over` | `mail.oversee` · full | people | the conversation |
 | `mail_mute` | `/mail/mute.php` | **mailbox**, **thread[]**, muted (yes or no) | restore prior |  |  | `thread.mute` | `mail.use` · triage | yes | the first conversation |
 | `mail_unscreened_release` | `/oversight/release.php` | **mailbox**, **message** (a message key id) | — |  |  | `unscreened.release` | `mail.oversee` · full | people | the dispatch |
-| `mail_unscreened_dismiss` | `/oversight/dismiss.php` | **mailbox**, **message** | — |  |  | `unscreened.dismiss` | `mail.oversee` · full | people | the dispatch |
+| `mail_unscreened_dismiss` | `/oversight/dismiss.php` | **mailbox**, **message**, as_spam (yes to move it to Spam) | — |  |  | `unscreened.dismiss` | `mail.oversee` · full | people | the dispatch |
 | `mail_sender_mark_known` | `/oversight/mark-known.php` | **mailbox**, **address** (the sender) | restore prior |  |  | `sender.mark_known` | `mail.oversee` · full | people | the correspondent |
 | `mail_policy_set` | `/oversight/policy.php` | **mailbox**, send_mode (hold_all internal_auto allowlist_auto or auto), allow_domain[], allow_address[], first_contact_review (yes or no), attachments_review (yes or no), max_external_per_day, max_per_hour, max_per_thread_per_day, wake_on_mail (yes or no), wake_from (none internal internal_and_known or all_authenticated), disclosure (yes or no), disclosure_text | restore prior | ✔ |  | `policy.set` | `mail.oversee` · full | people | the policy |
 | `mail_mailbox_pause` | `/oversight/pause.php` | **mailbox**, reason | mail_mailbox_resume |  |  | `mailbox.pause` | `mail.oversee` · full | people | the mailbox |
@@ -248,7 +249,7 @@ Actions:
 
 | Action | Endpoint | Params | Undo | Confirm | Agent approval | Log event | Who | Agent | record_id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `mail_label` | `/mail/label.php` | **mailbox**, **thread[]**, **label**, removed (yes to take the label off) | restore prior |  |  | `message.label` | `mail.use` · triage | yes | the first conversation |
+| `mail_label` | `/mail/label.php` | **mailbox**, thread[], **label**, removed (yes to take the label off), matching (a search query — every conversation it finds up to 1000 instead of thread) | restore prior |  |  | `message.label` | `mail.use` · triage | yes | the first conversation |
 | `mail_snooze` | `/mail/snooze.php` | **mailbox**, **thread[]**, **until** (an ISO time) | mail_unsnooze |  |  | `thread.snooze` | `mail.use` · triage | yes | the first conversation |
 | `mail_unsnooze` | `/mail/unsnooze.php` | **mailbox**, **thread[]** | mail_snooze |  |  | `thread.unsnooze` | `mail.use` · triage | yes | the first conversation |
 | `mail_folder_create` | `/mail/folder-create.php` | **mailbox**, **name**, parent (an existing folder's name) | mail_folder_delete |  |  | `folder.create` | `mail.use` · triage | yes | the folder |
@@ -277,7 +278,7 @@ Actions:
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `mail_permission_grant` | `/access/grant.php` | **mailbox**, person, agent, department, **level** (view triage send or full), reason (required for break-glass), expires_at (an ISO date within 30 days for break-glass) | mail_permission_revoke | ✔ |  | `permission.grant` | `mail.use` · full · or `access.audit` for break-glass | people | the permission row |
 | `mail_permission_revoke` | `/access/revoke.php` | **mailbox**, **permission** (the row's id) | — | ✔ |  | `permission.revoke` | `mail.use` · full · or `access.audit` | people | the permission row |
-| `mail_mailbox_settings_save` | `/mail/settings-save.php` | **mailbox**, undo_seconds (0 to 30), conversation_view (yes or no), images (ask or always), density (comfortable or compact), shortcuts (yes or no), ai_read (yes or no), share_with_apps (yes or no) | restore prior |  |  | `mailbox.settings` | `mail.use` · full | people | the mailbox |
+| `mail_mailbox_settings_save` | `/mail/settings-save.php` | **mailbox**, undo_seconds (0 to 30), conversation_view (yes or no), images (ask or always), density (comfortable or compact), shortcuts (yes or no), page_size (25 50 or 100), ai_read (yes or no), share_with_apps (yes or no) | restore prior |  |  | `mailbox.settings` | `mail.use` · full | people | the mailbox |
 
 ## Correspondents and the K7 share (slice 8)
 
@@ -304,7 +305,7 @@ Actions:
 | Action | Endpoint | Params | Undo | Confirm | Agent approval | Log event | Who | Agent | record_id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `mail_notification_read` | `/notifications/read.php` | notification (one id), every_one (yes to mark all read) | — |  |  | `notification.read` | own | people | the notification |
-| `mail_notification_prefs_save` | `/settings/notifications/save.php` | email_enabled (yes or no), sms_enabled (yes or no), kind[] (the notices that may mail), new_mail_mailbox[] (mailbox ids) | restore prior |  |  | `notification.prefs` | own | people | the member |
+| `mail_notification_prefs_save` | `/settings/notifications/save.php` | email_enabled (yes or no), text_enabled (yes or no), kind[] (the notices that may mail), text_kind[] (the notices that may text), new_mail_mailbox[] (mailbox ids) | restore prior |  |  | `notification.prefs` | own | people | the member |
 
 ## Home, admin and settings (slice 10)
 
@@ -321,7 +322,7 @@ Actions:
 
 | Action | Endpoint | Params | Undo | Confirm | Agent approval | Log event | Who | Agent | record_id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `mail_settings_save` | `/admin/settings/save.php` | undo_seconds_default, images_default (ask or always), body_index_kb, held_expiry_hours, agent_external_budget, hold_all_agents (yes or no), hold_all_external (yes or no), clerk_hour | restore prior | ✔ |  | `settings.save` | `settings.manage` | people | the settings |
+| `mail_settings_save` | `/admin/settings/save.php` | undo_send_seconds (0 to 30), images_default (ask or always), index_text_max_kb, max_attachments_mb, draft_save_seconds, poll_visible_seconds, poll_hidden_seconds, held_expiry_hours, default_send_mode (hold_all internal_auto allowlist_auto or auto), default_first_contact_review (yes or no), default_attachments_review (yes or no), default_max_external_per_day, default_max_per_hour, default_max_per_thread_per_day, default_wake_on_mail (yes or no), default_wake_from (none internal internal_and_known or all_authenticated), default_disclosure (yes or no), disclosure_text, agent_external_budget (empty for the warm-up), hold_all_agents (yes or no), hold_all_external (yes or no), mm3_identity_enforced (yes or no), clerk_note_at (HH:MM) | restore prior | ✔ |  | `settings.save` | `settings.manage` | people | the settings |
 | `mail_notice_save` | `/admin/settings/notice.php` | **text** (the notice in plain words — a new version) | — | ✔ |  | `notice.save` | `settings.manage` | people | the notice version |
 | `mail_mailbox_resync` | `/admin/sync/resync.php` | **mailbox** | — |  |  | `mailbox.resync` | `settings.manage` | people | the mailbox |
 | `mail_mailbox_reindex` | `/admin/sync/reindex.php` | **mailbox** | — |  |  | `mailbox.reindex` | `settings.manage` | people | the mailbox |

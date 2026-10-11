@@ -151,6 +151,9 @@ else
     keyset "$MAILER_ENV" ML_MAILER_KEY "$MK" secret
   fi
   unset MK MK2
+  # the part key (Phase 1, reading-and-rendering.md): signs the one-hour /p/ and /img/ links; the mail service mints, PHP verifies —
+  # config/.env alone (both read it); made once, kept, never printed
+  if [ -z "$(valof "$ENVF" ML_PART_KEY)" ]; then keyset "$ENVF" ML_PART_KEY "$(openssl rand -hex 32)" secret; fi
 fi
 
 # ------------------------------------------------------------------------------------------------------------------

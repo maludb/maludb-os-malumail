@@ -14,7 +14,7 @@ Not an exemplar: it replicates slice 1's admin screens (cards, full-page forms, 
 2's reads. The person's home (`/` → their default mailbox's Inbox) is the shell's; "home" in this slice's name is the admin's.
 
 **Prerequisites**: slices 1 (domains, mailboxes, aliases — the overview's cards link there), 2 (the mail service's `status`, the
-index's counts), 5 (dispatches, held mail, policies — the agents' page reads them); db/012 (below).
+index's counts), 5 (dispatches, held mail, policies — the agents' page reads them); db/013_list_and_sync.sql (built and proven: `db/proof/phase1_list.sql`).
 
 ## Divergences from the design
 
@@ -100,12 +100,12 @@ a link to the kernel's run page) filtered by `?status=` and `?agent=`; a `failed
 | `app/features/admin/overview.php` | `admin_overview()`, `admin_sync_rows()`, `admin_agent_cards()`, `admin_dispatches()` |
 | `app/views/admin/{overview,sync,settings,agents}.php`, `app/views/admin/partials/{sync-row,dispatch-row,switch-banner}.php` | templates |
 | `services/mailer/server.py` | `POST /v1/status` (all) — `mail-service.md` §1 |
-| `db/012_phase1_fixes.sql` (shared, reconciled) | `ml_settings_save()`, `ml_notice_save()`, `ml_mailbox_reindex()`, `ml_dispatch_retry()`, `ml_sync_health()` |
+| `db/013_list_and_sync.sql` | `ml_settings_save()`, `ml_notice_save()`, `ml_mailbox_reindex()`, `ml_dispatch_retry()`, `ml_sync_health()` |
 | `tests/phase3/slice10/{run.sh,admin.php,browser.mjs}` | the proof |
 
 ## Query functions and mail-service calls (signatures fixed)
 
-**SQL (db/012; each refuses an agent and a member without the right, in SQL):**
+**SQL (`db/013_list_and_sync.sql`; each refuses an agent and a member without the right, in SQL):**
 
 - `ml_settings_save(p_by bigint, p_values jsonb) RETURNS jsonb` — `ml_require_person(p_by)`, `ml_require_right(p_by,
   'settings.manage')`; only the keys of §Screens are accepted (an unknown key refused by name); the table's CHECKs stand; answers
@@ -199,7 +199,7 @@ kernel's hires, grants and duties (the OS).
   all_authenticated), `default_disclosure` (yes or no), `disclosure_text`, `agent_external_budget` (empty for the warm-up),
   `hold_all_agents` (yes or no), `hold_all_external` (yes or no), `mm3_identity_enforced` (yes or no), `clerk_note_at` (HH:MM).
   `mail_mailbox_resync` and `mail_mailbox_reindex`: `Who` stays `settings.manage`.
-- **db/012**: `ml_settings_save()`, `ml_notice_save()`, `ml_mailbox_reindex()`, `ml_dispatch_retry()`, `ml_sync_health()` as above;
+- **db/013_list_and_sync.sql** — BUILT and proven (`db/proof/phase1_list.sql`, 75 checks): `ml_settings_save()`, `ml_notice_save()`, `ml_mailbox_reindex()`, `ml_dispatch_retry()`, `ml_sync_health()` as above;
   GRANT EXECUTE to `malumail_rw`; `ml_sync_health()` also to `malumail_records_ro` for `mailbox_health`.
 - **Tool surface**: `mailbox_health` reads `ml_sync_health()` for a Mail admin and `mcp_mailboxes` for everyone else.
 - **mail-service.md** (this fork's own): `POST /v1/status` (all) added.

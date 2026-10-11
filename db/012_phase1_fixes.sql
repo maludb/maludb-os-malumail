@@ -117,7 +117,10 @@ DECLARE b mailboxes%ROWTYPE; k text; clean jsonb := '{}'::jsonb; may_switch bool
 BEGIN
     PERFORM ml_require_person(p_by);
     SELECT * INTO b FROM mailboxes WHERE id = p_mailbox;
-    IF NOT FOUND OR ml_mailbox_level(p_mailbox, p_by) IS DISTINCT FROM 'full' THEN
+    -- a person holding full saves any of it; a Mail admin, who holds no level on a shared mailbox, only its two switches
+    IF NOT FOUND OR (ml_mailbox_level(p_mailbox, p_by) IS DISTINCT FROM 'full'
+                     AND NOT (b.kind <> 'person' AND ml_member_has_right(p_by, 'mailboxes.manage')
+                              AND COALESCE(p_settings, '{}'::jsonb) = '{}'::jsonb)) THEN
         RAISE EXCEPTION 'No such mailbox' USING ERRCODE = 'no_data_found';
     END IF;
     FOR k IN SELECT jsonb_object_keys(COALESCE(p_settings, '{}'::jsonb)) LOOP
@@ -164,17 +167,13 @@ BEGIN
     RETURN n;
 END$$;
 
--- ------------------------------------------------------------------------------------------------- shared widenings (slices 5, 6, 9)
+-- ------------------------------------------------------------------------------------------------- shared widenings (slices 5, 6)
 -- Done here once so db/013–015 never replace each other's CHECKs: a mail turn may now carry a reviewer's note back to the agent
--- (`review`, sending-and-oversight.md) or a snoozed conversation waking on an agent's mailbox (`snooze`, search-labels-snooze.md);
--- the Clerk's morning note is a notice of its own kind (`clerk_note`, notifications.md). A snooze's return reuses `snooze_woke`.
+-- (`review`, sending-and-oversight.md) or a snoozed conversation waking on an agent's mailbox (`snooze`, search-labels-snooze.md).
+-- No notice kind is added: a snooze's return is `snooze_woke`, the Clerk's morning note `digest` (notifications.md).
 ALTER TABLE agent_dispatches DROP CONSTRAINT agent_dispatches_kind_check;
 ALTER TABLE agent_dispatches ADD CONSTRAINT agent_dispatches_kind_check
     CHECK (kind IN ('mention', 'dm', 'duty_proposal', 'ask', 'mail', 'release', 'review', 'snooze'));
-ALTER TABLE notifications DROP CONSTRAINT notifications_kind_check;
-ALTER TABLE notifications ADD CONSTRAINT notifications_kind_check
-    CHECK (kind IN ('new_mail', 'held_mail', 'review_decided', 'unscreened', 'break_glass', 'permission_granted', 'credential_failed',
-                    'sync_failed', 'quota', 'snooze_woke', 'send_failed', 'send_deferred', 'agent_replied', 'digest', 'clerk_note'));
 
 -- ------------------------------------------------------------------------------------------------- grants
 GRANT SELECT ON mcp_members, mcp_departments, mcp_templates TO malumail_records_ro, malumail_rw;

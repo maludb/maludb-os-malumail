@@ -23,7 +23,15 @@ nothing runs after it, and nothing runs behind the body's CSP and sandbox either
 The mail service's skeleton, `services/mailer/`, has its signed door, the administration plane and the IMAP probe with the
 circuit breaker. `tests/mailer/run.sh` proves it with 62 checks against a fake Mailbox MCP and an IMAP fixture.
 
-Next: Phase 1 for the owner's approval.
+**Phase 1 is written** (`docs/phase1-consistency.md`):
+- the tool surface: 36 records and 7 activity tools;
+- the action manifest: 45 screens and 67 actions;
+- three build specs and eleven slice specs;
+- the schema's Phase 1 fixes, db/012–015.
+
+`tests/phase1/check_specs.sh` shows the documents agree, and `tests/phase0/schema.sh` passes 514 checks over db/001–015.
+
+Next: the owner's approval of Phase 1 → Phase 2.
 
 ## Documents
 

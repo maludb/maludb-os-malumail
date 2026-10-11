@@ -14,10 +14,10 @@ Used by slice 4 (writing, `writing.md`), slice 5 (oversight, `oversight.md`) and
 | Piece | Built in Phase 0 | This spec |
 |---|---|---|
 | `ml_outbound_submit()` | the row on Send: recipients checked, `Message-ID` minted, threading copied, refusal, hold reasons, undo window, disclosure line, `Auto-Submitted` | who calls it (§3), the MIME it becomes (§4) |
-| the status machine (`ml_outbound_guard()`) | every transition below; held leaves only by a person's approve or edit | `deferred → held` (§5.4, db/012) |
+| the status machine (`ml_outbound_guard()`) | every transition below; held leaves only by a person's approve or edit | `deferred → held` (§5.4, `db/015_sending_oversight.sql`) |
 | `ml_outbound_hold_reasons()`, `ml_outbound_refusal()` | §5's reasons and RFC 3834's loop rules | the gaps of §7 |
-| `ml_outbound_claim()`, `_sent()`, `_deferred()`, `_failed()` | the outbox's claim with the kill switch, the backoff, correspondents learned | the loop (§5), crash rule (§5.3), `filed_at` (db/012) |
-| `ml_review_decide()`, `ml_held_expire()`, `mail_reviews` | the five decisions, append-only, expiry | the note reaching the agent (§8.3), the edit's before-text (db/012) |
+| `ml_outbound_claim()`, `_sent()`, `_deferred()`, `_failed()` | the outbox's claim with the kill switch, the backoff, correspondents learned | the loop (§5), crash rule (§5.3), `filed_at` (`db/015_sending_oversight.sql`) |
+| `ml_review_decide()`, `ml_held_expire()`, `mail_reviews` | the five decisions, append-only, expiry | the note reaching the agent (§8.3), the edit's before-text (`db/015_sending_oversight.sql`) |
 | `ml_dispatch_decide()`, `agent_dispatches` | the wake rule after the spike | the worker's turn (§9) |
 | `ml_unscreened_release()`, `_dismiss()`, `ml_sender_mark_known()` | people's three answers | — |
 | the SMTP fixture | — | §11 |
@@ -103,12 +103,12 @@ submitted copy never does.
 ## 5. The outbox loop (the mail service, `services/mailer/outbox.py`)
 
 The outbox pass replaces the skeleton's empty count. It wakes every 2 seconds while rows are due, every `ML_MAILER_PASS_SECONDS`
-otherwise, and on a `NOTIFY ml_outbox` the submit function raises (db/012 adds `pg_notify('ml_outbox', id)` to `ml_outbound_submit()`,
-`ml_review_decide()` and the retry, so Send leaves within a second of its undo window).
+otherwise, and on a `NOTIFY ml_outbox` (`db/015_sending_oversight.sql`'s trigger `outbound_email_wake` notifies whenever a row becomes `queued` — Send,
+an approval, a retry, a resume — so Send leaves within a second of its undo window).
 
 ### 5.1 Claim
 
-`SELECT * FROM ml_outbound_claim(10)` — in one statement it first **re-holds** queued (and, after db/012, deferred) agent rows whose
+`SELECT * FROM ml_outbound_claim(10)` — in one statement it first **re-holds** queued (and deferred) agent rows whose
 mailbox is paused, and unreviewed agent rows caught by `hold_all_agents` / `hold_all_external`, then marks up to ten due rows
 `sending` with `attempts + 1` (`FOR UPDATE SKIP LOCKED`, ordered by `send_after, id`). Two service instances never claim one row.
 
@@ -125,7 +125,7 @@ For each claimed row, in its own task, at most **two submissions at a time per m
 4. On success: **`ml_outbound_sent(id, <queue id from the 250 reply>, <the reply>)`** at once — before anything else can fail — so the
    row is never submitted again.
 5. **`append_sent`** (`mail-service.md`): `APPEND` the Sent copy (with `Bcc`) to the mailbox's `\Sent` folder with `\Seen` and the
-   submission time; then `UPDATE outbound_email SET filed_at = now()` (db/012). MaluMail files no copy itself (research 04 §B).
+   submission time; then `UPDATE outbound_email SET filed_at = now()`. MaluMail files no copy itself (research 04 §B).
 6. **`store_flags`** `+\Answered` on the message answered (`reply_to_key_id`'s current location) — never `\Seen`, so an intake
    mailbox is safe.
 7. The draft's Drafts copy is expunged and `mail_drafts.discarded_at` set (`append_draft`'s delete half).
@@ -144,18 +144,20 @@ A row `sent` with `filed_at` null is retried by the next pass (steps 5–7 only)
 | `535` at login (authentication refused) | the **circuit breaker** (`store.trip_breaker()`, exactly as the IMAP probe): the credential failed, the Mail admins told; the row `failed` with *"The mailbox's credential was refused"* |
 | a connection or TLS failure | the row back to `deferred` (the mailbox's backoff, as `server.Backoff`) |
 
-**A crash.** A row found `sending` for more than ten minutes when the service starts was claimed and its fate is unknown: it may have
-been submitted before the crash. **It is never submitted again automatically.** The service searches the mailbox's Sent folder for its
-`Message-ID` (`UID SEARCH HEADER Message-ID`); found → `sent`; not found → `failed` with *"The mail service stopped while sending this
+**A crash.** A row found `sending` for more than ten minutes when the service starts (`ml_outbound_stalled(10)`) was claimed and its
+fate is unknown: it may have been submitted before the crash. **It is never submitted again automatically** — `db/015_sending_oversight.sql`'s status machine
+refuses `sending → queued`. The service searches the mailbox's Sent folder for its `Message-ID` (`UID SEARCH HEADER Message-ID`);
+found → `ml_outbound_sent()`; not found → `ml_outbound_lost()`, `failed` with *"The mail service stopped while sending this
 message; it may have gone. Check with the recipient before you retry"*. (Phase 0's note in db/009 said "→ queued when not found"; the
 Sent copy is appended **after** submission, so its absence proves nothing — decision 1 below.)
 
 ### 5.4 The kill switch reaches every row that has not left
 
-- `ml_mailbox_pause(on)` moves the mailbox's queued agent rows to `held` with `paused`; db/012 adds `deferred` rows (and the status
+- `ml_mailbox_pause(on)` moves the mailbox's queued agent rows to `held` with `paused`; it now takes `deferred` rows too (and the status
   machine admits `deferred → held`).
-- **Resume** (db/012): rows held for `paused` **alone** that a person had already approved go back to `queued`; every other row keeps
-  its other reasons with `paused` removed and waits for a person.
+- **Resume** (`db/015_sending_oversight.sql`): a row a person had **approved** before the pause held it goes back to `queued` (`paused` removed); an
+  unreviewed row held for more than the pause loses `paused` and waits for a person; an unreviewed row held for the pause alone keeps
+  `paused` as its reason and waits for a person.
 - The business-wide switches catch unreviewed agent rows at the claim; a reviewed row is a person's decision and goes.
 
 ## 6. Schedule and undo
@@ -174,18 +176,18 @@ queued, sending, sent and deferred agent rows in the window), the business budge
 switches. `ml_outbound_refusal()` refuses RFC 3834's machine mail (`Auto-Submitted` not `no`, a list, a null return path) and the same
 normalised body to an overlapping recipient within seven days.
 
-**Gaps this spec closes (db/012):**
+**Gaps this spec closes (`db/015_sending_oversight.sql`, proven by `db/proof/phase1_sending.sql`):**
 
 1. **Deferred rows escaped the kill switch** (§5.4).
-2. **The cap on one conversation** compares `ml_key_thread()` per outbound row in a scan; db/012 stores `outbound_email.thread_anchor_key`
-   (the answered message's thread anchor at Send) and indexes `(mailbox_id, thread_anchor_key, created_at)`.
+2. **The cap on one conversation** compared `ml_key_thread()` per outbound row in a scan; `outbound_email.thread_anchor_key` now holds the
+   conversation's anchor at Send (`ml_thread_anchor()` — its lowest message key), indexed `(mailbox_id, thread_anchor_key, created_at)`.
 3. **The note reaching the agent** (§8.3): `agent_dispatches.kind` gains `review`.
 4. **An edit's before-text** (§8.2): `mail_reviews.before_subject`, `before_body_text`.
-5. **A take-over from the conversation** (not from the review page) left the agent's held replies in that conversation waiting: db/012's
+5. **A take-over from the conversation** (not from the review page) left the agent's held replies in that conversation waiting: now
    `ml_thread_take_over(on)` cancels them with a `take_over` review each.
-6. **The held-mail notice**: nothing tells a reviewer that mail waits. db/012 adds `ml_outbound_held_notice()` — an AFTER trigger on
-   `outbound_email` when a row becomes `held` by Send or by a business switch (not by its own overseer's pause): `ml_notify(<each
-   reviewer>, 'held_mail', …)` with `record_type = 'outbound'`, once per row.
+6. **The held-mail notice**: nothing told a reviewer that mail waits. `ml_outbound_held_notice()` is an AFTER trigger on `outbound_email`
+   when a row becomes `held` with a reason other than `paused` (a pause's re-hold tells no one): `ml_notify(<each reviewer>, 'held_mail',
+   …)` with `record_type = 'outbound'` — the reviewers are `ml_outbound_reviewers()` — never twice while unread.
 
 **Not gaps** (kept as built): an approved message ignores the caps (a person decided); a person's mail is never held; bounces do not yet
 feed the warm-up beyond week 4 (the budget stays at 200 until slice 10 counts bounces — design §5's "then up half a week while bounces
@@ -205,7 +207,7 @@ refused by `ml_require_person()` inside `ml_review_decide()` and by the `mail_re
 | Decision | The row | What else |
 |---|---|---|
 | approve | `held → queued`, the undo window from now, `Auto-Submitted` dropped | correspondents become **known** when it is sent (approved by a person) |
-| edit | the same, with the new subject and body (HTML sanitised by the handler) | `mail_reviews` keeps the digests **and** (db/012) the text before; the review page shows the diff |
+| edit | the same, with the new subject and body (HTML sanitised by the handler) | `mail_reviews` keeps the digests **and** the text before (`before_subject`, `before_body_text`); the review page shows the diff |
 | reject | `held → rejected` | the note (required) reaches the agent (§8.3) |
 | reply | stays `held`; `review_id` set | the note (required) reaches the agent as a question; the agent may withdraw (`mail_send_cancel`) and send a new one |
 | take over | `held → cancelled` | the conversation's state: `taken_over_by` the reviewer, `agent_muted`; only a reply has a conversation |
@@ -217,7 +219,7 @@ an `expire` review (no reviewer), and the agent is told (§8.3); its reviewers g
 
 ### 8.3 Telling the agent
 
-A reject, a reply, an expiry and a take-over each make **one `agent_dispatches` row** (db/012: `kind = 'review'`, `record_type =
+A reject, a reply, an expiry and a take-over each make **one `agent_dispatches` row** (`ml_review_dispatch()`: `kind = 'review'`, `record_type =
 'outbound'`, `record_id` = the outbound id, `acting_member_id` = the reviewer, or the primary overseer for an expiry). The worker's
 dispatch pass (§9) runs it as one chat turn whose utterance is a person's words, not mail:
 
@@ -333,29 +335,13 @@ MUSTs (8): `R35`, `R39`, `R40`, `R41`, `R42`, `R44`, `R45`, `R47`
 
 ## Changes this spec asks of the shared documents
 
-**db/012** (sketches):
-
-```sql
-ALTER TABLE outbound_email ADD COLUMN filed_at timestamptz,                -- the Sent copy appended (§5.2)
-                           ADD COLUMN thread_anchor_key bigint REFERENCES mail_message_keys(id) ON DELETE SET NULL;  -- §7 gap 2
-CREATE INDEX outbound_email_thread_idx ON outbound_email (mailbox_id, thread_anchor_key, created_at) WHERE sender_is_agent;
-ALTER TABLE mail_reviews ADD COLUMN before_subject text, ADD COLUMN before_body_text text,
-    ADD CONSTRAINT mail_reviews_before_text CHECK (decision <> 'edit' OR before_body_text IS NOT NULL);
-ALTER TABLE agent_dispatches DROP CONSTRAINT agent_dispatches_kind_check,
-    ADD CONSTRAINT agent_dispatches_kind_check CHECK (kind IN ('mention','dm','duty_proposal','ask','mail','release','review'));
--- ml_outbound_guard(): admit deferred → held.
--- ml_outbound_claim(): the paused re-hold covers status IN ('queued','deferred').
--- ml_mailbox_pause(off): held rows whose only reason is 'paused' and whose review_id is an approve/edit → queued; others lose 'paused'.
--- ml_mailbox_pause(on): also deferred rows.
--- ml_outbound_submit(): store thread_anchor_key; pg_notify('ml_outbox', oid::text) when queued.
--- ml_outbound_hold_reasons(): over_thread counts by thread_anchor_key.
--- ml_review_decide(): edit stores before_subject/before_body_text; reject/reply/take_over insert a kind='review' dispatch;
---   pg_notify('ml_outbox') on approve/edit.
--- ml_held_expire(): a kind='review' dispatch per row (acting = primary overseer) and ml_notify(reviewers, 'review_decided', …).
--- ml_thread_take_over(on): cancel the agent's held replies in the conversation, each with a take_over review.
--- ml_outbound_held_notice(): AFTER INSERT OR UPDATE OF status trigger → ml_notify each reviewer 'held_mail' once per row,
---   not when the hold reason added is 'paused' by the mailbox's own decider.
-```
+**Done in `db/015_sending_oversight.sql`** (Phase 1; proven by `db/proof/phase1_sending.sql`, 73 checks, beside `phase0_proof.sql`'s 232): the columns
+`outbound_email.filed_at`, `thread_anchor_key`; `mail_reviews.before_subject`, `before_body_text` (an edit needs them);
+`mail_drafts.filed_at`; `notifications.item_count`; the status machine (`sending → queued` refused, `deferred → held` admitted);
+`ml_outbound_stalled()`, `ml_outbound_lost()`, `ml_outbound_retry()`; the claim and pause over deferred rows and the resume rule;
+`ml_thread_anchor()` in Send and the conversation cap; `ml_review_dispatch()` from reject, reply, take-over (review or conversation)
+and expiry; `ml_outbound_reviewers()` and the held-mail and expiry notices; `ml_notify()`'s text row; `ml_notify_coalesce()`;
+`ml_agent_mail_summary()`; the `ml_outbox` and `ml_drafts` wake-ups. `agent_dispatches.kind` = `review` came with db/012.
 
 **The tool surface:** `outbox_list` answers its writer the latest decision and note for each of their own rows (`decision`, `note`,
 `decided_at`).

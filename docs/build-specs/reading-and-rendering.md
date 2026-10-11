@@ -97,12 +97,14 @@ opaque-origin frame carries no cookie:
 
 ```
 {signed} = base64url(json {b: mailbox id, k: message key id, f: folder id, v: uidvalidity, u: uid, p: part, d: "inline"|"attachment",
-                           m: member id, e: unix expiry}) "." hex(HMAC-SHA256(ML_LINK_KEY, the first half))
+                           m: member id, e: unix expiry}) "." hex(HMAC-SHA256(ML_PART_KEY, the first half))
 ```
 
-- Minted by the page as it renders (the attachment list and `cid_url()`), **valid one hour**, bound to the member who rendered it.
-- The door verifies the MAC in constant time, the expiry, that the member is still active and **still opens the mailbox at `view`**
-  (`ml_mailbox_level`), then streams the mail service's `part` call. **Anything else answers 404** — an unsigned or forged
+- **One key, `ML_PART_KEY`** (in `config/.env`), signs both public doors' tokens. It is **minted by the mail service when it sanitises**
+  (`cid:` images — `cid_url()` — and the part list `fetch` returns) **and by PHP** for the links it renders itself; **verified by
+  PHP's `/p/` and `/img/` doors** only. Every token is **valid one hour** and **bound to the member and the message** it was made for.
+- The door verifies the MAC in constant time, the expiry, that the member is still active and **still opens the mailbox at `view` —
+  re-checked on every use** (`ml_mailbox_level`), then streams the mail service's `part` call. **Anything else answers 404** — an unsigned or forged
   same-origin URL is never a part (the sanitiser proof's one same-origin image request, research 04 §A).
 - `d = "inline"` is honoured **only** for a raster image (`image/png`, `jpeg`, `gif`, `webp`, sniffed from the bytes, not the
   part's declared type); every other part is `attachment`.
@@ -123,13 +125,14 @@ conversation shows *"Images in this message are not shown — Show images · Alw
 **Show images.** The frame reloads with `?images=1`; `fetch` sanitises with `remote_image_url(url) → /img/{signed}`:
 
 ```
-{signed} = base64url(json {b: mailbox id, k: message key id, n: index, u: the URL, e: unix expiry}) "." hex(HMAC-SHA256(ML_LINK_KEY, …))
+{signed} = base64url(json {b: mailbox id, k: message key id, n: index, u: the URL, m: member id, e: unix expiry}) "." hex(HMAC-SHA256(ML_PART_KEY, …))
 ```
 
-Valid ten minutes. Tracking pixels stay dropped.
+Minted by the mail service as it sanitises with images shown; valid one hour, bound to the member and the message, the member's level
+re-checked on every use — as the part door's. Tracking pixels stay dropped.
 
 **Always show from a sender** (`mail_images_allow`, slice 3): the mailbox's `mail_correspondents` row for the sender gains
-`images_always` (db/012). It applies **only to a message that proves its sender**: `dmarc_pass`, or `local_submission` from a
+`images_always` (`db/014_reading_search.sql`, read by `ml_images_always_for(message)`). It applies **only to a message that proves its sender**: `dmarc_pass`, or `local_submission` from a
 colleague (§5's internal proof) — a forged `From:` never turns images on (decision 3).
 
 **`GET /img/{signed}`** (`html/img.php`, public allow-list) verifies the token, then asks **the image door** on loopback
@@ -225,8 +228,9 @@ MUSTs (2): `R34`, `R41`
 
 1. **`form-action 'none'; base-uri 'none'` join §6.4's policy.** `default-src` does not cover them; both only narrow what the frame may
    do.
-2. **One signing key for the two public doors, `ML_LINK_KEY`**, PHP's alone (the image door and the mail service never need it).
-   Separate from `ML_MAILER_KEY`, so a leak of a page's links never signs a call to the mail service.
+2. **One signing key for the two public doors, `ML_PART_KEY`** (decided by the coordinator): minted by the mail service as it sanitises
+   and by PHP for the links it renders, verified only by PHP's doors, one hour, bound to the member and the message, the level
+   re-checked on every use. Separate from `ML_MAILER_KEY`, so a leaked link never signs a call to the mail service.
 3. **Always-show-images needs a proven sender** (DMARC pass, or `local_submission` from a colleague). A spoofed From would otherwise
    switch tracking on.
 4. **A plain-text message renders in the page, never in the frame.** The frame exists for HTML; escaped text needs no sandbox.
@@ -242,10 +246,11 @@ MUSTs (2): `R34`, `R41`
 
 ## Changes this spec asks of the shared documents
 
-- **maludb-os.json `env`**: add `ML_LINK_KEY` to the required keys, generated at install like `ACTION_TOKEN_KEY`; and `tests/setup_dev.sh`
-  writes one. `ML_IMAGES_TEST_ALLOW` is documented in `config/.env.example` as proofs-only.
-- **db/012**: `mail_correspondents` appends `images_always boolean NOT NULL DEFAULT false`, `images_set_by bigint REFERENCES members(id)`,
-  `images_set_at timestamptz`, and `ml_images_allow()` (sketched in `reading.md`).
+- **maludb-os.json `env`**: `ML_PART_KEY` among the required keys, generated at install like `ACTION_TOKEN_KEY` (the mail service reads
+  it from `config/.env` like the rest); `tests/setup_dev.sh` writes one. `ML_IMAGES_TEST_ALLOW` is documented in `config/.env.example`
+  as proofs-only.
+- **`db/014_reading_search.sql`** (BUILT, proven by `db/proof/phase1_reading.sql`): `mail_correspondents.images_always`,
+  `images_set_by`, `images_set_at`; `ml_images_allow()`; `ml_images_always_for()`; `mcp_correspondents` appends the flag.
 - **mail-service.md (fork A)**: `fetch` takes `form` (`html` · `text` · `headers`) and `images` (`ask` · `show`), returns the
   `Sanitised` fields plus the header summary (From, Sender, Reply-To, To, Cc, Date, DMARC, spam score, List-*, Auto-Submitted) and
   the part list (`part`, name, type, decoded size, content-id); `part` streams one part by `(folder, uidvalidity, uid, part)`;

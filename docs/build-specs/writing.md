@@ -111,7 +111,7 @@ draft_discard(PDO $pdo, int $mailbox, int $draft, int $member): void
 draft_attachments(PDO $pdo, int $draft): array; draft_attachment_total(PDO $pdo, int $draft): int
 outbound_send(PDO $pdo, int $mailbox, int $member, array $fields): array    // wraps ml_outbound_submit(); ['outbound', 'status', 'hold_reasons', 'refusal', 'send_after']
 outbound_cancel(PDO $pdo, int $outbound, int $member): ?int                 // ml_outbound_cancel() → the reopened draft
-outbound_retry(PDO $pdo, int $outbound, int $member): void                  // failed → queued (db/012's ml_outbound_retry())
+outbound_retry(PDO $pdo, int $outbound, int $member): void                  // failed → queued (`db/015_sending_oversight.sql`'s ml_outbound_retry())
 identity_save(PDO $pdo, int $mailbox, ?int $identity, array $fields, int $member): int
 identity_delete(PDO $pdo, int $mailbox, int $identity, int $member): void
 ```
@@ -202,9 +202,9 @@ None for the owner.
 
 ## Changes this spec asks of the shared documents
 
-- **db/012**: `ml_outbound_retry(p_outbound, p_member)` (`failed → queued` by the writer or a `send` holder, `retry_at` cleared,
-  `pg_notify('ml_outbox')`); `ml_drafts_notify()` (`pg_notify('ml_drafts', id)` after a draft row is inserted or changed);
-  `mail_drafts.filed_at timestamptz` (the APPEND done for this `saved_at`); grants on both to `malumail_rw`.
+- **Done in `db/015_sending_oversight.sql`**: `ml_outbound_retry(p_outbound, p_member)` (the writer, or a member with `send`; a fresh deferral
+  budget); the `ml_drafts` wake-up when a draft is saved or discarded; `mail_drafts.filed_at`. The `ml_outbox` wake-up is a trigger on
+  every row that becomes `queued`.
 - **`mail-service.md`** (fork A): the door routes `append_draft`, `fetch` with a `profile`, `sanitise`, `identity_check`, and the
   IMAP fixture's APPEND, UID EXPUNGE, STORE and SEARCH HEADER.
 - **The manifest**: none — its nine rows stand as written.

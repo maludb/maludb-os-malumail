@@ -1,6 +1,6 @@
 {
     "generated_from": "docs/malumail-action-manifest.md",
-    "generated_at": "2026-10-11T20:06:41+00:00",
+    "generated_at": "2026-10-11T20:20:37+00:00",
     "screens": {
         "home": {
             "screen": "home",
@@ -948,9 +948,15 @@
                 },
                 {
                     "name": "thread",
-                    "required": true,
+                    "required": false,
                     "repeated": true,
                     "hint": ""
+                },
+                {
+                    "name": "matching",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "a search query — every conversation it finds up to 1000 instead of thread"
                 }
             ],
             "undo": "mail_move",
@@ -975,7 +981,7 @@
                 },
                 {
                     "name": "thread",
-                    "required": true,
+                    "required": false,
                     "repeated": true,
                     "hint": ""
                 },
@@ -984,6 +990,12 @@
                     "required": true,
                     "repeated": false,
                     "hint": ""
+                },
+                {
+                    "name": "matching",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "a search query — every conversation it finds up to 1000 instead of thread"
                 }
             ],
             "undo": "mail_move",
@@ -1008,9 +1020,15 @@
                 },
                 {
                     "name": "thread",
-                    "required": true,
+                    "required": false,
                     "repeated": true,
                     "hint": ""
+                },
+                {
+                    "name": "matching",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "a search query — every conversation it finds up to 1000 instead of thread"
                 }
             ],
             "undo": "mail_move",
@@ -1035,9 +1053,15 @@
                 },
                 {
                     "name": "thread",
-                    "required": true,
+                    "required": false,
                     "repeated": true,
                     "hint": ""
+                },
+                {
+                    "name": "matching",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "a search query — every conversation it finds up to 1000 instead of thread"
                 }
             ],
             "undo": "mail_not_spam",
@@ -1062,9 +1086,15 @@
                 },
                 {
                     "name": "thread",
-                    "required": true,
+                    "required": false,
                     "repeated": true,
                     "hint": ""
+                },
+                {
+                    "name": "matching",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "a search query — every conversation it finds up to 1000 instead of thread"
                 }
             ],
             "undo": "mail_spam",
@@ -1089,7 +1119,7 @@
                 },
                 {
                     "name": "thread",
-                    "required": true,
+                    "required": false,
                     "repeated": true,
                     "hint": ""
                 },
@@ -1104,6 +1134,12 @@
                     "required": false,
                     "repeated": false,
                     "hint": "yes or no"
+                },
+                {
+                    "name": "matching",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "a search query — every conversation it finds up to 1000 instead of thread"
                 }
             ],
             "undo": "restore prior",
@@ -1128,7 +1164,7 @@
                 },
                 {
                     "name": "thread",
-                    "required": true,
+                    "required": false,
                     "repeated": true,
                     "hint": ""
                 },
@@ -1137,6 +1173,12 @@
                     "required": false,
                     "repeated": false,
                     "hint": "yes or no"
+                },
+                {
+                    "name": "matching",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "a search query — every conversation it finds up to 1000 instead of thread"
                 }
             ],
             "undo": "restore prior",
@@ -1805,25 +1847,7 @@
                     "name": "body_format",
                     "required": false,
                     "repeated": false,
-                    "hint": ""
-                },
-                {
-                    "name": "to",
-                    "required": false,
-                    "repeated": true,
-                    "hint": ""
-                },
-                {
-                    "name": "cc",
-                    "required": false,
-                    "repeated": true,
-                    "hint": ""
-                },
-                {
-                    "name": "bcc",
-                    "required": false,
-                    "repeated": true,
-                    "hint": ""
+                    "hint": "text or html"
                 }
             ],
             "undo": null,
@@ -1992,6 +2016,12 @@
                     "required": true,
                     "repeated": false,
                     "hint": ""
+                },
+                {
+                    "name": "as_spam",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes to move it to Spam"
                 }
             ],
             "undo": null,
@@ -2184,7 +2214,7 @@
                 },
                 {
                     "name": "thread",
-                    "required": true,
+                    "required": false,
                     "repeated": true,
                     "hint": ""
                 },
@@ -2199,6 +2229,12 @@
                     "required": false,
                     "repeated": false,
                     "hint": "yes to take the label off"
+                },
+                {
+                    "name": "matching",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "a search query — every conversation it finds up to 1000 instead of thread"
                 }
             ],
             "undo": "restore prior",
@@ -2654,6 +2690,12 @@
                     "hint": "yes or no"
                 },
                 {
+                    "name": "page_size",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "25 50 or 100"
+                },
+                {
                     "name": "ai_read",
                     "required": false,
                     "repeated": false,
@@ -2714,7 +2756,7 @@
                     "hint": "yes or no"
                 },
                 {
-                    "name": "sms_enabled",
+                    "name": "text_enabled",
                     "required": false,
                     "repeated": false,
                     "hint": "yes or no"
@@ -2724,6 +2766,12 @@
                     "required": false,
                     "repeated": true,
                     "hint": "the notices that may mail"
+                },
+                {
+                    "name": "text_kind",
+                    "required": false,
+                    "repeated": true,
+                    "hint": "the notices that may text"
                 },
                 {
                     "name": "new_mail_mailbox",
@@ -2747,10 +2795,10 @@
             "endpoint": "/admin/settings/save.php",
             "params": [
                 {
-                    "name": "undo_seconds_default",
+                    "name": "undo_send_seconds",
                     "required": false,
                     "repeated": false,
-                    "hint": ""
+                    "hint": "0 to 30"
                 },
                 {
                     "name": "images_default",
@@ -2759,7 +2807,31 @@
                     "hint": "ask or always"
                 },
                 {
-                    "name": "body_index_kb",
+                    "name": "index_text_max_kb",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "max_attachments_mb",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "draft_save_seconds",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "poll_visible_seconds",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "poll_hidden_seconds",
                     "required": false,
                     "repeated": false,
                     "hint": ""
@@ -2771,10 +2843,70 @@
                     "hint": ""
                 },
                 {
-                    "name": "agent_external_budget",
+                    "name": "default_send_mode",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "hold_all internal_auto allowlist_auto or auto"
+                },
+                {
+                    "name": "default_first_contact_review",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                },
+                {
+                    "name": "default_attachments_review",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                },
+                {
+                    "name": "default_max_external_per_day",
                     "required": false,
                     "repeated": false,
                     "hint": ""
+                },
+                {
+                    "name": "default_max_per_hour",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "default_max_per_thread_per_day",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "default_wake_on_mail",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                },
+                {
+                    "name": "default_wake_from",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "none internal internal_and_known or all_authenticated"
+                },
+                {
+                    "name": "default_disclosure",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                },
+                {
+                    "name": "disclosure_text",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "agent_external_budget",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "empty for the warm-up"
                 },
                 {
                     "name": "hold_all_agents",
@@ -2789,10 +2921,16 @@
                     "hint": "yes or no"
                 },
                 {
-                    "name": "clerk_hour",
+                    "name": "mm3_identity_enforced",
                     "required": false,
                     "repeated": false,
-                    "hint": ""
+                    "hint": "yes or no"
+                },
+                {
+                    "name": "clerk_note_at",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "HH:MM"
                 }
             ],
             "undo": "restore prior",

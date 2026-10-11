@@ -97,7 +97,10 @@ it will do (the manifest's "When the user wants…") and the slice that builds i
 
 ## MCP tools this slice names
 
-`notice_status`, `find_members`, `find_departments`, `find_mailboxes` (Phase 4 serves them; the shell's screens read the same SQL).
+`notice_status`, `find_members`, `find_departments`, `find_mailboxes` (Phase 4 serves them; the shell's screens read the same SQL);
+`app_roles` (the kernel's read of the two roles, over the kit's roles view); and the activity server's general tools, which read
+the trail this phase starts writing: `member_activity`, `record_history`, `activity_search`, `recent_activity` (`my-trail` is the
+screen over the same events).
 
 ## Query functions and mail-service calls (signatures fixed)
 

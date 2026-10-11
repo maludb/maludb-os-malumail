@@ -24,9 +24,9 @@ hold `settings.manage`.
 
 | Kind | To | Made by | Says (title; body) |
 |---|---|---|---|
-| `new_mail` | a person who chose the mailbox (`new_mail_mailbox_ids`) and may open it | the worker's `new_mail` pass | *"3 new messages in sales@"* — coalesced: an unread `new_mail` notice for that mailbox under 30 minutes old is updated, not repeated |
-| `held_mail` | each reviewer of the held message | db/012's trigger `ml_outbound_held_notice()` | *"Mail from Ada waits for your review (first contact, attachment)"* |
-| `review_decided` | the other reviewers when a held message expires | `ml_held_expire()` (db/012) | *"Ada's message expired with no decision"* |
+| `new_mail` | a person who chose the mailbox (`new_mail_mailbox_ids`) and may open it | the worker's `new_mail` pass | *"3 new messages in sales@"* — coalesced by `ml_notify_coalesce()`: an unread `new_mail` notice for that mailbox under 30 minutes old has its count (`item_count`) raised, not repeated |
+| `held_mail` | each reviewer of the held message | `db/015_sending_oversight.sql`'s trigger `ml_outbound_held_notice()` | *"Mail from Ada waits for your review (first contact, attachment)"* |
+| `review_decided` | the other reviewers when a held message expires | `ml_held_expire()` (`db/015_sending_oversight.sql`) | *"Ada's message expired with no decision"* |
 | `unscreened` | the agent mailbox's primary overseer | `ml_dispatch_decide()` (db/010) | *"Mail for Ada waits for a person"* |
 | `break_glass` | the owner of a person's mailbox | db/010's permissions trigger (slice 7) | *"Marco was given access to your mailbox until 30 Oct: <reason>"* — the reason is the granter's words |
 | `permission_granted` | a person given a row | the same trigger | *"You can now open sales@ (send)"* |
@@ -38,7 +38,7 @@ hold `settings.manage`.
 | `digest` | each overseer, weekdays at `clerk_note_at` | the worker's `clerk_note` pass, actor the Clerk | *"Your agents' mail this morning"*; body: per mailbox, held over a day, Unscreened, quota, failures — counts and links |
 
 **Delivery.** `ml_notify()` writes the bell row and, when the person's choices say so, an `email` row of `notification_outbox`
-(deduplicated by `n<notification id>`). db/012 adds the **text** row: when `text_enabled` and the kind is in `text_kinds` (default
+(deduplicated by `n<notification id>`). `db/015_sending_oversight.sql`'s `ml_notify()` adds the **text** row: when `text_enabled` and the kind is in `text_kinds` (default
 `{held_mail}`), a `channel = 'text'` row. The worker's `notify_outbox` pass sends:
 
 - `email` through `app/mail.php` (MaluMail's `/v1/send`, the installer's key): plain text, the title, a link to the record, and the line
@@ -151,7 +151,6 @@ None for the owner.
 - **The manifest**: `mail_notification_prefs_save` → params `email_enabled (yes or no), text_enabled (yes or no), kind[] (the notices that
   may mail), text_kind[] (the notices that may text), new_mail_mailbox[] (mailbox ids)` (the column's own name, `text_enabled`, replaces
   `sms_enabled`).
-- **db/012**: `ml_notify()` also writes the `text` outbox row (`text_enabled` and `p_kind = ANY (text_kinds)`), deduplicated by
-  `t<notification id>`; `ml_notify_coalesce(p_member, p_mailbox, p_count)` for `new_mail` (updates the unread notice under 30 minutes
-  old, else inserts); the held-mail trigger and the expiry notice are sending-and-oversight's.
+- **Done in `db/015_sending_oversight.sql`**: `ml_notify()`'s text row (deduplicated by `t<notification id>`), `ml_notify_coalesce()` with
+  `notifications.item_count`, the held-mail trigger and the expiry notice (proven by `db/proof/phase1_sending.sql`).
 - **The tool surface**: none (`my_notifications` stands; `notice_status` is the shell's).

@@ -13,7 +13,7 @@ in SQL, the mail service through `app/mailer.php`, the poll by change counter. S
 slice draws; slice 6 adds `label-view` and search on the same gatherer.
 
 **Prerequisites**: Phase 2's shell (`sso-shell.md`: the layout with the rail's frame, `app/mailer.php`, the record picker, the search
-box, `/api/v1/health`); Phase 0's schema (db/008's index and threading, db/011's views) and the mail service's skeleton; db/012 (below).
+box, `/api/v1/health`); Phase 0's schema (db/008's index and threading, db/011's views) and the mail service's skeleton; db/013_list_and_sync.sql (built and proven: `db/proof/phase1_list.sql`).
 
 ## Divergences from the design
 
@@ -118,14 +118,14 @@ button: the breaker). Spam and Trash: "Nothing here." Scheduled: "Nothing schedu
 | `html/assets/js/mail-list.js` | selection, the bulk bar's state, the poll with the visibility guard, the title and the favicon |
 | `services/mailer/{index.py,watch.py,textpass.py}`, changes to `server.py`, `store.py`, `imap.py`, `config.py` | `mail-service.md` §§2–3, 8–9 |
 | `bin/worker.php` | the `index_catch_up` pass made real: mailboxes live but not synced for 10 minutes → `sync`; tombstones pruned after a day |
-| `db/012_phase1_fixes.sql` (shared, reconciled) | `ml_mail_list()`, `ml_mailbox_counts()`, `ml_unread_count()`, the change counter (mail-service.md) |
+| `db/013_list_and_sync.sql` | `ml_mail_list()`, `ml_mailbox_counts()`, `ml_unread_count()`, the change counter (mail-service.md) |
 | `mcp/records_server.py` (Phase 4 wires it; this slice writes the tools' queries) | `find_mailboxes`, `mailbox_get`, `mailbox_overview`, `mail_list`, `find_folders` |
 | `tests/fixtures/imap_server.py` | slice 2's growth (`mail-service.md` §12) |
 | `tests/phase3/slice2/{run.sh,list.php,sync.py,browser.mjs}` | the proof |
 
 ## Query functions and mail-service calls (signatures fixed)
 
-**SQL (db/012; SECURITY DEFINER, the wall inside, `STABLE`, read once per statement):**
+**SQL (`db/013_list_and_sync.sql`; SECURITY DEFINER, the wall inside, `STABLE`, read once per statement):**
 
 - `ml_mail_list(p_mailbox bigint, p_view text, p_folder bigint, p_label bigint, p_unread boolean, p_before_at timestamptz,
   p_before_id bigint, p_limit integer) RETURNS TABLE (thread_id bigint, subject text, participants text[], names jsonb,
@@ -138,7 +138,12 @@ button: the breaker). Spam and Trash: "Nothing here." Scheduled: "Nothing schedu
 - `ml_mailbox_counts(p_mailbox bigint) RETURNS jsonb` — `{inbox_unread, inbox_total, starred, snoozed, next_wake, drafts, scheduled,
   deferred, failed, held, unscreened, spam}` (the `mailbox_overview` tool's answer and the rail's).
 - `ml_unread_count(p_mailbox bigint) RETURNS integer` — Inbox, by `ml_read_mode()`'s rule for the caller.
-- `ml_mailbox_touch(p_mailbox bigint, p_threads bigint[]) RETURNS bigint` and `mail_mailbox_changes` (`mail-service.md`).
+- The poll: `ml_mailbox_seq(p_mailbox bigint) RETURNS bigint` (NULL when the caller may not open it) and
+  `ml_mailbox_changed(p_mailbox bigint, p_since bigint, p_limit integer) RETURNS TABLE (thread_id bigint, change_seq bigint, gone
+  boolean)` — the conversations changed since `p_since` and the tombstones of those that went (an agent never gets a sensitive one).
+- `ml_mailbox_touch(p_mailbox bigint, p_threads bigint[]) RETURNS bigint`, `mail_mailbox_changes`, `ml_tombstones_prune()` (the
+  worker's `index_catch_up` pass) — `mail-service.md`.
+- Inside: `ml_mail_list_ids()` (the view's filter and cursor, shared by the list and its total) and `ml_thread_unread_for()`.
 
 **PHP (`app/features/mail/list.php`):**
 
@@ -221,7 +226,7 @@ under a user-level Apache on 9201 rendering `deploy/apache-malumail.conf`. Playw
 
 ## Changes this spec asks of the shared documents
 
-- **db/012**: `ml_mail_list()`, `ml_mail_list_total()`, `ml_mailbox_counts()`, `ml_unread_count()` as above (GRANT EXECUTE to
+- **db/013_list_and_sync.sql** — BUILT and proven (`db/proof/phase1_list.sql`, 75 checks): `ml_mail_list()`, `ml_mail_list_total()`, `ml_mailbox_counts()`, `ml_unread_count()` as above (GRANT EXECUTE to
   `malumail_rw` and `malumail_records_ro`); the change counter of `mail-service.md` (`mail_mailbox_changes`, `mail_threads.change_seq`,
   `ml_mailbox_touch()`, `mail_thread_tombstones`). Sketch of the Inbox branch:
   `SELECT … FROM mail_threads t CROSS JOIN LATERAL ml_thread_state(t.id) st WHERE t.mailbox_id = p_mailbox AND
@@ -231,4 +236,4 @@ under a user-level Apache on 9201 rendering `deploy/apache-malumail.conf`. Playw
 - **Manifest**: `mail_mailbox_settings_save` gains `page_size (25 50 or 100)` (slice 7's action; the setting this slice reads).
 - **Tool surface**: `mail_list`'s `view` gains `outbox` (it already serves `scheduled`); `mailbox_overview` answers
   `ml_mailbox_counts()`'s fields.
-- **mcp/requirements.txt**: `imapclient==4.1.0` (`mail-service.md`).
+- **mcp/requirements.txt**: `imapclient==4.1.0` (accepted; the coordinator bumps it).

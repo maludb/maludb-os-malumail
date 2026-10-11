@@ -42,6 +42,7 @@
       "ML_IMAGES_PORT",
       "ML_MAILER_KEY",
       "ML_SEAL_PUBLIC_KEY",
+      "ML_PART_KEY",
       "MALUMAIL_MCP_URL",
       "ML_IMAP_HOST",
       "ML_IMAP_PORT",
@@ -62,7 +63,8 @@
       "MAIL_FROM",
       "MAIL_FROM_NAME",
       "ML_STORAGE_DIR",
-      "API_CORS_ORIGINS"
+      "API_CORS_ORIGINS",
+      "ML_MAILER_MAX_CONNECTIONS"
     ]
   },
   "services": [
@@ -174,7 +176,7 @@
   "shares": [
     {
       "tool": "correspondence_index",
-      "description": "Conversations with an address or a domain over the mailboxes marked shared with applications (agents' and shared mailboxes by default; a person's only if its owner opts in): subject, participants, dates, mailbox, message count, a 200-character snippet, the URL — every answer in the mailbox's access log (os.malumail-correspondence/1)",
+      "description": "Conversations with an address or a domain over the mailboxes marked shared with applications (agents' and shared mailboxes by default; a person's only if its owner opts in), since a date: subject, participants, dates, mailbox, message count, a 200-character snippet, the URL; truncated past 256 kB — every answer in the access log, one k7.read row per mailbox drawn on (os.malumail-correspondence/1)",
       "scoped": false,
       "timeout_seconds": 15
     }
@@ -304,12 +306,7 @@
         "skills/mail-basics",
         "skills/overseeing-agent-mail",
         "skills/explain-a-held-message"
-      ],
-      "duty": {
-        "name": "The overseers' morning note",
-        "schedule_cron": "10 7 * * 1-5",
-        "instructions": "Weekdays at 07:10: for the agent mailboxes you hold triage on, read review_queue (held mail older than a day), unscreened_mail, mailbox_health (near quota, failing to sync) and oversight_summary, and write ONE short note per overseer covering only their mailboxes: counts first, then at most five items with links. Ids, counts, addresses and subjects of agent mailboxes only — never a body. Propose, never decide: you approve, reject, release, mark known, pause or change a policy for nobody."
-      }
+      ]
     }
   ],
   "approvals": [

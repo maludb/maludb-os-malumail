@@ -74,13 +74,13 @@ The headers as a two-column list, then the source escaped in a `pre-wrap` block 
 | `html/p.php`, `html/img.php` | the part door and the image door's front (reading-and-rendering §3, §4) |
 | `html/mail/archive.php`, `move.php`, `trash.php`, `spam.php`, `not-spam.php`, `flag.php`, `mark-read.php`, `delete-forever.php`, `trash-empty.php`, `images-allow.php`, `sensitive.php` | the eleven actions |
 | `app/features/mail/reading.php` | the queries and helpers below |
-| `app/features/mail/links.php` | `ml_link_sign()`, `ml_link_verify()` for `/p/` and `/img/` |
+| `app/features/mail/links.php` | `ml_part_sign()`, `ml_part_verify()` for `/p/` and `/img/` (`ML_PART_KEY`; the mail service signs with the same key) |
 | `app/views/mail/thread.php`, `message.php`, `original.php`, `banners.php`, `attachments.php` | templates |
 | `html/assets/mail/keys.js`, `frame.js`, `remote-image.svg` | the keyboard; the frame's height listener; the placeholder |
 | `services/mailer/extract.py` | the agent's text (reading-and-rendering §6) |
 | `services/mailer/sanitise.py` | the link-host addition (reading-and-rendering §1) |
 | `services/images/door.py` | the image door |
-| `db/012_phase1.sql` (shared, reconciled) | `ml_images_allow()`, the correspondents' columns, `ml_thread_keys()` |
+| `db/014_reading_search.sql` (BUILT; proof `db/proof/phase1_reading.sql`) | `ml_images_allow()`, `ml_images_always_for()`, the correspondents' columns, `ml_thread_keys()` |
 | `tests/phase3/slice3/run.sh`, `browser.mjs`, `door.py` | the proof |
 
 ## Query functions and mail-service calls (signatures fixed)
@@ -107,10 +107,14 @@ The mail service (`mail-service.md`, consumed by name):
   §B) and records it as `special_use = 'archive'`; it updates the index in the same request; it answers `moved` for a stale
   UIDVALIDITY and the refusal sentence for a refused op.
 
-SQL (db/012):
+SQL (`db/014_reading_search.sql`, built and proven):
 
-- `ml_images_allow(p_mailbox bigint, p_address text, p_by bigint, p_on boolean) RETURNS void` — `ml_require_person(p_by)`, level `full`.
-- `ml_thread_keys(p_thread bigint) RETURNS bigint[]` — the conversation's message keys (the anchors for states and labels).
+- `ml_images_allow(p_mailbox bigint, p_address text, p_by bigint, p_on boolean) RETURNS void` — `ml_require_person(p_by)`, level `full`
+  (404's sentence below any level).
+- `ml_images_always_for(p_message bigint) RETURNS boolean` — the message's sender is always-shown on its mailbox **and** proven (a
+  DMARC pass, or a colleague's local submission); false for a mailbox the caller cannot open. `body.php` asks it for `images`.
+- `ml_thread_keys(p_thread bigint) RETURNS bigint[]` — the conversation's message keys (the anchors for states and labels); empty for
+  a conversation the caller cannot open, and for an agent on a sensitive one.
 
 ## MCP tools this slice makes real
 
@@ -196,23 +200,8 @@ mute (slice 5); the list and the poll (slice 2); retention of Trash and Spam (Ex
 - **Manifest**: `mail_archive`, `mail_move`, `mail_trash`, `mail_spam`, `mail_not_spam`, `mail_flag`, `mail_mark_read` — `**thread[]**`
   becomes `thread[]`, and each gains `matching` (a search query — every conversation it finds up to 1000) as the last parameter.
   (Slice 6's `mail_label` gains the same.)
-- **db/012**:
-  ```sql
-  ALTER TABLE mail_correspondents ADD COLUMN images_always boolean NOT NULL DEFAULT false,
-      ADD COLUMN images_set_by bigint REFERENCES members(id) ON DELETE SET NULL, ADD COLUMN images_set_at timestamptz;
-  CREATE FUNCTION ml_images_allow(p_mailbox bigint, p_address text, p_by bigint, p_on boolean) RETURNS void
-      LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-  BEGIN
-      PERFORM ml_require_person(p_by);
-      IF ml_mailbox_level(p_mailbox, p_by) <> 'full' THEN RAISE EXCEPTION 'Showing images always is set by someone with full on the mailbox' USING ERRCODE = 'insufficient_privilege'; END IF;
-      INSERT INTO mail_correspondents AS c (mailbox_id, address, images_always, images_set_by, images_set_at)
-      VALUES (p_mailbox, lower(btrim(p_address)), p_on, p_by, now())
-      ON CONFLICT (mailbox_id, address) DO UPDATE SET images_always = p_on, images_set_by = p_by, images_set_at = now();
-  END$$;
-  CREATE FUNCTION ml_thread_keys(p_thread bigint) RETURNS bigint[] LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
-      $$ SELECT COALESCE(array_agg(DISTINCT message_key_id), '{}') FROM mail_messages WHERE thread_id = p_thread $$;
-  ```
-  `mcp_correspondents` appends `images_always`.
-- **maludb-os.json**: `ML_LINK_KEY` (reading-and-rendering §Changes).
+- **`db/014_reading_search.sql`** — BUILT: the correspondents' columns, `ml_images_allow()`, `ml_images_always_for()`, `ml_thread_keys()`,
+  `mcp_correspondents.images_always` (proof `db/proof/phase1_reading.sql`).
+- **maludb-os.json**: `ML_PART_KEY` (reading-and-rendering §3 and §Changes — the decided key).
 - **The IMAP fixture** (`tests/fixtures/imap_server.py`) grows by the commands named in the proof's heading — mail-service.md's slice 2
   growth comes first; this slice adds `BINARY.PEEK`/`BINARY.SIZE`, `UID MOVE` with `COPYUID`, `UID EXPUNGE` and `CREATE`.

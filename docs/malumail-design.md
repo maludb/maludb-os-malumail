@@ -1077,6 +1077,7 @@ log, `mail_reviews` and the outbound rows (§6.6); R54's "AI may read" switch is
 | K8 | Wake an agent from an application | owed to every sibling; the chat-turn dispatch with the primary overseer as acting member until then |
 | **K46** | The kernel's agent and assistant sends go through this application's outbox (or its policy) once the application serves that mailbox | owed; until then oversight covers what agents send through this application (§5) |
 | **K55** | **The kernel's Actions MCP gives every application's actions ONE flat namespace**: `mcp/application_actions.py` registers the first application's action under a name and skips every later one with a log line — so an agent granted Inventory's `customer_create` is handed the cidery's. Found 2026-10-11 (Phase 0's packaging): on this installation 212 of 1,149 built application actions are skipped and 144 names are registered by more than one application; `message_send` is the kernel's own agent messaging. Wanted: a name per application (`<app_key>.<action>` or a prefix) and grants that name the application | **built** — kernel c3fed48 (2026-10-11, the owner: "Fix it"): a shared name is served as `<app_key>_<action>`, kept once given; APPLIED by the owner the same day (148 grants moved, all 1,149 served). MaluMail's `mail_…` names stay — unique, so served as written |
+| **K56** | The run facts (`html/api/v1/runs/facts.php`) answer an application the **names of the tools a run called**, so a reviewer of an agent's held mail sees what the agent looked at before it wrote (design §5's review page) | owed (found in Phase 1, `oversight.md`); until then the review page shows the run id and links to the kernel's run page |
 | **MM1** | **Application passwords per mailbox, bound to the OS server's address**: a table, a second Dovecot SQL passdb with `allow_nets`, Mailbox MCP tools to issue (returned once), list and revoke | **required for people's mailboxes in production**; the development and the agents' mailboxes do without (D3) |
 | **MM2** | **How this server's logins are protected from the mail server's abuse protection** — agreed with the infrastructure side, scoped to the application-password path (detail in the owner's handoff, not here) | **required before the spike** |
 | MM3 | An identity rule at submission: which addresses a login may send as (itself and the aliases that deliver to it) | owed; the webmail restricts identities itself, and §5's wake rule treats internal-looking mail as outside unless this application sent it |
@@ -1333,5 +1334,21 @@ questions in one sitting and changed none:
      and the size limit.
   7. **The application's `mcp/venv`** now exists in the clone (built for these proofs), so the installer's `venv` step reads done.
 
-  **NEXT:** Phase 1 for the owner's approval: the tool surface, the action manifest, the three build specs and the ten slice specs.
-  **People's existing mailboxes wait on MM1.**
+- **2026-10-11, PHASE 1 WRITTEN** (the owner: "Yes"; `docs/phase1-consistency.md` is the record):
+  - **The tool surface:** 36 records tools and 7 activity tools (`docs/malumail-mcp-tool-surface.md`).
+  - **The action manifest:** 45 screens and 67 actions, 41 a person's alone and 3 paused for agents
+    (`docs/malumail-action-manifest.md` → `mcp/action_registry.json`).
+  - **The specs:** three build specs (`mail-service`, `reading-and-rendering`, `sending-and-oversight`) and the shell's plus ten slice
+    specs in `docs/build-specs/`.
+  - **db/012–015** — the schema the specs found missing — each proven: `tests/phase0/schema.sh` applies 001–015 and runs **514 checks
+    green** (232 + 37 + 75 + 97 + 73). The kit stays 101, the mail service 62 (on IMAPClient 4.1.0).
+  - **`tests/phase1/check_specs.sh`: 98 green.** Every screen and action is claimed by exactly one spec, every tool is named, every
+    grant is real and in its job description, and every research MUST is claimed or held by name (R56 and R63).
+  - **The changes from the approved design** (`phase1-consistency.md` decisions 2, 5, 10 and 16):
+    - the mail service reads every level itself;
+    - a person's new password is shown once and never stored, the service deciding from the mailbox's kind;
+    - IMAPClient 4.1.0;
+    - the Clerk's morning note is the worker's deterministic `digest`, not a model's duty.
+  - **K56** is new (§12). **Three questions are for the owner**, each with a recommendation.
+
+  **NEXT:** the owner's approval of Phase 1 → Phase 2, the shell. **People's existing mailboxes wait on MM1.**

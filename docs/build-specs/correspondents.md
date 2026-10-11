@@ -8,7 +8,7 @@ index writes `mail_correspondents` as it syncs), slice 4 (sending makes a corres
 
 ## Divergences from the design
 
-- **The share takes a `since`** (the tool surface names it; db/011's `ml_correspondence_index()` has none — db/012 adds it).
+- **The share takes a `since`** (the tool surface names it; db/011's `ml_correspondence_index()` had none — `db/014_reading_search.sql` adds it).
 - **A company's view leaves out public mail providers.** "What have we exchanged with this company" groups by the address's domain,
   which is meaningless for `gmail.com`; a fixed list of about twenty public providers offers the address only (decision 2).
 
@@ -79,7 +79,7 @@ stand-in of the kernel's K7 call):
   last_message_at, message_count, snippet ≤ 200, url}]`, `url` = `APP_URL/m/{mailbox}/t/{thread}` — the consumer's person opens it
   only if MaluMail's wall lets them (otherwise 404, the wall unchanged).
 - **The access log**: one `k7.read` row **per mailbox the answer drew on**, with the consumer, the consumer's agent, the count and
-  the domain asked about (never the subject) — through `ml_log_k7_read()` (db/012), the records role's only other write. The
+  the domain asked about (never the subject) — through `ml_log_k7_read()` (`db/014_reading_search.sql`), the records role's only other write. The
   mailbox's owner and the Mail admins see it in the access log (slice 7).
 - **Never**: a sensitive conversation, a mailbox not shared with applications, an inactive or suspended mailbox, more than the
   snippet.
@@ -93,15 +93,16 @@ stand-in of the kernel's K7 call):
 | `app/features/mail/correspondents.php` | queries |
 | `app/views/mail/people.php`, `person.php`, `complete.php` | templates |
 | `mcp/share_correspondence.py` | the share's handler the records server mounts (Phase 4 wires it into the server) |
-| `db/012_phase1.sql` (shared, reconciled) | `ml_correspondence_index()` with `since`, `ml_log_k7_read()`, `ml_complete()` |
+| `db/014_reading_search.sql` (BUILT; proof `db/proof/phase1_reading.sql`) | `ml_correspondence_index()` with `since`, `ml_log_k7_read()`, `ml_complete()`, the name index |
 | `tests/phase3/slice8/run.sh`, `browser.mjs`, `k7.py` | the proof (`k7.py` stands in for the kernel's K7 call) |
 
 ## Query functions and mail-service calls (signatures fixed)
 
-SQL (db/012):
+SQL (`db/014_reading_search.sql`, built and proven):
 
-- `ml_correspondence_index(p_address text, p_domain text, p_limit integer, p_since timestamptz DEFAULT NULL)` — db/011's, with `since`
-  (`t.last_message_at >= p_since`) and the suspended mailboxes left out.
+- `ml_correspondence_index(p_address text DEFAULT NULL, p_domain text DEFAULT NULL, p_limit integer DEFAULT 25, p_since timestamptz
+  DEFAULT NULL)` — db/011's, with `since` (`t.last_message_at >= p_since`) and the suspended mailboxes left out; the three-argument
+  form is dropped (its calls resolve to this one).
 - `ml_log_k7_read(p_mailboxes bigint[], p_consumer text, p_consumer_agent bigint, p_counts integer[], p_domain text) RETURNS void` —
   SECURITY DEFINER, executable by `malumail_records_ro` only; one `activity_log` row per mailbox, action `k7.read`, source `application`.
 - `ml_complete(p_mailbox bigint, p_q text, p_limit integer DEFAULT 8) RETURNS TABLE (address text, name text, source text, outside
@@ -170,24 +171,8 @@ itself (slice 5); contact photos.
 
 ## Changes this spec asks of the shared documents
 
-- **db/012**:
-  ```sql
-  CREATE OR REPLACE FUNCTION ml_correspondence_index(p_address text DEFAULT NULL, p_domain text DEFAULT NULL, p_limit integer DEFAULT 25,
-      p_since timestamptz DEFAULT NULL) ...   -- db/011's body + AND (p_since IS NULL OR t.last_message_at >= p_since)
-                                              --                 + AND b.suspended_at IS NULL
-  DROP FUNCTION ml_correspondence_index(text, text, integer);
-  CREATE FUNCTION ml_log_k7_read(p_mailboxes bigint[], p_consumer text, p_consumer_agent bigint, p_counts integer[], p_domain text) RETURNS void
-      LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-  BEGIN
-      INSERT INTO activity_log (actor_member_id, source, action, entity_type, entity_id, mailbox_id, after)
-      SELECT p_consumer_agent, 'application', 'k7.read', 'mailbox', m, m,
-             jsonb_build_object('application', 'malumail', 'consumer', p_consumer, 'consumer_agent', p_consumer_agent, 'count', c, 'domain', p_domain)
-        FROM unnest(p_mailboxes, p_counts) AS u(m, c);
-  END$$;
-  REVOKE ALL ON FUNCTION ml_log_k7_read(bigint[], text, bigint, integer[], text) FROM PUBLIC;
-  GRANT EXECUTE ON FUNCTION ml_log_k7_read(bigint[], text, bigint, integer[], text) TO malumail_records_ro;
-  CREATE FUNCTION ml_complete(p_mailbox bigint, p_q text, p_limit integer DEFAULT 8) RETURNS TABLE (...) ...;  -- as above
-  CREATE INDEX mail_correspondents_name_trgm ON mail_correspondents USING gin (name gin_trgm_ops);
-  ```
+- **`db/014_reading_search.sql`** — BUILT and proven (`db/proof/phase1_reading.sql`): `ml_correspondence_index()` with `p_since` and
+  suspended mailboxes left out (the old three-argument form dropped), `ml_log_k7_read()` (the records role's alone), `ml_complete()`,
+  the trigram index on correspondents' names.
 - **maludb-os.json `shares[]`**: `correspondence_index`'s description gains "since" and "at most 256 kB, truncated beyond".
 - **The tool surface**: `correspondence_index`'s arguments already name `since`; its answer gains `truncated`.

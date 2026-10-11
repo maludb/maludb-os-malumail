@@ -81,7 +81,7 @@ customer key nor the sealing secret** — the proof checks it.
 - `bash tests/phase0/run.sh` — the kit without a kernel, the schema proof included: **101 checks** (2026-10-11), ports 9201–9203
   (`ML_MIGRATIONS_UPTO=005` for the kit alone: 100).
 - `bash tests/phase0/schema.sh` — the schema proof alone on a fresh `ml_proof`: `db/proof/phase0_proof.sql`, **232 checks**
-  (2026-10-11). A check that ACTS and then READS splits into two statements: a stable function sees the statement's snapshot.
+  (2026-10-11), and since Phase 1 the four `db/proof/phase1_*.sql` after it (514 in all). A check that ACTS and then READS splits into two statements: a stable function sees the statement's snapshot.
 
 ## The schema (Phase 0, 2026-10-11) — design §16 "Phase 0 continued" for the decisions
 - `db/006` domains, `ml_aliases` (the internal test's cache), mailboxes, sealed credentials, permissions, identities, agent
@@ -113,6 +113,15 @@ customer key nor the sealing secret** — the proof checks it.
 - `bash tests/mailer/run.sh` runs **62 checks** in about 15 s on scratch `ml_mailer`, against `tests/fixtures/fake_mailbox_mcp.py`
   and `tests/fixtures/imap_server.py`; the service listens on 9206 and a second instance on 9207. **Never point a proof at
   MaluMail's real server with a wrong password**: the fixture exists so the breaker can be proven without that.
+
+## Phase 1 (2026-10-11, written — awaiting the owner's approval) — `docs/phase1-consistency.md`
+- `docs/malumail-mcp-tool-surface.md` (36 + 7 tools), `docs/malumail-action-manifest.md` (45 screens, 67 actions) →
+  `php bin/build_action_registry.php` (`--check` in every proof); three build specs and eleven slice specs in `docs/build-specs/`.
+- `bash tests/phase1/check_specs.sh` — the documents agree (98 checks). `bash tests/phase0/schema.sh` — db/001–015 and every proof
+  (514 checks).
+- **No plain-value parameter may carry a resolver's name** (`mailbox`, `folder`, `to_folder`, `label`, `thread`, `correspondent`,
+  `template`, `identity`, `member`, `person`, `agent`, `owner`, `overseer`, `primary_overseer`, `department`): the kernel's actions server
+  resolves them registry-wide.
 
 ## Numbers
 Ports `APP_INTERNAL_PORT=8199`, `MCP_RECORDS_PORT=8852`, `MCP_ACTIVITY_PORT=8853`, `ML_MAILER_PORT=8854`, `ML_IMAGES_PORT=8855`;

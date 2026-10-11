@@ -39,7 +39,7 @@ and address; **received · woken · unscreened · sent · held now · rejected �
 edited, rejected (the counts that earn a wider policy); the oldest held message's age; *Paused* in red with who paused it and why;
 **Pause / Resume** (`hx-post`, Pause asks for a reason inline); links to its queue, Unscreened, policy and mailbox. 375 px: one card a
 row; 1280: three a row. Empty: *"You oversee no agent's mailbox. A Mail admin names an agent mailbox's overseers."* The data is one
-gatherer, `ml_agent_mail_summary(mailbox, days)` (db/012), shared with the tools `agent_mail_summary` and `oversight_summary`.
+gatherer, `ml_agent_mail_summary(mailbox, days)` (`db/015_sending_oversight.sql`), shared with the tools `agent_mail_summary` and `oversight_summary`.
 
 ### `review-queue` — `/oversight/review` (params `mailbox`, `reason`)
 
@@ -62,7 +62,7 @@ a reply). After a decision the page answers with the next message in the queue.
 ### `review-edit` — `/oversight/review/{outbound}/edit`
 
 Full page: subject and body in slice 4's editor (Squire), the recipients shown read-only. **Save and send** posts `mail_review_edit`;
-the review history then shows the diff of the text before and after (db/012's `before_body_text`).
+the review history then shows the diff of the text before and after (`before_subject`, `before_body_text`, `db/015_sending_oversight.sql`).
 
 ### `unscreened` — `/oversight/unscreened` (param `mailbox`)
 
@@ -191,9 +191,9 @@ utterance and context**), the fakes on 9203, the mail service on 9206 with the I
 
 - **The manifest**: `mail_review_edit` → params `**outbound**, subject, **body**, body_format` (no recipients); `mail_unscreened_dismiss`
   → add `as_spam (yes to move it to Junk)`.
-- **db/012**: `ml_agent_mail_summary(p_mailbox bigint, p_days integer) RETURNS jsonb` (the counts of the cards, SECURITY DEFINER behind
-  `ml_level() >= 'triage'`), granted to `malumail_rw` and `malumail_records_ro`; the rest is sending-and-oversight's list.
-- **The kernel** (a new K item): the run facts answer an application the names of the tools a run called (`html/api/v1/runs/facts.php`,
+- **Done in `db/015_sending_oversight.sql`**: `ml_agent_mail_summary(p_mailbox, p_days)` (`ml_level() >= triage`, granted to `malumail_rw` and
+  `malumail_records_ro`), and the take-over that withdraws the agent's held replies in the conversation.
+- **The kernel** (K56, design §12): the run facts answer an application the names of the tools a run called (`html/api/v1/runs/facts.php`,
   `tools[]`), so the review page can list them (design §5).
 - **`deploy/apache-malumail.conf`**: `/oversight/review/{outbound}` → `view.php?id=`, `/edit` → `form.php?id=`, `/body` → `body.php?id=`
   (the body's CSP as `/m/{mailbox}/msg/{message}/body`); `/m/{mailbox}/policy` → `m/policy.php`.

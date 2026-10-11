@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The schema proof (docs/malumail-design.md §10, Phase 0): a fresh scratch database `ml_proof`, every db/[0-9]*.sql applied in order as
-# postgres, then db/proof/phase0_proof.sql (one transaction, rolled back). Re-runnable from nothing; never touches an installed database.
+# postgres, then db/proof/phase0_proof.sql and each Phase 1 proof db/proof/phase1_*.sql (each one transaction, rolled back). Re-runnable from nothing; never touches an installed database.
 # The three installer roles are made here when missing (cluster-wide, NOLOGIN — the installer gives them passwords).
 # `sudo -n -u postgres` is used for scratch ml_* databases and these roles only.
 set -euo pipefail
@@ -24,3 +24,8 @@ for f in db/[0-9]*.sql; do
 done
 echo " $n migrations applied to $DB"
 $PSQL -d "$DB" -f db/proof/phase0_proof.sql
+for proof in db/proof/phase1_*.sql; do
+  [ -f "$proof" ] || continue
+  echo "== $proof"
+  $PSQL -d "$DB" -f "$proof"
+done
