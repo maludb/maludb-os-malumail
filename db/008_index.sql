@@ -145,6 +145,9 @@ CREATE TABLE mail_messages (
     auto_submitted     text,                                  -- the Auto-Submitted header's value (NULL = absent)
     is_list            boolean NOT NULL DEFAULT false,        -- List-* present, or Precedence bulk/list/junk
     return_path_null   boolean NOT NULL DEFAULT false,        -- Return-Path: <>
+    local_submission   boolean NOT NULL DEFAULT false,        -- arrived by AUTHENTICATED SUBMISSION on MaluMail's own server (its `with ESMTPSA`
+                                                              -- Received line, no inbound filter verdict) — the spike, research 04 §B: internal
+                                                              -- mail carries no DMARC result; with MM3 this proves an internal sender (db/010)
     body_text          text,                                  -- the text pass, capped (ml_settings.index_text_max_kb)
     text_indexed_at    timestamptz,
     tsv                tsvector,
@@ -310,25 +313,44 @@ END$$;
 CREATE TRIGGER mail_messages_after AFTER INSERT OR DELETE OR UPDATE OF thread_id, seen, flagged, folder_id, has_attachments, received_at
     ON mail_messages FOR EACH ROW EXECUTE FUNCTION ml_messages_after();
 
--- Rebuild a mailbox's conversations from its messages, oldest first (after a bulk sync, or to prove a rebuild loses nothing).
+-- Rebuild a mailbox's conversations from its messages, oldest first (after a bulk sync, or to prove a rebuild loses nothing). While it
+-- runs, each conversation keeps only what the next message's match reads (count, last date, participants); every figure is computed
+-- once at the end, set-based (the spike, research 04 §B: refreshing after every message cost 3.3 ms a message).
 CREATE OR REPLACE FUNCTION ml_threads_rebuild(p_mailbox bigint) RETURNS integer
     LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE r record; t bigint; parts text[]; n integer := 0;
+DECLARE r record; t bigint; parts text[]; n integer := 0; own text[];
 BEGIN
     PERFORM set_config('app.ml_bulk', 'on', true);
+    own := ARRAY(SELECT lower(address::text) FROM mailboxes WHERE id = p_mailbox UNION SELECT lower(address::text) FROM mail_identities WHERE mailbox_id = p_mailbox);
     UPDATE mail_messages SET thread_id = NULL WHERE mailbox_id = p_mailbox;
     DELETE FROM mail_threads WHERE mailbox_id = p_mailbox;
     FOR r IN SELECT * FROM mail_messages WHERE mailbox_id = p_mailbox ORDER BY COALESCE(sent_at, received_at), id LOOP
-        parts := ml_participants(p_mailbox, r.from_address::text, r.to_addresses, r.cc_addresses);
+        parts := COALESCE(ARRAY(SELECT DISTINCT a FROM (SELECT lower(btrim(x)) a FROM unnest(ARRAY[r.from_address::text] || r.to_addresses || r.cc_addresses) x
+                                                         WHERE x IS NOT NULL AND btrim(x) <> '') y WHERE NOT (a = ANY (own)) ORDER BY a), '{}');
         t := ml_thread_find(p_mailbox, r.message_key_id, r.in_reply_to, r.references_ids, r.subject, COALESCE(r.sent_at, r.received_at), parts);
         IF t IS NULL THEN
-            INSERT INTO mail_threads (mailbox_id, subject, subject_norm, participants, first_message_at, last_message_at)
-            VALUES (p_mailbox, r.subject, ml_subject_norm(r.subject), parts, COALESCE(r.sent_at, r.received_at), r.received_at) RETURNING id INTO t;
+            INSERT INTO mail_threads (mailbox_id, subject, subject_norm, participants, first_message_at, last_message_at, message_count)
+            VALUES (p_mailbox, r.subject, ml_subject_norm(r.subject), parts, COALESCE(r.sent_at, r.received_at), r.received_at, 1) RETURNING id INTO t;
+        ELSE
+            UPDATE mail_threads SET message_count = message_count + 1, last_message_at = GREATEST(last_message_at, r.received_at),
+                   participants = ARRAY(SELECT DISTINCT x FROM unnest(participants || parts) x ORDER BY x)
+             WHERE id = t;
         END IF;
         UPDATE mail_messages SET thread_id = t WHERE id = r.id;
-        PERFORM ml_thread_refresh(t);                       -- keeps message_count, participants and dates current for the next message's match
         n := n + 1;
     END LOOP;
+    -- every conversation's figures, once
+    WITH agg AS (
+        SELECT m.thread_id, count(*) AS n,
+               count(*) FILTER (WHERE NOT m.seen AND COALESCE(f.special_use, '') NOT IN ('trash', 'junk', 'sent', 'drafts')) AS unread,
+               min(COALESCE(m.sent_at, m.received_at)) AS first_at, max(m.received_at) AS last_at, bool_or(m.has_attachments) AS att,
+               bool_or(m.flagged) AS fl, array_agg(DISTINCT m.folder_id) AS folders,
+               (array_agg(m.subject ORDER BY m.received_at DESC, m.id DESC))[1] AS subj, (array_agg(m.snippet ORDER BY m.received_at DESC, m.id DESC))[1] AS snip
+          FROM mail_messages m JOIN mail_folders f ON f.id = m.folder_id
+         WHERE m.mailbox_id = p_mailbox GROUP BY m.thread_id)
+    UPDATE mail_threads th SET message_count = agg.n, unread_count = agg.unread, first_message_at = agg.first_at, last_message_at = agg.last_at,
+           has_attachments = agg.att, flagged = agg.fl, folder_ids = agg.folders, subject = agg.subj, snippet = agg.snip, updated_at = now()
+      FROM agg WHERE th.id = agg.thread_id;
     PERFORM set_config('app.ml_bulk', 'off', true);
     RETURN n;
 END$$;

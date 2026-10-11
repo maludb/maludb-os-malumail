@@ -1266,6 +1266,13 @@ questions in one sitting and changed none:
     sanitiser's attack testing is sourced (a published sanitiser test suite the owner approves, for slice 3's proof, is the
     recommendation) — `docs/research/04-mail-spike.md`.
 
-  **NEXT:** the owner — MM2 and two test mailboxes (MaluMail's infrastructure side), the sanitiser corpus's source, K55 → the mail
-  spike's IMAP/SMTP half (§10.1) → the mail service's skeleton with the fake Mailbox MCP and the IMAP/SMTP fixture → Phase 1 for
-  the owner's approval. **People's existing mailboxes wait on MM1.**
+- **2026-10-11, the spike's IMAP/SMTP half RUN** (MM2 in place; two test mailboxes the owner made; `research/04` §B): IMAPClient
+  3.0.1 with raw `imaplib` for `NOTIFY`, `SELECT … QRESYNC`, `VANISHED` and `MOVE`'s `COPYUID`; 5,000 messages synced in about 10 s
+  (envelopes 6.0 s, text 3.8 s); new mail seen in about half a second by `IDLE` and by `NOTIFY`; a reconnect's `QRESYNC` 79 ms;
+  submission answers a queue id and keeps our `Message-ID`; no copy in Sent; no `\Archive` or Snoozed folder. **Found: mail between
+  the business's mailboxes carries no DMARC result**, so §5's wake rule now proves a colleague by this application's own `sent`
+  record (or, with MM3, by `local_submission`) and asks DMARC of outside mail only (`db/010`); the rebuild of conversations is set-based
+  at the end (16.7 s → 3.5 s for 5,000). The proof: 232 checks. Both test mailboxes are empty again.
+
+  **NEXT:** the owner — K55, the sanitiser corpus's source → the mail service's skeleton with the fake Mailbox MCP and the
+  IMAP/SMTP fixture → Phase 1 for the owner's approval. **People's existing mailboxes wait on MM1.**

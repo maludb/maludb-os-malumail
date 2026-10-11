@@ -344,8 +344,12 @@ END$$;
 -- ================================================================================================ the mail turn (D11)
 -- What arriving mail on an agent's mailbox does (one row per agent per message key, whichever folders it is in). Answers the decision:
 --   wake (queued: the worker turns it into ONE chat turn — acting member the primary overseer, the turn carrying ids, never text);
---   unscreened (a person releases it, marks the sender known, or marks it spam): unauthenticated, an unknown outside sender, an
---     internal-looking sender this application did not send (until MM3), or no primary overseer to act;
+--   unscreened (a person releases it, marks the sender known, or marks it spam): an internal-looking sender this application did not
+--     send (until MM3), outside mail without a DMARC pass, an unknown outside sender, or no primary overseer to act;
+-- THE EVIDENCE (the spike, research 04 §B): mail between the business's mailboxes carries NO filter verdict — no DMARC result ever. So
+-- a colleague is proven by this application having SENT the message (its Message-ID in outbound_email, sent), or — once MaluMail
+-- enforces the sender's identity at submission (MM3, mm3_identity_enforced) — by its arriving through authenticated submission on
+-- MaluMail's own server (local_submission). DMARC is the test for OUTSIDE mail only.
 --   skipped: not an agent's inbox, the kernel's intake, suspended, paused, wake off, the mailbox's own mail, machine mail, a muted,
 --     taken-over or sensitive conversation.
 CREATE OR REPLACE FUNCTION ml_dispatch_decide(p_message bigint) RETURNS text
@@ -362,10 +366,11 @@ BEGIN
     SELECT * INTO s FROM ml_settings WHERE id = 1;
     SELECT * INTO st FROM ml_thread_state(m.thread_id);
     acting := b.primary_overseer_id;
-    authed := COALESCE(m.dmarc_pass, false);
     claims_internal := ml_is_internal_address(m.from_address::text);
-    internal := authed AND claims_internal
-                AND (s.mm3_identity_enforced OR EXISTS (SELECT 1 FROM outbound_email o WHERE o.message_id = m.message_id_header AND o.status = 'sent'));
+    internal := claims_internal
+                AND (EXISTS (SELECT 1 FROM outbound_email o WHERE o.message_id = m.message_id_header AND o.status = 'sent')
+                     OR (s.mm3_identity_enforced AND m.local_submission));
+    authed := internal OR (NOT claims_internal AND COALESCE(m.dmarc_pass, false));
     known := ml_is_known(b.id, m.from_address::text);
     status := 'skipped';
     IF b.intake_owner = 'kernel' THEN dec := 'kernel_intake';
@@ -377,13 +382,13 @@ BEGIN
     ELSIF st.sensitive THEN dec := 'sensitive';
     ELSIF st.taken_over_by IS NOT NULL OR st.agent_muted THEN dec := 'taken_over';
     ELSIF st.muted THEN dec := 'muted';
+    ELSIF claims_internal AND NOT internal THEN dec := 'internal_unproven'; status := 'unscreened';
     ELSIF NOT authed THEN dec := 'unauthenticated'; status := 'unscreened';
     ELSIF (p.wake_from = 'internal' AND internal)
        OR (p.wake_from = 'internal_and_known' AND (internal OR known))
        OR p.wake_from = 'all_authenticated' THEN
         IF acting IS NULL THEN dec := 'no_overseer'; status := 'unscreened';
         ELSE dec := 'wake'; status := 'queued'; END IF;
-    ELSIF claims_internal AND NOT internal THEN dec := 'internal_unproven'; status := 'unscreened';
     ELSE dec := 'unknown_sender'; status := 'unscreened';
     END IF;
     INSERT INTO agent_dispatches (record_type, record_id, agent_member_id, kind, via, acting_member_id, status, decision, mailbox_id, message_key_id,

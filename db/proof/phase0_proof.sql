@@ -41,12 +41,12 @@ BEGIN
     u := COALESCE((x->>'uid')::bigint, (SELECT COALESCE(max(m.uid), 0) + 1 FROM mail_messages m WHERE m.folder_id = fid));
     INSERT INTO mail_messages (folder_id, uidvalidity, uid, message_key_id, message_id_header, in_reply_to, references_ids, from_address, from_name,
                                to_addresses, cc_addresses, subject, sent_at, received_at, size, seen, flagged, has_attachments, attachment_names,
-                               dmarc_pass, auto_submitted, is_list, return_path_null, snippet, body_text)
+                               dmarc_pass, auto_submitted, is_list, return_path_null, snippet, body_text, local_submission)
     VALUES (fid, COALESCE((x->>'uidvalidity')::bigint, 1), u, key, mid, x->>'irt', COALESCE(ARRAY(SELECT jsonb_array_elements_text(x->'refs')), '{}'),
             frm, x->>'name', tos, ccs, subj, at, at, COALESCE((x->>'size')::integer, 2000), COALESCE((x->>'seen')::boolean, false),
             COALESCE((x->>'flagged')::boolean, false), COALESCE((x->>'att')::boolean, false), COALESCE(ARRAY(SELECT jsonb_array_elements_text(x->'names')), '{}'),
             CASE WHEN x ? 'dmarc' THEN (x->>'dmarc')::boolean ELSE true END, x->>'auto', COALESCE((x->>'list')::boolean, false),
-            COALESCE((x->>'rpnull')::boolean, false), left(COALESCE(x->>'body', subj), 200), x->>'body')
+            COALESCE((x->>'rpnull')::boolean, false), left(COALESCE(x->>'body', subj), 200), x->>'body', COALESCE((x->>'local')::boolean, false))
     RETURNING mail_messages.id INTO newid;
     PERFORM pg_temp.keep(k, newid);
     PERFORM pg_temp.keep('key:' || k, key);
@@ -537,18 +537,25 @@ SET ROLE malumail_rw;
 
 -- ================================================================ 12. the mail turn: who wakes an agent (§5, D11)
 SELECT ml_policy_set(pg_temp.i('mbS'), 26, '{"wake_from": "internal_and_known"}');
-SELECT pg_temp.msg('d1', pg_temp.i('mbS'), 'inbox', '<d1@subello.example>', 'dana@subello.example', '{sched@subello.example}', 'Can you book Friday?', now() - interval '30 minutes');
+SELECT pg_temp.msg('d1', pg_temp.i('mbS'), 'inbox', '<d1@subello.example>', 'dana@subello.example', '{sched@subello.example}', 'Can you book Friday?', now() - interval '30 minutes',
+                   '{"dmarc": null, "local": true}');
 SELECT pg_temp.decide('d1');
 SELECT pg_temp.check(pg_temp.d('d1') = 'internal_unproven' AND (pg_temp.dispatch('d1')).status = 'unscreened',
                      'a colleague''s From the application did not send proves nothing until MM3: unscreened');
 SELECT pg_temp.send('dsend', 'mbD', 30, '{sched@subello.example}', 'Room for Friday', 'Please book the large room.');
 UPDATE outbound_email SET send_after = now() - interval '1 second' WHERE id = pg_temp.i('dsend');
 SELECT ml_outbound_claim(50); SELECT ml_outbound_sent(pg_temp.i('dsend'), NULL, '250 Ok');
-SELECT pg_temp.msg('d2', pg_temp.i('mbS'), 'inbox', (pg_temp.ob('dsend')).message_id, 'dana@subello.example', '{sched@subello.example}', 'Room for Friday', now() - interval '20 minutes');
+SELECT pg_temp.msg('d2', pg_temp.i('mbS'), 'inbox', (pg_temp.ob('dsend')).message_id, 'dana@subello.example', '{sched@subello.example}', 'Room for Friday', now() - interval '20 minutes',
+                   '{"dmarc": null, "local": true}');
 SELECT pg_temp.decide('d2');
 SELECT pg_temp.check(pg_temp.d('d2') = 'wake' AND (pg_temp.dispatch('d2')).status = 'queued' AND (pg_temp.dispatch('d2')).acting_member_id = 26
                      AND (pg_temp.dispatch('d2')).conversation_id = 'mail:' || pg_temp.i('mbS') || ':' || pg_temp.key('d2'),
-                     'mail this application sent from a colleague wakes the agent: one turn, Priya the acting member, ids not text');
+                     'mail this application sent from a colleague wakes the agent (internal mail carries no DMARC result — the spike): one turn, Priya the acting member, ids not text');
+SELECT pg_temp.msg('spoof', pg_temp.i('mbS'), 'inbox', '<spoof@else.example>', 'priya@subello.example', '{sched@subello.example}', 'Wire the deposit today', now() - interval '19 minutes',
+                   '{"dmarc": false}');
+SELECT pg_temp.decide('spoof');
+SELECT pg_temp.check(pg_temp.d('spoof') = 'internal_unproven' AND (pg_temp.dispatch('spoof')).status = 'unscreened',
+                     'outside mail claiming the business''s own domain wakes no one: unscreened');
 SELECT pg_temp.msg('d3', pg_temp.i('mbS'), 'inbox', '<d3@partner.example>', 'stranger@partner.example', '{sched@subello.example}', 'Partnership', now() - interval '20 minutes');
 SELECT pg_temp.decide('d3');
 SELECT pg_temp.check(pg_temp.d('d3') = 'unknown_sender' AND (pg_temp.dispatch('d3')).status = 'unscreened'
@@ -608,9 +615,14 @@ SELECT pg_temp.decide('m1');
 SELECT pg_temp.check(pg_temp.d('m1') = 'not_an_agent_inbox', 'a person''s mail never dispatches');
 UPDATE ml_settings SET mm3_identity_enforced = true WHERE id = 1;
 SELECT ml_policy_set(pg_temp.i('mbS'), 26, '{"wake_from": "internal"}');
-SELECT pg_temp.msg('d12', pg_temp.i('mbS'), 'inbox', '<d12@subello.example>', 'dana@subello.example', '{sched@subello.example}', 'Lunch?', now() - interval '4 minutes');
+SELECT pg_temp.msg('d12', pg_temp.i('mbS'), 'inbox', '<d12@subello.example>', 'dana@subello.example', '{sched@subello.example}', 'Lunch?', now() - interval '4 minutes',
+                   '{"dmarc": null, "local": true}');
 SELECT pg_temp.decide('d12');
-SELECT pg_temp.check(pg_temp.d('d12') = 'wake', 'once MaluMail enforces the sender''s identity (MM3), an authenticated colleague counts');
+SELECT pg_temp.check(pg_temp.d('d12') = 'wake', 'once MaluMail enforces the sender''s identity (MM3), a colleague''s authenticated submission counts');
+SELECT pg_temp.msg('d13', pg_temp.i('mbS'), 'inbox', '<d13@else.example>', 'dana@subello.example', '{sched@subello.example}', 'Lunch!', now() - interval '3 minutes',
+                   '{"dmarc": false}');
+SELECT pg_temp.decide('d13');
+SELECT pg_temp.check(pg_temp.d('d13') = 'internal_unproven', '…but a colleague''s address arriving from OUTSIDE (no authenticated submission) still proves nothing');
 UPDATE ml_settings SET mm3_identity_enforced = false WHERE id = 1;
 -- release
 SELECT pg_temp.refused(format($$SELECT ml_unscreened_release(%s, 44)$$, (pg_temp.dispatch('d1')).id), 'an agent never decides', 'the agent cannot release its own Unscreened mail');

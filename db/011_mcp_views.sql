@@ -41,7 +41,8 @@ SELECT m.id, m.mailbox_id, m.folder_id, m.uidvalidity, m.uid, m.message_key_id, 
        ml_is_automated(m.auto_submitted, m.is_list, m.return_path_null) AS automated,
        NOT ml_is_internal_address(m.from_address::text) AS from_outside,
        m.body_text,
-       EXISTS (SELECT 1 FROM mail_viewer_reads r WHERE r.member_id = app_current_member_id() AND r.message_key_id = m.message_key_id) AS read_by_me
+       EXISTS (SELECT 1 FROM mail_viewer_reads r WHERE r.member_id = app_current_member_id() AND r.message_key_id = m.message_key_id) AS read_by_me,
+       m.local_submission
   FROM mail_messages m
  WHERE m.mailbox_id = ANY ((SELECT ml_my_mailbox_ids('view'))::bigint[])
    AND ((SELECT app_member_kind()) = 'human'
