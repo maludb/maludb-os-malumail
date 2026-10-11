@@ -8,10 +8,10 @@ and reviews.
 
 ## Status
 
-**Planning (Phase 0), 2026-10-10.** The design is written and awaits the owner's decisions (D1–D16). MaluMail's platform,
-the estate and the field are surveyed. No schema and no screens yet.
+**Planning (Phase 0).** The design was written 2026-10-10 and **approved by the owner 2026-10-11** — every decision
+(D1–D16) as recommended. MaluMail's platform, the estate and the field are surveyed. No schema and no screens yet.
 
-Next: the owner's answers → MaluMail's MM2 (this server exempted from login bans) and the test mailbox → the mail spike →
+Next: MaluMail's MM2 (agreed with MaluMail's infrastructure side, design §12) and two test mailboxes → the mail spike →
 the kernel's catalog row (K43) → the rest of Phase 0.
 
 ## Documents

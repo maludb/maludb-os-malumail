@@ -1092,7 +1092,7 @@ log, `mail_reviews` and the outbound rows (§6.6); R54's "AI may read" switch is
 MaluMail's items take the prefix **MM**: the kernel's records numbered MaluMail's earlier items M1–M4 and MaluDB's M1–M12 in
 one series, and the two collide. (MM8 is the infrastructure side's own housekeeping, kept in the owner's handoff.)
 
-## 13. The decisions (recommendations; the owner's answers go in §15)
+## 13. The decisions (the owner took every recommendation on 2026-10-11 — §15)
 
 The repository's visibility (**public**) and the DNS label (**`webmail`**) were the owner's answers on 2026-10-10.
 
@@ -1154,7 +1154,33 @@ The repository's visibility (**public**) and the DNS label (**`webmail`**) were 
 
 ## 15. The owner's answers
 
-*(awaiting the owner — D1–D16 and (a)–(c))*
+**2026-10-11 — every recommendation, as §13 writes it.** The owner walked through the sixteen decisions and the three open
+questions in one sitting and changed none:
+
+| # | The owner's answer |
+|---|---|
+| D1 | **"MaluMail"**, key `malumail`, label `webmail`, prefix `ml_`, the unnamed top area, category `email`, `feather-mail` |
+| D2 | **Two roles, Mail user and Mail admin; Mail admin works only for a kernel super-admin**; agents never administer |
+| D3 | **Two planes**: admin through the Mailbox MCP, content over IMAP/SMTP from the mail service with **per-mailbox application passwords (MM1)**; people's existing mailboxes wait on MM1 |
+| D4 | **Envelopes, flags, conversations and the text of every message** in the index; the rest on demand, never stored |
+| D5 | **IMAP folders where a message lives, conversations across folders, the application's own labels** |
+| D6 | **The mail service holds `NOTIFY`/`IDLE`; the browser polls** (15 s visible, 60 s hidden); no socket |
+| D7 | **Sanitised HTML in an opaque-origin frame; remote images on request** through the image door |
+| D8 | **Rich text, undo send 10 s, schedule send, drafts in the Drafts folder**; agents write markdown |
+| D9 | **The owner shares by rows; a role never opens a person's mailbox; any other grant is break-glass**; the access log; the monitoring notice |
+| D10 | **`hold_all` for a new agent mailbox, the caps and the business budget, disclosure; reviewers are people** in the application's queue |
+| D11 | **Authenticated mail from internal or known senders wakes an agent; unknown outside senders wait in Unscreened** |
+| D12 | **A person may share their mailbox with an agent up to `send`; its sends are held for that person; `ai_read` off by default** |
+| D13 | **The webmail never sets `\Seen` on an intake mailbox and never moves its INBOX**; K45, HD8 and CRM7 owed |
+| D14 | **Actions with ids, never mail text; a person's mail reaches a model only by their choice** |
+| D15 | **One share, `correspondence_index`; on request, not a default** |
+| D16 | **8199 / 8852 / 8853 / 8854 / 8855, scratch 9201–9207; the planning model through slice 5, Sonnet 5.5 slices 6–10 and Phase 4** |
+
+- **(a)** Keep **`webmail`**. `malumail.subello.com` was not made for this application; it is left as it is.
+- **(b)** **The owner hands §12's MM rows to MaluMail's infrastructure side** — MM2 and the two test mailboxes first (the
+  spike waits on them), then MM1 (people's mailboxes wait on it), then MM3. This work writes requests and never changes
+  MaluMail's production servers.
+- **(c)** The plugins stay **read from the local clones** (`~/htmx-php-builder` 0.9.0, `~/maludb-os-integration`).
 
 ## 16. State
 
@@ -1171,5 +1197,9 @@ The repository's visibility (**public**) and the DNS label (**`webmail`**) were 
     conversation states; drafts in the Drafts folder; the image door its own unit; MaluMail's abuse-protection details kept
     out of this public repository).
 
-  **NEXT:** the owner's answers (§15) → MM2 and two test mailboxes → the mail spike → K43 (db/181) → Phase 0's schema, kit,
-  manifest, agents, skills and deploy → the owner's go → Phase 1. **People's existing mailboxes wait on MM1.**
+- **2026-10-11.** **The design APPROVED** — the owner took every recommendation, D1–D16 and (a)–(c) (§15); MaluMail's MM
+  rows go to the infrastructure side from the owner.
+
+  **NEXT:** MM2 and two test mailboxes (MaluMail's infrastructure side) → the mail spike (§10.1) → K43 (db/181) → Phase 0's
+  schema, kit, manifest, agents, skills and deploy → Phase 1 for the owner's approval. **People's existing mailboxes wait on
+  MM1.**
