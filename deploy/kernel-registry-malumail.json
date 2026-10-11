@@ -9,63 +9,87 @@
       "query_param": "q",
       "id_field": "mailbox_id",
       "label_field": "address",
-      "params": ["mailbox"]
+      "params": [
+        "mailbox"
+      ]
     },
     "folder": {
       "tool": "find_folders",
       "query_param": "q",
       "id_field": "folder_id",
       "label_field": "name",
-      "params": ["folder", "to_folder"]
+      "params": [
+        "folder",
+        "to_folder"
+      ]
     },
     "label": {
       "tool": "find_labels",
       "query_param": "q",
       "id_field": "label_id",
       "label_field": "label",
-      "params": ["label"]
+      "params": [
+        "label"
+      ]
     },
     "thread": {
       "tool": "find_threads",
       "query_param": "q",
       "id_field": "thread_id",
       "label_field": "subject",
-      "params": ["thread"]
+      "params": [
+        "thread"
+      ]
     },
     "correspondent": {
       "tool": "find_correspondents",
       "query_param": "q",
       "id_field": "address",
       "label_field": "name",
-      "params": ["correspondent"]
+      "params": [
+        "correspondent"
+      ]
     },
     "template": {
       "tool": "find_templates",
       "query_param": "q",
       "id_field": "template_id",
       "label_field": "name",
-      "params": ["template"]
+      "params": [
+        "template"
+      ]
     },
     "identity": {
       "tool": "find_identities",
       "query_param": "q",
       "id_field": "identity_id",
       "label_field": "address",
-      "params": ["identity"]
+      "params": [
+        "identity"
+      ]
     },
     "member": {
       "tool": "find_members",
       "query_param": "q",
       "id_field": "member_id",
       "label_field": "display_name",
-      "params": ["member", "person", "agent", "owner"]
+      "params": [
+        "member",
+        "person",
+        "agent",
+        "owner",
+        "overseer",
+        "primary_overseer"
+      ]
     },
     "department": {
       "tool": "find_departments",
       "query_param": "q",
       "id_field": "department_id",
       "label_field": "name",
-      "params": ["department"]
+      "params": [
+        "department"
+      ]
     }
   }
 }

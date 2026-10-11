@@ -251,7 +251,11 @@
           "mail_mute",
           "mail_delete_forever",
           "mail_trash_empty",
-          "mail_folder_delete"
+          "mail_folder_delete",
+          "mail_send_cancel",
+          "mail_draft_discard",
+          "mail_not_spam",
+          "mail_unsnooze"
         ]
       },
       "skills": [
@@ -310,11 +314,11 @@
   ],
   "approvals": [
     {
-      "action": "mail_folder_delete",
+      "action": "mail_delete_forever",
       "category": "deletion"
     },
     {
-      "action": "mail_delete_forever",
+      "action": "mail_folder_delete",
       "category": "deletion"
     },
     {

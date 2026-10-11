@@ -1,0 +1,2892 @@
+{
+    "generated_from": "docs/malumail-action-manifest.md",
+    "generated_at": "2026-10-11T20:06:41+00:00",
+    "screens": {
+        "home": {
+            "screen": "home",
+            "url": "/",
+            "section": "The shell (Phase 2 — sso-shell)",
+            "when": "my default mailbox's Inbox — the person's own, else the first they can open; a person with no mailbox yet sees why and who can connect one",
+            "params": [],
+            "built": true,
+            "stub": false
+        },
+        "notice": {
+            "screen": "notice",
+            "url": "/notice",
+            "section": "The shell (Phase 2 — sso-shell)",
+            "when": "the business's mail-monitoring notice, and to acknowledge it (on first use, and when its version changes)",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "my-trail": {
+            "screen": "my-trail",
+            "url": "/my/trail",
+            "section": "The shell (Phase 2 — sso-shell)",
+            "when": "my own trail here: what I sent, decided, filed and opened, by mailbox",
+            "params": [
+                "since",
+                "mailbox"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "tokens-list": {
+            "screen": "tokens-list",
+            "url": "/tokens",
+            "section": "The shell (Phase 2 — sso-shell)",
+            "when": "my tokens for the two read MCP servers: label, last used, revoke; mint a new one (shown once)",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "admin-domains": {
+            "screen": "admin-domains",
+            "url": "/admin/domains",
+            "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
+            "when": "MaluMail's hosted domains for the customer key: which this business serves, which are internal, SPF/DKIM/DMARC as last read",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "admin-mailboxes": {
+            "screen": "admin-mailboxes",
+            "url": "/admin/mailboxes",
+            "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
+            "when": "every mailbox of the served domains as cards: kind, owner or overseers, quota and use, sync state, the credential's state, intake owner",
+            "params": [
+                "kind",
+                "domain",
+                "state",
+                "q"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "admin-mailbox-new": {
+            "screen": "admin-mailbox-new",
+            "url": "/admin/mailboxes/new",
+            "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
+            "when": "create a mailbox — domain, local part, kind, owner (the record picker), quota, overseers and the primary overseer for an agent's",
+            "params": [
+                "domain",
+                "local_part",
+                "kind",
+                "owner"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "admin-mailbox-view": {
+            "screen": "admin-mailbox-view",
+            "url": "/admin/mailboxes/{mailbox}",
+            "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
+            "when": "one mailbox for a Mail admin: suspend or reactivate, quota, reset the password (a person's shown once), connect or reconnect the webmail, the credential's state, intake owner, share with applications, overseers",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "admin-aliases": {
+            "screen": "admin-aliases",
+            "url": "/admin/aliases",
+            "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
+            "when": "the forwarding addresses of the served domains, outside destinations flagged",
+            "params": [
+                "domain",
+                "outside",
+                "q"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "admin-alias-new": {
+            "screen": "admin-alias-new",
+            "url": "/admin/aliases/new",
+            "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
+            "when": "create a forwarding address — source and destinations, an outside destination confirmed by name",
+            "params": [
+                "domain",
+                "local_part"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "admin-alias-view": {
+            "screen": "admin-alias-view",
+            "url": "/admin/aliases/{alias}",
+            "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
+            "when": "one forwarding address: edit its destinations, delete it",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "mailbox-view": {
+            "screen": "mailbox-view",
+            "url": "/m/{mailbox}/v/{view}",
+            "section": "The mail service and the list (slice 2 — the first exemplar)",
+            "when": "a mailbox's view as Gmail's conversation list — `inbox`, `starred`, `snoozed`, `sent`, `drafts`, `scheduled`, `outbox`, `all`, `spam`, `trash` — with select, the bulk bar, stars, labels, the attachment icon, snippets, dates, cursor paging and the \"N new\" bar",
+            "params": [
+                "view",
+                "before",
+                "unread"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "folder-view": {
+            "screen": "folder-view",
+            "url": "/m/{mailbox}/f/{folder}",
+            "section": "The mail service and the list (slice 2 — the first exemplar)",
+            "when": "one IMAP folder's conversations, the same list",
+            "params": [
+                "before",
+                "unread"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "thread-view": {
+            "screen": "thread-view",
+            "url": "/m/{mailbox}/t/{thread}",
+            "section": "Reading (slice 3 — the second exemplar)",
+            "when": "one conversation: earlier messages collapsed, quoted text folded, the sandboxed body, attachments, Show images, the outside and sender-mismatch banners, the DMARC result; Reply, Reply all, Forward, Archive, Delete, Spam, Move, Label, Snooze, Mute, Mark unread, Print, Show original; Take over on an agent's mailbox",
+            "params": [
+                "message"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "message-original": {
+            "screen": "message-original",
+            "url": "/m/{mailbox}/msg/{message}/original",
+            "section": "Reading (slice 3 — the second exemplar)",
+            "when": "one message's headers and source, and the `.eml` download",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "compose": {
+            "screen": "compose",
+            "url": "/m/{mailbox}/compose",
+            "section": "Writing (slice 4 — the third exemplar)",
+            "when": "write new mail, or a reply or forward — From (identities), To/Cc/Bcc with autocomplete, subject, the editor (rich or plain), attachments, the signature, canned replies; Send, Schedule, Save draft, Discard; Undo after Send",
+            "params": [
+                "reply",
+                "reply_all",
+                "forward",
+                "to",
+                "subject",
+                "body",
+                "template"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "draft-edit": {
+            "screen": "draft-edit",
+            "url": "/m/{mailbox}/drafts/{draft}",
+            "section": "Writing (slice 4 — the third exemplar)",
+            "when": "go on with a draft — one written here or on a phone",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "identity-new": {
+            "screen": "identity-new",
+            "url": "/m/{mailbox}/identities/new",
+            "section": "Writing (slice 4 — the third exemplar)",
+            "when": "add an address this mailbox sends as — its own, or an alias MaluMail delivers to it — with display name, reply-to and signature",
+            "params": [
+                "address"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "identity-edit": {
+            "screen": "identity-edit",
+            "url": "/m/{mailbox}/identities/{identity}/edit",
+            "section": "Writing (slice 4 — the third exemplar)",
+            "when": "change an identity's display name, reply-to, signature or default",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "oversight": {
+            "screen": "oversight",
+            "url": "/oversight",
+            "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
+            "when": "a card per agent mailbox I oversee: received, sent, held, rejected (7 days), last activity, Pause/Resume",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "review-queue": {
+            "screen": "review-queue",
+            "url": "/oversight/review",
+            "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
+            "when": "the held mail waiting for me — the overseers', and a person's own for an agent's mail from their mailbox — oldest first, with its reasons",
+            "params": [
+                "mailbox",
+                "reason"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "review-view": {
+            "screen": "review-view",
+            "url": "/oversight/review/{outbound}",
+            "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
+            "when": "one held message as it will go out, beside the conversation it answers, the agent's purpose, its run and every hold reason; Approve, Edit, Reject with a note, Reply to the agent, Take over",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "review-edit": {
+            "screen": "review-edit",
+            "url": "/oversight/review/{outbound}/edit",
+            "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
+            "when": "edit a held message before sending it — the edit kept as a diff",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "unscreened": {
+            "screen": "unscreened",
+            "url": "/oversight/unscreened",
+            "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
+            "when": "mail that did not wake an agent: Release (one turn), Mark sender known, Spam, Dismiss",
+            "params": [
+                "mailbox"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "agent-policy": {
+            "screen": "agent-policy",
+            "url": "/m/{mailbox}/policy",
+            "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
+            "when": "an agent mailbox's sending policy with each setting's meaning, its pause switch and its history",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "search": {
+            "screen": "search",
+            "url": "/m/{mailbox}/search",
+            "section": "Search, labels, snooze, folders and templates (slice 6)",
+            "when": "conversations of one mailbox matching Gmail's operators",
+            "params": [
+                "q",
+                "before"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "search-all": {
+            "screen": "search-all",
+            "url": "/search",
+            "section": "Search, labels, snooze, folders and templates (slice 6)",
+            "when": "the same over every mailbox I can open, each result naming its mailbox",
+            "params": [
+                "q",
+                "before"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "label-view": {
+            "screen": "label-view",
+            "url": "/m/{mailbox}/label/{label}",
+            "section": "Search, labels, snooze, folders and templates (slice 6)",
+            "when": "the conversations carrying one label",
+            "params": [
+                "before"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "folders": {
+            "screen": "folders",
+            "url": "/m/{mailbox}/folders",
+            "section": "Search, labels, snooze, folders and templates (slice 6)",
+            "when": "a mailbox's IMAP folders: create, rename, delete, counts",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "labels": {
+            "screen": "labels",
+            "url": "/m/{mailbox}/labels",
+            "section": "Search, labels, snooze, folders and templates (slice 6)",
+            "when": "a mailbox's labels: create, rename, colour, delete, counts",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "templates": {
+            "screen": "templates",
+            "url": "/templates",
+            "section": "Search, labels, snooze, folders and templates (slice 6)",
+            "when": "my canned replies and the shared ones",
+            "params": [
+                "q"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "template-new": {
+            "screen": "template-new",
+            "url": "/templates/new",
+            "section": "Search, labels, snooze, folders and templates (slice 6)",
+            "when": "write a canned reply",
+            "params": [
+                "name",
+                "body"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "template-edit": {
+            "screen": "template-edit",
+            "url": "/templates/{template}/edit",
+            "section": "Search, labels, snooze, folders and templates (slice 6)",
+            "when": "change or delete a canned reply",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "mailbox-access": {
+            "screen": "mailbox-access",
+            "url": "/m/{mailbox}/access",
+            "section": "Delegation and access (slice 7)",
+            "when": "who can open this mailbox and at what level, and why (owner, a row, a department, Mail admin, the Clerk); revoke",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "access-grant-new": {
+            "screen": "access-grant-new",
+            "url": "/m/{mailbox}/access/new",
+            "section": "Delegation and access (slice 7)",
+            "when": "give a person, a department or an agent a level on this mailbox (the record picker); on a person's mailbox by anyone but its owner, the break-glass form with a reason and an expiry",
+            "params": [
+                "person",
+                "department",
+                "agent",
+                "level"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "mailbox-access-log": {
+            "screen": "mailbox-access-log",
+            "url": "/m/{mailbox}/access-log",
+            "section": "Delegation and access (slice 7)",
+            "when": "every view of this mailbox by anyone but its owner — lists, conversations, parts, raw, MCP and K7 reads",
+            "params": [
+                "since",
+                "who"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "mailbox-settings": {
+            "screen": "mailbox-settings",
+            "url": "/m/{mailbox}/settings",
+            "section": "Delegation and access (slice 7)",
+            "when": "this mailbox's settings: undo seconds, conversation view, images, density, shortcuts; on a person's mailbox, **Let the Mail Expert read my mail when I ask** and **Share with applications** (both off by default)",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "correspondents": {
+            "screen": "correspondents",
+            "url": "/m/{mailbox}/people",
+            "section": "Correspondents and the K7 share (slice 8)",
+            "when": "everyone this mailbox has written to or heard from: first and last contact, counts, known or not, internal or outside",
+            "params": [
+                "q",
+                "known",
+                "outside"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "correspondent-view": {
+            "screen": "correspondent-view",
+            "url": "/m/{mailbox}/people/{correspondent}",
+            "section": "Correspondents and the K7 share (slice 8)",
+            "when": "what this mailbox has exchanged with one address or its company's domain, as conversations",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "notifications": {
+            "screen": "notifications",
+            "url": "/notifications",
+            "section": "Notifications (slice 9)",
+            "when": "my notices: new mail in the mailboxes I chose, held mail for my review, decisions, unscreened mail, break-glass on my mailbox, failures",
+            "params": [
+                "unread"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "notification-settings": {
+            "screen": "notification-settings",
+            "url": "/settings/notifications",
+            "section": "Notifications (slice 9)",
+            "when": "which notices reach me in-app, by mail and by text (K6), and for which mailboxes new mail notifies me",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "admin": {
+            "screen": "admin",
+            "url": "/admin",
+            "section": "Home, admin and settings (slice 10)",
+            "when": "the Mail admin's overview: domains served, mailboxes by kind and state, forwarding addresses going outside, sync health, failed credentials, the agents' budget today",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "admin-sync": {
+            "screen": "admin-sync",
+            "url": "/admin/sync",
+            "section": "Home, admin and settings (slice 10)",
+            "when": "per mailbox: sync state, last sync, index and text coverage, errors; Re-sync, Re-index text",
+            "params": [
+                "state"
+            ],
+            "built": false,
+            "stub": false
+        },
+        "admin-settings": {
+            "screen": "admin-settings",
+            "url": "/admin/settings",
+            "section": "Home, admin and settings (slice 10)",
+            "when": "MaluMail's settings: the undo and images defaults, the body index cap, held-mail expiry, the agent policy defaults, the agents' business-wide budget and its two switches, the monitoring notice, the Clerk's hour",
+            "params": [],
+            "built": false,
+            "stub": false
+        },
+        "admin-agents": {
+            "screen": "admin-agents",
+            "url": "/admin/agents",
+            "section": "Home, admin and settings (slice 10)",
+            "when": "the agents with mailboxes, their mail turns (dispatches) and their states; Retry a failed one",
+            "params": [
+                "status",
+                "agent"
+            ],
+            "built": false,
+            "stub": false
+        }
+    },
+    "actions": {
+        "mail_notice_acknowledge": {
+            "action": "mail_notice_acknowledge",
+            "section": "The shell (Phase 2 — sso-shell)",
+            "endpoint": "/notice/acknowledge.php",
+            "params": [
+                {
+                    "name": "version",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "the notice version shown"
+                }
+            ],
+            "undo": null,
+            "confirm": false,
+            "approval": null,
+            "log_event": "notice.acknowledge",
+            "who": "`mail.use`",
+            "agent": false,
+            "record_id": "the acknowledgement",
+            "built": false
+        },
+        "mail_token_mint": {
+            "action": "mail_token_mint",
+            "section": "The shell (Phase 2 — sso-shell)",
+            "endpoint": "/tokens/mint.php",
+            "params": [
+                {
+                    "name": "name",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "what the token is for"
+                },
+                {
+                    "name": "expires_days",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "1 to 365"
+                }
+            ],
+            "undo": "mail_token_revoke",
+            "confirm": false,
+            "approval": null,
+            "log_event": "token.mint",
+            "who": "`tokens.own`",
+            "agent": false,
+            "record_id": "the token",
+            "built": false
+        },
+        "mail_token_revoke": {
+            "action": "mail_token_revoke",
+            "section": "The shell (Phase 2 — sso-shell)",
+            "endpoint": "/tokens/revoke.php",
+            "params": [
+                {
+                    "name": "token",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "its id"
+                }
+            ],
+            "undo": null,
+            "confirm": true,
+            "approval": null,
+            "log_event": "token.revoke",
+            "who": "`tokens.own` · own",
+            "agent": false,
+            "record_id": "the token",
+            "built": false
+        },
+        "mail_domains_serve_set": {
+            "action": "mail_domains_serve_set",
+            "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
+            "endpoint": "/admin/domains/serve.php",
+            "params": [
+                {
+                    "name": "domain",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "a hosted domain's name"
+                },
+                {
+                    "name": "served",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "yes or no"
+                },
+                {
+                    "name": "internal",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                }
+            ],
+            "undo": "restore prior",
+            "confirm": true,
+            "approval": null,
+            "log_event": "domains.serve",
+            "who": "`domains.manage`",
+            "agent": false,
+            "record_id": "the domain",
+            "built": false
+        },
+        "mail_mailbox_create": {
+            "action": "mail_mailbox_create",
+            "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
+            "endpoint": "/admin/mailboxes/create.php",
+            "params": [
+                {
+                    "name": "domain",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "local_part",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "kind",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "person agent or shared"
+                },
+                {
+                    "name": "display_name",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "owner",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "a person for a person's mailbox or an agent for an agent's"
+                },
+                {
+                    "name": "quota_gib",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "1 to 50"
+                },
+                {
+                    "name": "overseer",
+                    "required": false,
+                    "repeated": true,
+                    "hint": "people for an agent's mailbox"
+                },
+                {
+                    "name": "primary_overseer",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": "mail_mailbox_suspend",
+            "confirm": false,
+            "approval": null,
+            "log_event": "mailbox.create",
+            "who": "`mailboxes.manage`",
+            "agent": false,
+            "record_id": "the mailbox",
+            "built": false
+        },
+        "mail_mailbox_connect": {
+            "action": "mail_mailbox_connect",
+            "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
+            "endpoint": "/admin/mailboxes/connect.php",
+            "params": [
+                {
+                    "name": "address",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "an existing MaluMail mailbox on a served domain"
+                },
+                {
+                    "name": "kind",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "agent or shared until MM1"
+                },
+                {
+                    "name": "display_name",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "owner",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "overseer",
+                    "required": false,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "primary_overseer",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": "mail_mailbox_suspend",
+            "confirm": true,
+            "approval": null,
+            "log_event": "mailbox.connect",
+            "who": "`mailboxes.manage`",
+            "agent": false,
+            "record_id": "the mailbox",
+            "built": false
+        },
+        "mail_mailbox_update": {
+            "action": "mail_mailbox_update",
+            "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
+            "endpoint": "/admin/mailboxes/update.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "display_name",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "intake_owner",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "none kernel helpdesk sales_crm or other"
+                },
+                {
+                    "name": "share_with_apps",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                },
+                {
+                    "name": "primary_overseer",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": "restore prior",
+            "confirm": false,
+            "approval": null,
+            "log_event": "mailbox.update",
+            "who": "`mailboxes.manage`",
+            "agent": false,
+            "record_id": "the mailbox",
+            "built": false
+        },
+        "mail_mailbox_suspend": {
+            "action": "mail_mailbox_suspend",
+            "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
+            "endpoint": "/admin/mailboxes/suspend.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "reason",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": "mail_mailbox_reactivate",
+            "confirm": true,
+            "approval": null,
+            "log_event": "mailbox.suspend",
+            "who": "`mailboxes.manage`",
+            "agent": false,
+            "record_id": "the mailbox",
+            "built": false
+        },
+        "mail_mailbox_reactivate": {
+            "action": "mail_mailbox_reactivate",
+            "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
+            "endpoint": "/admin/mailboxes/reactivate.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": "mail_mailbox_suspend",
+            "confirm": false,
+            "approval": null,
+            "log_event": "mailbox.reactivate",
+            "who": "`mailboxes.manage`",
+            "agent": false,
+            "record_id": "the mailbox",
+            "built": false
+        },
+        "mail_mailbox_quota_set": {
+            "action": "mail_mailbox_quota_set",
+            "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
+            "endpoint": "/admin/mailboxes/quota.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "quota_gib",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "1 to 50"
+                }
+            ],
+            "undo": "restore prior",
+            "confirm": false,
+            "approval": null,
+            "log_event": "mailbox.quota",
+            "who": "`mailboxes.manage`",
+            "agent": false,
+            "record_id": "the mailbox",
+            "built": false
+        },
+        "mail_mailbox_password_reset": {
+            "action": "mail_mailbox_password_reset",
+            "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
+            "endpoint": "/admin/mailboxes/reset.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": null,
+            "confirm": true,
+            "approval": null,
+            "log_event": "mailbox.password_reset",
+            "who": "`mailboxes.manage`",
+            "agent": false,
+            "record_id": "the mailbox",
+            "built": false
+        },
+        "mail_alias_create": {
+            "action": "mail_alias_create",
+            "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
+            "endpoint": "/admin/aliases/create.php",
+            "params": [
+                {
+                    "name": "domain",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "local_part",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "destination",
+                    "required": true,
+                    "repeated": true,
+                    "hint": "addresses — at most 20"
+                },
+                {
+                    "name": "confirm_outside",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "the outside addresses typed back"
+                }
+            ],
+            "undo": "mail_alias_delete",
+            "confirm": true,
+            "approval": null,
+            "log_event": "alias.create",
+            "who": "`aliases.manage`",
+            "agent": false,
+            "record_id": "the alias",
+            "built": false
+        },
+        "mail_alias_update": {
+            "action": "mail_alias_update",
+            "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
+            "endpoint": "/admin/aliases/update.php",
+            "params": [
+                {
+                    "name": "alias",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "its address"
+                },
+                {
+                    "name": "destination",
+                    "required": true,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "confirm_outside",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": "restore prior",
+            "confirm": true,
+            "approval": null,
+            "log_event": "alias.update",
+            "who": "`aliases.manage`",
+            "agent": false,
+            "record_id": "the alias",
+            "built": false
+        },
+        "mail_alias_delete": {
+            "action": "mail_alias_delete",
+            "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
+            "endpoint": "/admin/aliases/delete.php",
+            "params": [
+                {
+                    "name": "alias",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": null,
+            "confirm": true,
+            "approval": null,
+            "log_event": "alias.delete",
+            "who": "`aliases.manage`",
+            "agent": false,
+            "record_id": "the alias",
+            "built": false
+        },
+        "mail_archive": {
+            "action": "mail_archive",
+            "section": "Reading (slice 3 — the second exemplar)",
+            "endpoint": "/mail/archive.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "thread",
+                    "required": true,
+                    "repeated": true,
+                    "hint": ""
+                }
+            ],
+            "undo": "mail_move",
+            "confirm": false,
+            "approval": null,
+            "log_event": "message.archive",
+            "who": "`mail.use` · triage",
+            "agent": true,
+            "record_id": "the first conversation",
+            "built": false
+        },
+        "mail_move": {
+            "action": "mail_move",
+            "section": "Reading (slice 3 — the second exemplar)",
+            "endpoint": "/mail/move.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "thread",
+                    "required": true,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "to_folder",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": "mail_move",
+            "confirm": false,
+            "approval": null,
+            "log_event": "message.move",
+            "who": "`mail.use` · triage",
+            "agent": true,
+            "record_id": "the first conversation",
+            "built": false
+        },
+        "mail_trash": {
+            "action": "mail_trash",
+            "section": "Reading (slice 3 — the second exemplar)",
+            "endpoint": "/mail/trash.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "thread",
+                    "required": true,
+                    "repeated": true,
+                    "hint": ""
+                }
+            ],
+            "undo": "mail_move",
+            "confirm": false,
+            "approval": null,
+            "log_event": "message.trash",
+            "who": "`mail.use` · triage",
+            "agent": true,
+            "record_id": "the first conversation",
+            "built": false
+        },
+        "mail_spam": {
+            "action": "mail_spam",
+            "section": "Reading (slice 3 — the second exemplar)",
+            "endpoint": "/mail/spam.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "thread",
+                    "required": true,
+                    "repeated": true,
+                    "hint": ""
+                }
+            ],
+            "undo": "mail_not_spam",
+            "confirm": false,
+            "approval": null,
+            "log_event": "message.spam",
+            "who": "`mail.use` · triage",
+            "agent": true,
+            "record_id": "the first conversation",
+            "built": false
+        },
+        "mail_not_spam": {
+            "action": "mail_not_spam",
+            "section": "Reading (slice 3 — the second exemplar)",
+            "endpoint": "/mail/not-spam.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "thread",
+                    "required": true,
+                    "repeated": true,
+                    "hint": ""
+                }
+            ],
+            "undo": "mail_spam",
+            "confirm": false,
+            "approval": null,
+            "log_event": "message.not_spam",
+            "who": "`mail.use` · triage",
+            "agent": true,
+            "record_id": "the first conversation",
+            "built": false
+        },
+        "mail_flag": {
+            "action": "mail_flag",
+            "section": "Reading (slice 3 — the second exemplar)",
+            "endpoint": "/mail/flag.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "thread",
+                    "required": true,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "message",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "one message of it"
+                },
+                {
+                    "name": "flagged",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                }
+            ],
+            "undo": "restore prior",
+            "confirm": false,
+            "approval": null,
+            "log_event": "message.flag",
+            "who": "`mail.use` · triage",
+            "agent": true,
+            "record_id": "the first conversation",
+            "built": false
+        },
+        "mail_mark_read": {
+            "action": "mail_mark_read",
+            "section": "Reading (slice 3 — the second exemplar)",
+            "endpoint": "/mail/mark-read.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "thread",
+                    "required": true,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "read",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                }
+            ],
+            "undo": "restore prior",
+            "confirm": false,
+            "approval": null,
+            "log_event": "message.mark_read",
+            "who": "`mail.use` · view",
+            "agent": true,
+            "record_id": "the first conversation",
+            "built": false
+        },
+        "mail_delete_forever": {
+            "action": "mail_delete_forever",
+            "section": "Reading (slice 3 — the second exemplar)",
+            "endpoint": "/mail/delete-forever.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "thread",
+                    "required": true,
+                    "repeated": true,
+                    "hint": "from Trash or Spam only"
+                }
+            ],
+            "undo": null,
+            "confirm": true,
+            "approval": "deletion",
+            "log_event": "message.delete_forever",
+            "who": "`mail.use` · triage",
+            "agent": true,
+            "record_id": "the first conversation",
+            "built": false
+        },
+        "mail_trash_empty": {
+            "action": "mail_trash_empty",
+            "section": "Reading (slice 3 — the second exemplar)",
+            "endpoint": "/mail/trash-empty.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "which",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "trash or spam"
+                }
+            ],
+            "undo": null,
+            "confirm": true,
+            "approval": "deletion",
+            "log_event": "trash.empty",
+            "who": "`mail.use` · triage",
+            "agent": true,
+            "record_id": "the mailbox",
+            "built": false
+        },
+        "mail_images_allow": {
+            "action": "mail_images_allow",
+            "section": "Reading (slice 3 — the second exemplar)",
+            "endpoint": "/mail/images-allow.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "sender",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "an address whose remote images always show"
+                }
+            ],
+            "undo": "restore prior",
+            "confirm": false,
+            "approval": null,
+            "log_event": "sender.images_allow",
+            "who": "`mail.use` · full",
+            "agent": false,
+            "record_id": "the mailbox",
+            "built": false
+        },
+        "mail_sensitive_set": {
+            "action": "mail_sensitive_set",
+            "section": "Reading (slice 3 — the second exemplar)",
+            "endpoint": "/mail/sensitive.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "thread",
+                    "required": true,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "sensitive",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                }
+            ],
+            "undo": "restore prior",
+            "confirm": false,
+            "approval": null,
+            "log_event": "thread.sensitive",
+            "who": "`mail.use` · triage",
+            "agent": false,
+            "record_id": "the first conversation",
+            "built": false
+        },
+        "mail_draft_save": {
+            "action": "mail_draft_save",
+            "section": "Writing (slice 4 — the third exemplar)",
+            "endpoint": "/mail/draft-save.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "draft",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "its id to replace"
+                },
+                {
+                    "name": "identity",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "to",
+                    "required": false,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "cc",
+                    "required": false,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "bcc",
+                    "required": false,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "subject",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "body",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "body_format",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "text or html"
+                },
+                {
+                    "name": "reply_to",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "a message key id"
+                },
+                {
+                    "name": "mode",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "new reply reply_all or forward"
+                }
+            ],
+            "undo": "mail_draft_discard",
+            "confirm": false,
+            "approval": null,
+            "log_event": "draft.save",
+            "who": "`mail.use` · triage",
+            "agent": true,
+            "record_id": "the draft",
+            "built": false
+        },
+        "mail_draft_discard": {
+            "action": "mail_draft_discard",
+            "section": "Writing (slice 4 — the third exemplar)",
+            "endpoint": "/mail/draft-discard.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "draft",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": null,
+            "confirm": false,
+            "approval": null,
+            "log_event": "draft.discard",
+            "who": "`mail.use` · triage",
+            "agent": true,
+            "record_id": "the draft",
+            "built": false
+        },
+        "mail_send": {
+            "action": "mail_send",
+            "section": "Writing (slice 4 — the third exemplar)",
+            "endpoint": "/mail/send.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "identity",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "to",
+                    "required": true,
+                    "repeated": true,
+                    "hint": "addresses"
+                },
+                {
+                    "name": "cc",
+                    "required": false,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "bcc",
+                    "required": false,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "subject",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "body",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "body_format",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "text or html"
+                },
+                {
+                    "name": "draft",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "the draft it sends"
+                },
+                {
+                    "name": "send_at",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "an ISO time for a scheduled send"
+                },
+                {
+                    "name": "purpose",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "why — required of an agent"
+                }
+            ],
+            "undo": "mail_send_cancel",
+            "confirm": false,
+            "approval": null,
+            "log_event": "message.send",
+            "who": "`mail.use` · send",
+            "agent": true,
+            "record_id": "the outbound message",
+            "built": false
+        },
+        "mail_reply": {
+            "action": "mail_reply",
+            "section": "Writing (slice 4 — the third exemplar)",
+            "endpoint": "/mail/reply.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "message",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "the message key id answered"
+                },
+                {
+                    "name": "reply_all",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                },
+                {
+                    "name": "identity",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "body",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "body_format",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "cc",
+                    "required": false,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "bcc",
+                    "required": false,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "draft",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "send_at",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "purpose",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": "mail_send_cancel",
+            "confirm": false,
+            "approval": null,
+            "log_event": "message.reply",
+            "who": "`mail.use` · send",
+            "agent": true,
+            "record_id": "the outbound message",
+            "built": false
+        },
+        "mail_forward": {
+            "action": "mail_forward",
+            "section": "Writing (slice 4 — the third exemplar)",
+            "endpoint": "/mail/forward.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "message",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "to",
+                    "required": true,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "cc",
+                    "required": false,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "bcc",
+                    "required": false,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "body",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "body_format",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "identity",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "attachments_included",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                },
+                {
+                    "name": "draft",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "send_at",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "purpose",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": "mail_send_cancel",
+            "confirm": false,
+            "approval": null,
+            "log_event": "message.forward",
+            "who": "`mail.use` · send",
+            "agent": true,
+            "record_id": "the outbound message",
+            "built": false
+        },
+        "mail_send_cancel": {
+            "action": "mail_send_cancel",
+            "section": "Writing (slice 4 — the third exemplar)",
+            "endpoint": "/mail/send-cancel.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "outbound",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "an outbound id in its undo window or scheduled"
+                }
+            ],
+            "undo": null,
+            "confirm": false,
+            "approval": null,
+            "log_event": "message.cancel",
+            "who": "`mail.use` · send",
+            "agent": true,
+            "record_id": "the draft reopened",
+            "built": false
+        },
+        "mail_outbox_retry": {
+            "action": "mail_outbox_retry",
+            "section": "Writing (slice 4 — the third exemplar)",
+            "endpoint": "/mail/outbox-retry.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "outbound",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "a failed one"
+                }
+            ],
+            "undo": null,
+            "confirm": false,
+            "approval": null,
+            "log_event": "outbound.retry",
+            "who": "`mail.use` · send",
+            "agent": true,
+            "record_id": "the outbound message",
+            "built": false
+        },
+        "mail_identity_save": {
+            "action": "mail_identity_save",
+            "section": "Writing (slice 4 — the third exemplar)",
+            "endpoint": "/mail/identity-save.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "identity",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "its id to change"
+                },
+                {
+                    "name": "address",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "display_name",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "reply_to_address",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "signature",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "is_default",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                }
+            ],
+            "undo": "restore prior",
+            "confirm": false,
+            "approval": null,
+            "log_event": "identity.save",
+            "who": "`mail.use` · full",
+            "agent": false,
+            "record_id": "the identity",
+            "built": false
+        },
+        "mail_identity_delete": {
+            "action": "mail_identity_delete",
+            "section": "Writing (slice 4 — the third exemplar)",
+            "endpoint": "/mail/identity-delete.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "identity",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": null,
+            "confirm": true,
+            "approval": null,
+            "log_event": "identity.delete",
+            "who": "`mail.use` · full",
+            "agent": false,
+            "record_id": "the identity",
+            "built": false
+        },
+        "mail_review_approve": {
+            "action": "mail_review_approve",
+            "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
+            "endpoint": "/oversight/approve.php",
+            "params": [
+                {
+                    "name": "outbound",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": null,
+            "confirm": false,
+            "approval": null,
+            "log_event": "review.approve",
+            "who": "`mail.oversee` · decider",
+            "agent": false,
+            "record_id": "the outbound message",
+            "built": false
+        },
+        "mail_review_edit": {
+            "action": "mail_review_edit",
+            "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
+            "endpoint": "/oversight/edit.php",
+            "params": [
+                {
+                    "name": "outbound",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "subject",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "body",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "body_format",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "to",
+                    "required": false,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "cc",
+                    "required": false,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "bcc",
+                    "required": false,
+                    "repeated": true,
+                    "hint": ""
+                }
+            ],
+            "undo": null,
+            "confirm": false,
+            "approval": null,
+            "log_event": "review.edit",
+            "who": "`mail.oversee` · decider",
+            "agent": false,
+            "record_id": "the outbound message",
+            "built": false
+        },
+        "mail_review_reject": {
+            "action": "mail_review_reject",
+            "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
+            "endpoint": "/oversight/reject.php",
+            "params": [
+                {
+                    "name": "outbound",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "note",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "reaches the agent in its next turn"
+                }
+            ],
+            "undo": null,
+            "confirm": false,
+            "approval": null,
+            "log_event": "review.reject",
+            "who": "`mail.oversee` · decider",
+            "agent": false,
+            "record_id": "the outbound message",
+            "built": false
+        },
+        "mail_review_reply": {
+            "action": "mail_review_reply",
+            "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
+            "endpoint": "/oversight/reply.php",
+            "params": [
+                {
+                    "name": "outbound",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "note",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "a question to the agent — the draft is kept"
+                }
+            ],
+            "undo": null,
+            "confirm": false,
+            "approval": null,
+            "log_event": "review.reply",
+            "who": "`mail.oversee` · decider",
+            "agent": false,
+            "record_id": "the outbound message",
+            "built": false
+        },
+        "mail_thread_take_over": {
+            "action": "mail_thread_take_over",
+            "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
+            "endpoint": "/oversight/take-over.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "thread",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": "restore prior",
+            "confirm": false,
+            "approval": null,
+            "log_event": "thread.take_over",
+            "who": "`mail.oversee` · full",
+            "agent": false,
+            "record_id": "the conversation",
+            "built": false
+        },
+        "mail_mute": {
+            "action": "mail_mute",
+            "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
+            "endpoint": "/mail/mute.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "thread",
+                    "required": true,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "muted",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                }
+            ],
+            "undo": "restore prior",
+            "confirm": false,
+            "approval": null,
+            "log_event": "thread.mute",
+            "who": "`mail.use` · triage",
+            "agent": true,
+            "record_id": "the first conversation",
+            "built": false
+        },
+        "mail_unscreened_release": {
+            "action": "mail_unscreened_release",
+            "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
+            "endpoint": "/oversight/release.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "message",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "a message key id"
+                }
+            ],
+            "undo": null,
+            "confirm": false,
+            "approval": null,
+            "log_event": "unscreened.release",
+            "who": "`mail.oversee` · full",
+            "agent": false,
+            "record_id": "the dispatch",
+            "built": false
+        },
+        "mail_unscreened_dismiss": {
+            "action": "mail_unscreened_dismiss",
+            "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
+            "endpoint": "/oversight/dismiss.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "message",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": null,
+            "confirm": false,
+            "approval": null,
+            "log_event": "unscreened.dismiss",
+            "who": "`mail.oversee` · full",
+            "agent": false,
+            "record_id": "the dispatch",
+            "built": false
+        },
+        "mail_sender_mark_known": {
+            "action": "mail_sender_mark_known",
+            "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
+            "endpoint": "/oversight/mark-known.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "address",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "the sender"
+                }
+            ],
+            "undo": "restore prior",
+            "confirm": false,
+            "approval": null,
+            "log_event": "sender.mark_known",
+            "who": "`mail.oversee` · full",
+            "agent": false,
+            "record_id": "the correspondent",
+            "built": false
+        },
+        "mail_policy_set": {
+            "action": "mail_policy_set",
+            "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
+            "endpoint": "/oversight/policy.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "send_mode",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "hold_all internal_auto allowlist_auto or auto"
+                },
+                {
+                    "name": "allow_domain",
+                    "required": false,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "allow_address",
+                    "required": false,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "first_contact_review",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                },
+                {
+                    "name": "attachments_review",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                },
+                {
+                    "name": "max_external_per_day",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "max_per_hour",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "max_per_thread_per_day",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "wake_on_mail",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                },
+                {
+                    "name": "wake_from",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "none internal internal_and_known or all_authenticated"
+                },
+                {
+                    "name": "disclosure",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                },
+                {
+                    "name": "disclosure_text",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": "restore prior",
+            "confirm": true,
+            "approval": null,
+            "log_event": "policy.set",
+            "who": "`mail.oversee` · full",
+            "agent": false,
+            "record_id": "the policy",
+            "built": false
+        },
+        "mail_mailbox_pause": {
+            "action": "mail_mailbox_pause",
+            "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
+            "endpoint": "/oversight/pause.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "reason",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": "mail_mailbox_resume",
+            "confirm": false,
+            "approval": null,
+            "log_event": "mailbox.pause",
+            "who": "`mail.oversee` · full",
+            "agent": false,
+            "record_id": "the mailbox",
+            "built": false
+        },
+        "mail_mailbox_resume": {
+            "action": "mail_mailbox_resume",
+            "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
+            "endpoint": "/oversight/resume.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": "mail_mailbox_pause",
+            "confirm": false,
+            "approval": null,
+            "log_event": "mailbox.resume",
+            "who": "`mail.oversee` · full",
+            "agent": false,
+            "record_id": "the mailbox",
+            "built": false
+        },
+        "mail_label": {
+            "action": "mail_label",
+            "section": "Search, labels, snooze, folders and templates (slice 6)",
+            "endpoint": "/mail/label.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "thread",
+                    "required": true,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "label",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "removed",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes to take the label off"
+                }
+            ],
+            "undo": "restore prior",
+            "confirm": false,
+            "approval": null,
+            "log_event": "message.label",
+            "who": "`mail.use` · triage",
+            "agent": true,
+            "record_id": "the first conversation",
+            "built": false
+        },
+        "mail_snooze": {
+            "action": "mail_snooze",
+            "section": "Search, labels, snooze, folders and templates (slice 6)",
+            "endpoint": "/mail/snooze.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "thread",
+                    "required": true,
+                    "repeated": true,
+                    "hint": ""
+                },
+                {
+                    "name": "until",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "an ISO time"
+                }
+            ],
+            "undo": "mail_unsnooze",
+            "confirm": false,
+            "approval": null,
+            "log_event": "thread.snooze",
+            "who": "`mail.use` · triage",
+            "agent": true,
+            "record_id": "the first conversation",
+            "built": false
+        },
+        "mail_unsnooze": {
+            "action": "mail_unsnooze",
+            "section": "Search, labels, snooze, folders and templates (slice 6)",
+            "endpoint": "/mail/unsnooze.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "thread",
+                    "required": true,
+                    "repeated": true,
+                    "hint": ""
+                }
+            ],
+            "undo": "mail_snooze",
+            "confirm": false,
+            "approval": null,
+            "log_event": "thread.unsnooze",
+            "who": "`mail.use` · triage",
+            "agent": true,
+            "record_id": "the first conversation",
+            "built": false
+        },
+        "mail_folder_create": {
+            "action": "mail_folder_create",
+            "section": "Search, labels, snooze, folders and templates (slice 6)",
+            "endpoint": "/mail/folder-create.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "name",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "parent",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "an existing folder's name"
+                }
+            ],
+            "undo": "mail_folder_delete",
+            "confirm": false,
+            "approval": null,
+            "log_event": "folder.create",
+            "who": "`mail.use` · triage",
+            "agent": true,
+            "record_id": "the folder",
+            "built": false
+        },
+        "mail_folder_rename": {
+            "action": "mail_folder_rename",
+            "section": "Search, labels, snooze, folders and templates (slice 6)",
+            "endpoint": "/mail/folder-rename.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "folder",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "name",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": "restore prior",
+            "confirm": false,
+            "approval": null,
+            "log_event": "folder.rename",
+            "who": "`mail.use` · triage",
+            "agent": true,
+            "record_id": "the folder",
+            "built": false
+        },
+        "mail_folder_delete": {
+            "action": "mail_folder_delete",
+            "section": "Search, labels, snooze, folders and templates (slice 6)",
+            "endpoint": "/mail/folder-delete.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "folder",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": null,
+            "confirm": true,
+            "approval": "deletion",
+            "log_event": "folder.delete",
+            "who": "`mail.use` · triage",
+            "agent": true,
+            "record_id": "the folder",
+            "built": false
+        },
+        "mail_label_create": {
+            "action": "mail_label_create",
+            "section": "Search, labels, snooze, folders and templates (slice 6)",
+            "endpoint": "/mail/label-create.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "name",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "colour",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": "mail_label_delete",
+            "confirm": false,
+            "approval": null,
+            "log_event": "label.create",
+            "who": "`mail.use` · triage",
+            "agent": true,
+            "record_id": "the label",
+            "built": false
+        },
+        "mail_label_update": {
+            "action": "mail_label_update",
+            "section": "Search, labels, snooze, folders and templates (slice 6)",
+            "endpoint": "/mail/label-update.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "label",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "name",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "colour",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": "restore prior",
+            "confirm": false,
+            "approval": null,
+            "log_event": "label.update",
+            "who": "`mail.use` · triage",
+            "agent": true,
+            "record_id": "the label",
+            "built": false
+        },
+        "mail_label_delete": {
+            "action": "mail_label_delete",
+            "section": "Search, labels, snooze, folders and templates (slice 6)",
+            "endpoint": "/mail/label-delete.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "label",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": null,
+            "confirm": true,
+            "approval": null,
+            "log_event": "label.delete",
+            "who": "`mail.use` · triage",
+            "agent": true,
+            "record_id": "the label",
+            "built": false
+        },
+        "mail_template_save": {
+            "action": "mail_template_save",
+            "section": "Search, labels, snooze, folders and templates (slice 6)",
+            "endpoint": "/templates/save.php",
+            "params": [
+                {
+                    "name": "template",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "its id to change"
+                },
+                {
+                    "name": "name",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "subject",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "body",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "shared",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                }
+            ],
+            "undo": "restore prior",
+            "confirm": false,
+            "approval": null,
+            "log_event": "template.save",
+            "who": "`mail.use`",
+            "agent": false,
+            "record_id": "the template",
+            "built": false
+        },
+        "mail_template_delete": {
+            "action": "mail_template_delete",
+            "section": "Search, labels, snooze, folders and templates (slice 6)",
+            "endpoint": "/templates/delete.php",
+            "params": [
+                {
+                    "name": "template",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": null,
+            "confirm": true,
+            "approval": null,
+            "log_event": "template.delete",
+            "who": "`mail.use` · own",
+            "agent": false,
+            "record_id": "the template",
+            "built": false
+        },
+        "mail_permission_grant": {
+            "action": "mail_permission_grant",
+            "section": "Delegation and access (slice 7)",
+            "endpoint": "/access/grant.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "person",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "agent",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "department",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "level",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "view triage send or full"
+                },
+                {
+                    "name": "reason",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "required for break-glass"
+                },
+                {
+                    "name": "expires_at",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "an ISO date within 30 days for break-glass"
+                }
+            ],
+            "undo": "mail_permission_revoke",
+            "confirm": true,
+            "approval": null,
+            "log_event": "permission.grant",
+            "who": "`mail.use` · full · or `access.audit` for break-glass",
+            "agent": false,
+            "record_id": "the permission row",
+            "built": false
+        },
+        "mail_permission_revoke": {
+            "action": "mail_permission_revoke",
+            "section": "Delegation and access (slice 7)",
+            "endpoint": "/access/revoke.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "permission",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "the row's id"
+                }
+            ],
+            "undo": null,
+            "confirm": true,
+            "approval": null,
+            "log_event": "permission.revoke",
+            "who": "`mail.use` · full · or `access.audit`",
+            "agent": false,
+            "record_id": "the permission row",
+            "built": false
+        },
+        "mail_mailbox_settings_save": {
+            "action": "mail_mailbox_settings_save",
+            "section": "Delegation and access (slice 7)",
+            "endpoint": "/mail/settings-save.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "undo_seconds",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "0 to 30"
+                },
+                {
+                    "name": "conversation_view",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                },
+                {
+                    "name": "images",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "ask or always"
+                },
+                {
+                    "name": "density",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "comfortable or compact"
+                },
+                {
+                    "name": "shortcuts",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                },
+                {
+                    "name": "ai_read",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                },
+                {
+                    "name": "share_with_apps",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                }
+            ],
+            "undo": "restore prior",
+            "confirm": false,
+            "approval": null,
+            "log_event": "mailbox.settings",
+            "who": "`mail.use` · full",
+            "agent": false,
+            "record_id": "the mailbox",
+            "built": false
+        },
+        "mail_notification_read": {
+            "action": "mail_notification_read",
+            "section": "Notifications (slice 9)",
+            "endpoint": "/notifications/read.php",
+            "params": [
+                {
+                    "name": "notification",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "one id"
+                },
+                {
+                    "name": "every_one",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes to mark all read"
+                }
+            ],
+            "undo": null,
+            "confirm": false,
+            "approval": null,
+            "log_event": "notification.read",
+            "who": "own",
+            "agent": false,
+            "record_id": "the notification",
+            "built": false
+        },
+        "mail_notification_prefs_save": {
+            "action": "mail_notification_prefs_save",
+            "section": "Notifications (slice 9)",
+            "endpoint": "/settings/notifications/save.php",
+            "params": [
+                {
+                    "name": "email_enabled",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                },
+                {
+                    "name": "sms_enabled",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                },
+                {
+                    "name": "kind",
+                    "required": false,
+                    "repeated": true,
+                    "hint": "the notices that may mail"
+                },
+                {
+                    "name": "new_mail_mailbox",
+                    "required": false,
+                    "repeated": true,
+                    "hint": "mailbox ids"
+                }
+            ],
+            "undo": "restore prior",
+            "confirm": false,
+            "approval": null,
+            "log_event": "notification.prefs",
+            "who": "own",
+            "agent": false,
+            "record_id": "the member",
+            "built": false
+        },
+        "mail_settings_save": {
+            "action": "mail_settings_save",
+            "section": "Home, admin and settings (slice 10)",
+            "endpoint": "/admin/settings/save.php",
+            "params": [
+                {
+                    "name": "undo_seconds_default",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "images_default",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "ask or always"
+                },
+                {
+                    "name": "body_index_kb",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "held_expiry_hours",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "agent_external_budget",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                },
+                {
+                    "name": "hold_all_agents",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                },
+                {
+                    "name": "hold_all_external",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no"
+                },
+                {
+                    "name": "clerk_hour",
+                    "required": false,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": "restore prior",
+            "confirm": true,
+            "approval": null,
+            "log_event": "settings.save",
+            "who": "`settings.manage`",
+            "agent": false,
+            "record_id": "the settings",
+            "built": false
+        },
+        "mail_notice_save": {
+            "action": "mail_notice_save",
+            "section": "Home, admin and settings (slice 10)",
+            "endpoint": "/admin/settings/notice.php",
+            "params": [
+                {
+                    "name": "text",
+                    "required": true,
+                    "repeated": false,
+                    "hint": "the notice in plain words — a new version"
+                }
+            ],
+            "undo": null,
+            "confirm": true,
+            "approval": null,
+            "log_event": "notice.save",
+            "who": "`settings.manage`",
+            "agent": false,
+            "record_id": "the notice version",
+            "built": false
+        },
+        "mail_mailbox_resync": {
+            "action": "mail_mailbox_resync",
+            "section": "Home, admin and settings (slice 10)",
+            "endpoint": "/admin/sync/resync.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": null,
+            "confirm": false,
+            "approval": null,
+            "log_event": "mailbox.resync",
+            "who": "`settings.manage`",
+            "agent": false,
+            "record_id": "the mailbox",
+            "built": false
+        },
+        "mail_mailbox_reindex": {
+            "action": "mail_mailbox_reindex",
+            "section": "Home, admin and settings (slice 10)",
+            "endpoint": "/admin/sync/reindex.php",
+            "params": [
+                {
+                    "name": "mailbox",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": null,
+            "confirm": false,
+            "approval": null,
+            "log_event": "mailbox.reindex",
+            "who": "`settings.manage`",
+            "agent": false,
+            "record_id": "the mailbox",
+            "built": false
+        },
+        "mail_dispatch_retry": {
+            "action": "mail_dispatch_retry",
+            "section": "Home, admin and settings (slice 10)",
+            "endpoint": "/admin/agents/retry.php",
+            "params": [
+                {
+                    "name": "dispatch",
+                    "required": true,
+                    "repeated": false,
+                    "hint": ""
+                }
+            ],
+            "undo": null,
+            "confirm": false,
+            "approval": null,
+            "log_event": "dispatch.retry",
+            "who": "`agents.manage`",
+            "agent": false,
+            "record_id": "the dispatch",
+            "built": false
+        }
+    }
+}
