@@ -24,6 +24,7 @@ $current   = null;
 foreach ($rail as $b) { if ((int) $b['id'] === (int) $mailboxId) { $current = $b; } }
 $current ??= $rail[0] ?? null;
 $noticeOk  = (current_member()['member_kind'] ?? '') !== 'human' || db_bool($pdo, 'SELECT ml_notice_acknowledged(:m)', ['m' => $me]);
+$railData  = $noticeOk ? mail_rail($pdo, (int) ($current['id'] ?? 0)) : null;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -55,7 +56,7 @@ $noticeOk  = (current_member()['member_kind'] ?? '') !== 'human' || db_bool($pdo
                 </a>
             </div>
             <div class="navbar-content">
-                <?= view('shared/rail.php', ['rail' => $rail, 'current' => $current, 'activeNav' => $activeNav, 'noticeOk' => $noticeOk]) ?>
+                <?= view('shared/rail.php', ['railData' => $railData, 'activeNav' => $activeNav, 'noticeOk' => $noticeOk]) ?>
             </div>
         </div>
     </nav>
@@ -216,6 +217,7 @@ $noticeOk  = (current_member()['member_kind'] ?? '') !== 'human' || db_bool($pdo
     <script src="/assets/js/common-init.min.js"></script>
     <script src="/assets/js/record-picker.js"></script>
     <script src="/assets/js/malumail.js"></script>
+    <script src="/assets/js/mail-list.js"></script>
     <script src="/assets/js/theme-customizer-init.min.js"></script>
 </body>
 </html>

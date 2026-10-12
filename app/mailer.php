@@ -40,15 +40,16 @@ function mailer_sign(string $key, string $method, string $path, string $body, ?i
 
 /**
  * One call to the mail service as $actorMemberId: answers the decoded `result`; throws MailerRefused (the service's code and its
- * sentence, which the handler shows) or MailerDown (no answer, or not configured).
+ * sentence, which the handler shows) or MailerDown (no answer, or not configured). $onBehalf is the person behind an agent's run
+ * (mail-service.md §1): signed into the body, so the service computes ml_level_as(mailbox, actor, on_behalf) itself.
  */
-function mailer_call(string $path, int $actorMemberId, array $args = [], int $timeout = 30): array
+function mailer_call(string $path, int $actorMemberId, array $args = [], ?int $onBehalf = null, int $timeout = 30): array
 {
     $key = (string) env('ML_MAILER_KEY', '');
     if ($key === '' || (int) env('ML_MAILER_PORT', '0') <= 0) {
         throw new MailerDown('The mail service is not configured on this server.');
     }
-    $body = json_encode(['actor' => $actorMemberId, 'args' => (object) $args], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    $body = json_encode(['actor' => $actorMemberId, 'on_behalf' => $onBehalf, 'args' => (object) $args], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
     $ch = curl_init(mailer_base() . $path);
     curl_setopt_array($ch, [
         CURLOPT_POST => true, CURLOPT_POSTFIELDS => $body, CURLOPT_RETURNTRANSFER => true,

@@ -4,8 +4,11 @@
 #
 # PHASE 0's SKELETON (2026-10-11, tests/mailer/run.sh): the signed door, /health, the administration plane over the Mailbox MCP (admin
 # tools only, served domains only, a new password sealed on arrival and never returned), the IMAP probe with the circuit breaker, and
-# the sync and outbox passes, EMPTY until slices 2 and 4. Without /etc/malumail/mailer.env, ConditionPathExists skips this unit cleanly
-# (no crash loop), and the health check says "mailer: down". The sandbox below is first exercised by the owner's apply.
+# the outbox pass, EMPTY until slice 4. SLICE 2 (2026-10-12) made the SYNC real: one watcher thread per live mailbox (NOTIFY, else IDLE
+# and the STATUS round every minute), a pool of at most three connections per mailbox for catch-up and the gentle text pass, every
+# connection of the service under ML_MAILER_MAX_CONNECTIONS (default 400); MemoryMax covers a few hundred live mailboxes at ~1 MB a
+# connection. Without /etc/malumail/mailer.env, ConditionPathExists skips this unit cleanly (no crash loop), and the health check says
+# "mailer: down". The sandbox below is first exercised by the owner's apply.
 #
 # Two environment files, read by systemd (as root) before the user changes: the application's config/.env (the database login, the ports,
 # MaluMail's hosts, ML_MAILER_KEY) and /etc/malumail/mailer.env — 0400, owned by malumail-mailer, written by deploy/ROOT_STEPS.sh — with

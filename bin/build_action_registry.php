@@ -228,6 +228,21 @@ function screen_controller(string $url): ?string
 {
     $path = parse_url($url, PHP_URL_PATH) ?: $url;
     $path = '/' . ltrim($path, '/');
+    // The mailbox's own routes (design §8, §9) — the vhost's rewrites and tests/dev_router.php's, by the template's own names (slice 2).
+    $mailboxRoutes = [
+        '#^/m/\{mailbox\}/v/\{view\}$#' => '/m/view.php', '#^/m/\{mailbox\}/f/\{folder\}$#' => '/m/folder.php',
+        '#^/m/\{mailbox\}/label/\{label\}$#' => '/m/label.php', '#^/m/\{mailbox\}/t/\{thread\}$#' => '/m/thread.php',
+        '#^/m/\{mailbox\}/msg/\{message\}/(original|body|raw)$#' => '/m/$1.php', '#^/m/\{mailbox\}/drafts/\{draft\}$#' => '/m/compose.php',
+        '#^/m/\{mailbox\}/people/\{correspondent\}$#' => '/m/person.php', '#^/m/\{mailbox\}/identities/new$#' => '/m/identity-form.php',
+        '#^/m/\{mailbox\}/identities/\{identity\}/edit$#' => '/m/identity-form.php', '#^/m/\{mailbox\}/access/new$#' => '/m/access-new.php',
+        '#^/m/\{mailbox\}/([a-z-]+)$#' => '/m/$1.php',
+    ];
+    foreach ($mailboxRoutes as $re => $file) {
+        if (preg_match($re, $path)) {
+            $f = WEB_ROOT . preg_replace($re, $file, $path);
+            return is_file($f) ? $f : null;
+        }
+    }
     $path = preg_replace('/\{[a-z_]+\}/', '1', $path);          // /pages/{id} → /pages/1
     if (str_ends_with($path, '/')) {
         return is_file(WEB_ROOT . $path . 'index.php') ? WEB_ROOT . $path . 'index.php' : null;

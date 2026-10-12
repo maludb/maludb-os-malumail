@@ -143,6 +143,22 @@ customer key nor the sealing secret** — the proof checks it.
   password, for the one redirect that shows it (`admin_reveal_once()`/`admin_take_revealed()`), never in JSON.
 - The IMAP fixture accepts what the fake Mailbox MCP issued (`--passwords`): a reset changes what logs in, as at MaluMail.
 
+## Slice 2 (2026-10-12, the mail service and the list BUILT — THE FIRST EXEMPLAR) — `docs/build-specs/mail-list.md`, `mail-service.md` §§2–3, 8–9
+- `bash tests/phase3/slice2/run.sh` (php -S) and `ML_APP=apache …`: scratch `ml_dev2`, Phase 2's servers with the IMAP fixture seeded
+  (`ML_IMAP_USERS`, one mailbox of 5,000 messages); `sync.py` 72, `list.php` 65, `browser.mjs` 45, `live.py` (MaluMail's test mailboxes
+  ONLY with `ML_LIVE_CREDENTIALS` naming the owner's handoff file in your own environment — never in the repo; one submission per run).
+  `ML_S2_HOLD=1` leaves the seeded servers up for development.
+- **Every list reads ONE gatherer**: `ml_mail_list()` behind `mailbox-view`, `folder-view` and the `mail_list` tool
+  (`app/features/mail/list.php`, `mcp/records_server.py`'s queries). The rail is `mail_rail()` over `ml_unread_counts()`; levels for many
+  mailboxes come from `ml_my_levels()` (db/017) — never `mcp_mailboxes.my_level`, one `ml_level()` per row.
+- **The poll** (`/m/{mailbox}/changes`) keys on `mail_mailbox_changes.seq`: 204 when unchanged; else out-of-band swaps. The mail service
+  must move the counter only when a list would change (`store.folder_state()` writes counts only when they differ).
+- **The mail service's sync** is `services/mailer/watch.py` (a watcher thread per live mailbox, a pool ≤ 3, every DB write through
+  `Sync.call()` onto the loop), `index.py` (one message → a row), `textpass.py`. IMAPClient's `idle_check` swallows an EOF — the watcher
+  treats two instant empty wakes as a dropped connection. Every fetch is a PEEK; the fixture counts any `\Seen` a fetch would set.
+- Phase 2's and the mailer suite's proofs follow built screens (a built screen answers by its own slice's proof; the mailer suite pauses
+  its seeded mailboxes so no watcher logs in beside the probe).
+
 ## Numbers
 Ports `APP_INTERNAL_PORT=8199`, `MCP_RECORDS_PORT=8852`, `MCP_ACTIVITY_PORT=8853`, `ML_MAILER_PORT=8854`, `ML_IMAGES_PORT=8855`;
 scratch 9201 (the app), 9202 (the fake kernel), 9203 (the fake MaluDB + MaluMail REST), 9204–9205 (the MCP servers), 9206 (the

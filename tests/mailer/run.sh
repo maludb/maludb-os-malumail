@@ -51,6 +51,9 @@ SELECT 'mailbox_password', 'proof', 'x', decode(v.box, 'hex'), m.id FROM (VALUES
  ('pat@business.example', '$(sealhex "$PW_PAT")'), ('clerk@business.example', '$(sealhex "$PW_WRONG")'),
  ('busy@business.example', '$(sealhex "$PW_BUSY")')) v(address, box) JOIN mailboxes m ON m.address = v.address;
 UPDATE mailboxes m SET credential_id = c.id FROM mailbox_credentials c WHERE c.mailbox_id = m.id;
+-- this suite proves the door, the probe and the breaker: the sync (slice 2, tests/phase3/slice2) is kept out by pausing the mailboxes,
+-- so no watcher logs in beside the probe and the fixture's login counts stay the probe's own
+UPDATE mailboxes SET sync_state = 'paused';
 SQL
 
 KEY=$(val "$MENV" MALUMAIL_MAILBOX_API_KEY)

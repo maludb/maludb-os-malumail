@@ -56,6 +56,8 @@ class Config:
     imap_port: int
     tls_ca_file: str | None            # proofs only: the scratch CA the fixture's certificate is signed by; refused in production
     pass_seconds: int
+    max_connections: int = 400         # ML_MAILER_MAX_CONNECTIONS: every IMAP connection of the service, watchers and pools (§2)
+    text_per_minute: int = 4           # ML_MAILER_TEXT_PER_MINUTE: the text pass's commands a minute per mailbox (§3.4); the proofs raise it
 
     @staticmethod
     def load(env: dict[str, str] | None = None) -> "Config":
@@ -90,4 +92,6 @@ class Config:
             imap_port=int(e.get("ML_IMAP_PORT") or 993),
             tls_ca_file=ca,
             pass_seconds=int(e.get("ML_MAILER_PASS_SECONDS") or 60),
+            max_connections=max(4, int(e.get("ML_MAILER_MAX_CONNECTIONS") or 400)),
+            text_per_minute=max(1, int(e.get("ML_MAILER_TEXT_PER_MINUTE") or 4)),
         )

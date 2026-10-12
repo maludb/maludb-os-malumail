@@ -40,7 +40,14 @@ Apache (`ML_APP=apache`), with headless Chromium at 375 and 1280 pixels.
 **Slice 1, domains, mailboxes and forwarding, is built** (2026-10-12), the CRUD exemplar: a Mail admin serves domains, creates and
 connects mailboxes (a person's password shown once and never stored; an agent's or a shared mailbox's sealed by the mail service and
 never shown), suspends, resizes and resets them, and manages forwarding addresses. `tests/phase3/slice1/run.sh` proves it under php -S
-and Apache. Next: slice 2, the mail service and the list.
+and Apache.
+
+**Slice 2, the mail service and the list, is built** (2026-10-12), the first exemplar: the mail service keeps every live mailbox in step
+with MaluMail's server (the first sync, NOTIFY — else IDLE and a STATUS round every minute — QRESYNC catch-up, UIDVALIDITY resets that
+keep everything keyed on a message, a gentle text pass for search; it never marks anything read), and every mailbox opens as Gmail's
+conversation list: ten views and its folders, stars, snippets, agent badges, keyset paging, unread counts per person in the rail, and a
+cheap poll that shows "N new" without moving the page. `tests/phase3/slice2/run.sh` proves it under php -S and Apache against an IMAP
+fixture, and once against MaluMail's own test mailboxes. Next: slice 3, reading.
 
 ## Documents
 

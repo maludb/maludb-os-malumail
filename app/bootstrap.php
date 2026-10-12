@@ -92,6 +92,7 @@ require_once __DIR__ . '/mailer.php';
 require_once __DIR__ . '/switcher.php';                  // the application switcher (K31)
 require_once __DIR__ . '/features/mail/wall.php';        // the wall as the pages meet it: ml_require_mailbox(), ml_rail()
 require_once __DIR__ . '/features/shell/nav.php';        // the rail, the tabs, the bell, the notice gate, the placeholders (Phase 2)
+require_once __DIR__ . '/features/mail/list.php';        // the list: ml_mail_list() behind the screens, the rail's groups, the poll (slice 2)
 require_once __DIR__ . '/picker.php';                    // the record picker (plugin 0.8.0)
 
 // A JSON caller (the kernel's actions server, an approval replay) never receives PHP's own

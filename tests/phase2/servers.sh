@@ -45,10 +45,15 @@ case "${1:-}" in
         printf 'subjectAltName=IP:127.0.0.1,DNS:localhost\n' > "$STATE/tls/san.ext"
         openssl x509 -req -in "$STATE/tls/imap.csr" -CA "$STATE/tls/ca.pem" -CAkey "$STATE/tls/ca.key" -CAcreateserial -days 2 -extfile "$STATE/tls/san.ext" -out "$STATE/tls/imap.pem" 2>/dev/null
       fi
-      echo '{}' > "$STATE/imap-users.json"; rm -f "$STATE/imap.port"
+      # slice 2: ML_IMAP_USERS names a users file (seeded mailboxes' passwords, inbox sizes), ML_IMAP_INBOX the default inbox size,
+      # ML_IMAP_FLAGS extra switches (--no-notify); the control directory is always $STATE/imap-control
+      if [ -n "${ML_IMAP_USERS:-}" ]; then cp "$ML_IMAP_USERS" "$STATE/imap-users.json"; else echo '{}' > "$STATE/imap-users.json"; fi
+      rm -f "$STATE/imap.port"
+      # shellcheck disable=SC2086
       "$PY" -I "$ROOT/tests/fixtures/imap_server.py" --users "$STATE/imap-users.json" --cert "$STATE/tls/imap.pem" --key "$STATE/tls/imap.key" \
-        --port-file "$STATE/imap.port" --stats "$STATE/imap-stats.json" --passwords "$STATE/mcp/passwords.jsonl" >"$STATE/imap.out" 2>&1 & echo $! > "$STATE/imap.pid"
-      for i in $(seq 1 50); do [ -s "$STATE/imap.port" ] && break; sleep 0.1; done
+        --port-file "$STATE/imap.port" --stats "$STATE/imap-stats.json" --passwords "$STATE/mcp/passwords.jsonl" \
+        --control "$STATE/imap-control" --inbox "${ML_IMAP_INBOX:-12}" ${ML_IMAP_FLAGS:-} >"$STATE/imap.out" 2>&1 & echo $! > "$STATE/imap.pid"
+      for i in $(seq 1 300); do [ -s "$STATE/imap.port" ] && break; sleep 0.1; done
       IMAPENV=(ML_IMAP_HOST=127.0.0.1 "ML_IMAP_PORT=$(cat "$STATE/imap.port")" "ML_TLS_CA_FILE=$STATE/tls/ca.pem")
     fi
     env "${IMAPENV[@]}" ML_MAILER_PORT=$P_MAILER MALUMAIL_MCP_URL="http://127.0.0.1:$(cat "$STATE/mcp.port")/mcp" ML_DEV_ENV="$ENVF" \

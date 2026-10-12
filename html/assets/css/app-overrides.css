@@ -96,3 +96,22 @@ html.app-skin-dark #record-picker .record-picker-search { background: #0f172a; }
 .rail-count { min-width: 1.5rem; text-align: right; }
 .rail-views .nxl-link { padding-top: .35rem; padding-bottom: .35rem; font-size: 13px; }
 .notice-card #notice-text { max-width: 60rem; }
+
+/* THE LIST (mail-list.md): Gmail's conversation rows — one line at 1280, two at 375; unread bold; density from the mailbox's setting. */
+.mail-row { min-height: 52px; padding-top: .55rem; padding-bottom: .55rem; }
+.mail-list.density-compact .mail-row { min-height: 44px; padding-top: .3rem; padding-bottom: .3rem; }
+.mail-row .mail-check .form-check-input { width: 1.15rem; height: 1.15rem; }
+.mail-row.mail-selected { background: var(--bs-primary-bg-subtle, rgba(59, 130, 246, .08)); }
+.mail-row:not(.mail-unread) { background-color: var(--bs-tertiary-bg, #f8f9fa); }
+.mail-row .mail-who { flex: 0 0 auto; }
+@media (min-width: 768px) { .mail-row .mail-who { width: 13rem; } }
+.mail-row .mail-what { font-size: 13px; }
+.mail-row .mail-meta { min-width: 4.5rem; }
+.mail-row .mail-row-link:focus-visible { outline: 2px solid var(--bs-primary); outline-offset: 2px; }
+.mail-bulk-bar { position: sticky; top: 0; z-index: 3; }
+.rail-group { letter-spacing: .04em; }
+.rail-counts .rail-address { line-height: 1.1; }
+/* WCAG AA contrast (slice 2's axe check): the theme's breadcrumb grey (#98a5bd on white, 2.5:1) and muted text on the page's grey. */
+.page-header .breadcrumb .breadcrumb-item { color: #56657c; }
+.page-header .breadcrumb .breadcrumb-item:last-child { opacity: 1; }
+#mail-range { color: #475569; }

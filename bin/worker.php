@@ -16,9 +16,9 @@ declare(strict_types=1);
  * a pass selects by; honoured only when APP_ENV is not prod. Exits 1 when a pass failed.
  *
  * PHASE 0: every pass but `key_usage_prune` is a STUB that changes nothing and answers 0 — the slice whose data it touches fills it in
- * (design §10): `index_catch_up` slice 2's; `dispatches`, `held_expiry` slice 5's; `snoozes` slice 6's; `break_glass_expiry` slice
+ * (design §10): `dispatches`, `held_expiry` slice 5's; `snoozes` slice 6's; `break_glass_expiry` slice
  * 7's; `notify_outbox`, `clerk_inputs` slice 9's. Each stub names its slice. REAL from the kit: `key_usage_prune`
- * (ml_prune_key_usage, db/005).
+ * (ml_prune_key_usage, db/005); real since slice 2: `index_catch_up`.
  */
 if (PHP_SAPI !== 'cli') { fwrite(STDERR, "CLI only.\n"); exit(1); }
 require_once dirname(__DIR__) . '/app/bootstrap.php';
@@ -79,8 +79,44 @@ exit($report['errors'] === [] ? 0 : 1);
 
 // ---- the passes (stubs until their slice) ------------------------------------------------------------------------------------------
 
-/** SLICE 2 — the index's catch-up checks: a mailbox whose folders the mail service has not confirmed within the hour is asked to resync (the mail service does the work; never this process). */
-function worker_pass_index_catch_up(PDO $pdo, int $limit, DateTimeImmutable $now): array { return ['asked' => 0, 'stub' => 'slice 2']; }
+/**
+ * SLICE 2 — the index's catch-up (mail-list.md "Files"): a live mailbox the mail service has not confirmed for ten minutes (its watcher's
+ * STATUS round stamps last_sync_at every minute) is asked to re-read through the `sync` call — the service does the work, never this
+ * process — as a Mail admin (the call needs settings.manage); conversations' tombstones older than a day are pruned (ml_tombstones_prune).
+ */
+function worker_pass_index_catch_up(PDO $pdo, int $limit, DateTimeImmutable $now): array
+{
+    $pruned = (int) $pdo->query('SELECT ml_tombstones_prune()')->fetchColumn();
+    $st = $pdo->prepare("SELECT m.id FROM mailboxes m JOIN mailbox_credentials c ON c.id = m.credential_id AND c.status = 'ok'
+                          WHERE m.active AND m.suspended_at IS NULL AND m.sync_state = 'live'
+                            AND (m.last_sync_at IS NULL OR m.last_sync_at < :cut)
+                          ORDER BY m.last_sync_at NULLS FIRST, m.id LIMIT :lim");
+    $st->bindValue('cut', $now->modify('-10 minutes')->format('c'));
+    $st->bindValue('lim', $limit, PDO::PARAM_INT);
+    $st->execute();
+    $stale = array_map('intval', array_column($st->fetchAll(), 'id'));
+    if ($stale === []) {
+        return ['asked' => 0, 'pruned' => $pruned];
+    }
+    $actor = (int) $pdo->query("SELECT m.id FROM members m WHERE m.member_kind = 'human' AND m.status = 'active'
+                                   AND ml_member_has_right(m.id, 'settings.manage') ORDER BY m.id LIMIT 1")->fetchColumn();
+    if ($actor <= 0) {
+        return ['asked' => 0, 'pruned' => $pruned, 'stale' => count($stale), 'note' => 'no Mail admin to ask as'];
+    }
+    $asked = 0;
+    $refused = 0;
+    foreach ($stale as $id) {
+        try {
+            mailer_call('/v1/mailboxes/' . $id . '/sync', $actor, [], null, 10);
+            $asked++;
+        } catch (MailerRefused) {
+            $refused++;                                   // not live at the service (paused, no credential): nothing to re-read
+        } catch (MailerDown) {
+            return ['asked' => $asked, 'pruned' => $pruned, 'stale' => count($stale), 'note' => 'the mail service is not answering'];
+        }
+    }
+    return ['asked' => $asked, 'refused' => $refused, 'pruned' => $pruned];
+}
 /** SLICE 5 — agent_dispatches: arriving mail that may wake an agent (wake_from, DMARC, internal only when sent from here, not muted, taken over or paused, never a kernel intake) becomes ONE chat turn of that agent through the kernel — the mailbox, the message key and the conversation in `context`, never mail text; the primary overseer the acting member until K8; a refusal shown in the kernel's words, a 5xx backed off. */
 function worker_pass_dispatches(PDO $pdo, int $limit, DateTimeImmutable $now): array { return ['sent' => 0, 'stub' => 'slice 5']; }
 /** SLICE 5 — held mail older than held_expiry_hours: `expired`, logged review.expire, the agent told in its next mail turn. */

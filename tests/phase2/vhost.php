@@ -7,7 +7,11 @@ echo "URL rules\n";
 ok(req('GET', '/sso')['code'] === 403, 'GET /sso without a token: 403');
 ok(page($j, '/notice')['code'] === 200 && page($j, '/tokens')['code'] === 200 && page($j, '/tokens/new')['code'] === 200 && page($j, '/my/trail')['code'] === 200, '/notice, /tokens, /tokens/new and /my/trail reach their files');
 ok(page($j, "/m/$priya")['code'] === 302 && page($j, "/m/$priya")['location'] === "/m/$priya/v/inbox", "/m/{mailbox} redirects to its Inbox");
-foreach (["/m/$priya/v/inbox", "/m/$priya/f/3", "/m/$priya/label/2", "/m/$priya/t/9", "/m/$priya/msg/3.1.7/original", "/m/$priya/drafts/4", "/m/$priya/people/jon%40acme.example",
+$r = page($j, "/m/$priya/v/inbox");
+ok($r['code'] === 200 && str_contains($r['body'], 'data-screen="mailbox-view"'), "/m/{mailbox}/v/{view} reaches its screen (slice 2 built it)");
+$r = page($j, "/m/$priya/f/3");
+ok($r['code'] === 404 && str_contains($r['body'], 'No such folder'), "/m/{mailbox}/f/{folder} reaches its screen (no such folder here: its own 404)");
+foreach (["/m/$priya/label/2", "/m/$priya/t/9", "/m/$priya/msg/3.1.7/original", "/m/$priya/drafts/4", "/m/$priya/people/jon%40acme.example",
           "/m/$priya/identities/new", "/m/$priya/identities/2/edit", "/m/$priya/access/new", "/m/$priya/search", "/m/$priya/access-log", "/oversight/review/5", "/oversight/review/5/edit",
           '/templates/new', '/templates/7/edit', '/search', '/notifications', '/settings/notifications'] as $p) {
     $r = page($j, $p);

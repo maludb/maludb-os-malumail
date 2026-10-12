@@ -309,9 +309,13 @@ except ConfigError:
 check(refused, "a door key shorter than 32 characters is refused at start")
 time.sleep(1.5)
 h = httpx.get(BASE + "/health", timeout=10).json()
-syncable = int(sql("select count(*) from mailboxes m join mailbox_credentials c on c.id = m.credential_id where m.active and c.status = 'ok'"))
-check(h["passes"]["sync"]["last_run_at"] and h["passes"]["sync"]["mailboxes"] == syncable and syncable >= 2 and h["passes"]["outbox"]["due"] == 0,
-      f"the empty passes run: the sync pass counts the {syncable} mailboxes with a live credential (not the failed clerk), the outbox 0 due",
+# slice 2: the sync pass keeps LIVE mailboxes in step (an ok credential, not suspended, not paused or failed) — run.sh pauses the
+# seeded ones (no watcher logs in beside the probe); those the admin flows made above are live
+withcred = int(sql("select count(*) from mailboxes m join mailbox_credentials c on c.id = m.credential_id where m.active and c.status = 'ok'"))
+live = int(sql("select count(*) from mailboxes m join mailbox_credentials c on c.id = m.credential_id where m.active and c.status = 'ok' "
+               "and m.suspended_at is null and m.sync_state not in ('paused', 'failed')"))
+check(h["passes"]["sync"]["last_run_at"] and h["passes"]["sync"]["mailboxes"] == live and withcred > live and h["passes"]["outbox"]["due"] == 0,
+      f"the passes run: the sync pass counts the {live} live mailboxes (not the paused ones, not the failed clerk; {withcred} hold an ok credential), the outbox 0 due",
       json.dumps(h["passes"]))
 check(h["credentials_failed"] == 1, "health counts the one failed credential")
 ss = subprocess.run(["ss", "-ltnH", "sport = :9206"], capture_output=True, text=True).stdout

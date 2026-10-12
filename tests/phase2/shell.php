@@ -72,7 +72,7 @@ foreach ([$jd, $jo, $jb, $jm] as $jj) { $c = csrf_of(page($jj, '/notice')['body'
 $tok = run_token(40, 9001);
 kernel_state(static function (array $s): array { $s['facts']['9001'] = ['valid' => true, 'is_agent' => true, 'member_id' => 40, 'endpoints' => [['application' => 'malumail']]]; return $s; });
 $r = req('GET', "/m/$expert/v/inbox", ['headers' => as_agent($tok)]);
-ok($r['code'] === 501 && (json_decode($r['body'], true)['error']['code'] ?? '') === 'not_built', 'an agent\'s action token is never gated by the notice (the Expert\'s own Inbox: 501 not_built, not notice_unacknowledged)');
+ok($r['code'] === 200 && is_array(json_decode($r['body'], true)['data']['rows'] ?? null), 'an agent\'s action token is never gated by the notice (the Expert\'s own Inbox answers its list — slice 2 built it — not notice_unacknowledged)');
 
 echo "5. Tokens\n";
 $tb = page($jp, '/tokens');
@@ -106,7 +106,7 @@ $built = ['home', 'notice', 'my-trail', 'tokens-list'];
 $wrong = [];
 $n = 0;
 foreach ($reg['screens'] as $id => $s) {
-    if (in_array($id, $built, true)) { continue; }
+    if (in_array($id, $built, true) || !empty($s['built'])) { continue; }          // a built screen answers by its own rules (its slice's proof)
     $url = $fill($s['url'], ['mailbox' => $priya, 'view' => 'inbox']);
     $isAdmin = str_starts_with($id, 'admin');
     $isOversight = in_array($id, ['oversight', 'review-queue', 'review-view', 'review-edit', 'unscreened'], true);

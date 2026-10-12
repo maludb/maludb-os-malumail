@@ -43,10 +43,11 @@ function ml_rail(?PDO $pdo = null): array
     }
     $pdo ??= db();
     $me = (int) (current_member_id() ?? 0);
-    $st = $pdo->prepare("SELECT id, address, display_name, kind, owner_member_id, my_level, inbox_unseen, held_count, suspended_at, sync_state
-                           FROM mcp_mailboxes
-                          WHERE my_level <> 'none'
-                          ORDER BY (kind = 'person' AND owner_member_id = :me) DESC, CASE kind WHEN 'person' THEN 1 WHEN 'shared' THEN 2 ELSE 3 END, address");
+    // the levels from ml_my_levels() — every mailbox's in one query (db/017) — never mcp_mailboxes.my_level, one ml_level() per row
+    $st = $pdo->prepare("SELECT b.id, b.address, b.display_name, b.kind, b.owner_member_id, l.level AS my_level, b.inbox_unseen, b.held_count, b.suspended_at, b.sync_state
+                           FROM mcp_mailboxes b JOIN ml_my_levels() l ON l.mailbox_id = b.id
+                          WHERE l.level <> 'none'
+                          ORDER BY (b.kind = 'person' AND b.owner_member_id = :me) DESC, CASE b.kind WHEN 'person' THEN 1 WHEN 'shared' THEN 2 ELSE 3 END, b.address");
     $st->execute(['me' => $me]);
     return $cache = $st->fetchAll();
 }

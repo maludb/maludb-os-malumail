@@ -105,7 +105,7 @@ const version = Number(sql('SELECT notice_version FROM ml_settings WHERE id = 1'
   ok(o.sw === o.iw, `no sideways scroll (${o.sw} = ${o.iw})`);
   await page.locator('#nav-view-sent a').click();
   await page.waitForFunction(() => document.getElementById('page-content').dataset.screen === 'mailbox-view' && location.pathname.endsWith('/v/sent'));
-  ok((await page.locator('#placeholder-slice').innerText()).includes('slice 2'), 'Sent opens its placeholder, naming slice 2');
+  ok(await shown(page, '#mail-list') && (await page.locator('#mail-list').getAttribute('data-view')) === 'sent', 'Sent opens its list (slice 2 built it) by HTMX from the rail');
   await page.screenshot({ path: `${SHOTS}/desktop-inbox.png` });
   ok(errors.length === 0, 'no console errors' + (errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''));
   await ctx.close();

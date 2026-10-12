@@ -1403,4 +1403,30 @@ questions in one sitting and changed none:
     key scoped to the test domain exists (MM7) — never the production key. The mail service 80 (was 62), the schema 536, the kit 101,
     Phase 2 79/43/28 and 79/47/28, the specs green.
 
-  **NEXT:** slice 2, the mail service and the list (the first exemplar). **People's existing mailboxes wait on MM1.**
+- **2026-10-12, SLICE 2 BUILT — the mail service and the list, THE FIRST EXEMPLAR** (`docs/build-specs/mail-list.md`, `mail-service.md`
+  §§2–3, 8–9; the owner: "Please begin"). 2 screens, 0 actions (the registry: 13 of 45 screens, 14 of 67 actions built).
+  - **The mail service's sync** (`services/mailer/watch.py`, `index.py`, `textpass.py`): one watcher thread per live mailbox (INBOX
+    selected, NOTIFY SET, else IDLE renewed every 25 min; the STATUS round every 60 s regardless), a pool of at most three connections
+    per mailbox under `ML_MAILER_MAX_CONNECTIONS`, every login through one function with Phase 0's breaker and backoff; the first sync
+    (Archive and Snoozed made by name, GETQUOTAROOT, the envelope pass INBOX → Sent → Drafts → the rest in batches of 500 with
+    `app.ml_bulk`, `ml_threads_rebuild()` after INBOX and at the end); catch-up by `SELECT … (QRESYNC (v m))` (VANISHED deleted, flags
+    applied, new UIDs fetched); a new UIDVALIDITY → `ml_folder_reset()` and a re-read; the text pass by `BINARY.PEEK` at a gentle rate;
+    the door's `sync`, `status`, `quota` and `on_behalf`; `/health`'s counts. The worker's `index_catch_up` is real.
+  - **The list**: `mailbox-view`, `folder-view`, the rail's four groups with per-person unread counts, the poll (`/m/{mailbox}/changes`:
+    204, else the rail, changed rows, removed rows and the "N new" bar out of band), the title's and the favicon's count, the bulk bar
+    showing only built actions (none yet). `mcp/records_server.py` holds the five tools' queries (the spec's file; Phase 4 serves them).
+  - **db/017** (found by the timing proof): db/013's list called `ml_thread_state()` for every conversation (a page 250–340 ms on
+    5,000; `ml_mailbox_counts()` 0.9 s) and `ml_my_mailbox_ids()` one `ml_level()` per mailbox of the estate. Now the list's core reads
+    the states once and joins (`ml_mail_list_ids_core()`, generic plans), the wall is computed set-wise (`ml_levels_as()`,
+    `ml_my_levels()`), and `ml_unread_counts()` serves the rail; `db/proof/slice2_wall_speed.sql` 18 proves the same answers (576
+    level cases, 288 id sets, 72 lists, paging, unread).
+  - **Decided while building:** catch-up uses SELECT … QRESYNC on a pool connection, the watcher's own events only trigger it;
+    the registry builder maps the mailbox routes (`/m/{mailbox}/v/{view}` → `html/m/view.php` …) as the vhost does; a page link
+    carries its row number (`n`) so "51–100 of N" needs no count; the theme's breadcrumb grey fails WCAG AA — `app-overrides.css`.
+  - **The proof:** `tests/phase3/slice2/run.sh` — sync 72, list 65, browser 45 under php -S and under Apache; the live step once
+    (spike01's first sync at MaluMail, one submission from spike02 in the index in 0.95 s through NOTIFY and on the Inbox list through
+    the poll in 1.26 s, spike01 left as found). Timings: a list page of 4,510 conversations 41–47 ms, the rail with 31 mailboxes 25 ms,
+    the poll's 204 query 3 ms (a whole HTTP page ~300–400 ms on this host, whose floor is ~75 ms). Slice 1 66/28 both modes, Phase 2
+    79/43/28 and 79/47/28, the mail service 80, the kit 101, the schema 554, the specs 98, the registry check green.
+
+  **NEXT:** slice 3, reading. **People's existing mailboxes wait on MM1.**
