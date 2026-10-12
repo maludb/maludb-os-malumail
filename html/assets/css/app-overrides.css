@@ -47,7 +47,6 @@ html.app-header-dark .nxl-navigation .m-header .logo-lg, .nxl-navigation .m-head
    MaluMail — every screen is read at 375 px first and at 1280 px (design §9): on a phone the mailbox rail, the conversation list
    and a conversation are one column each; on a desktop the list and the reading pane sit side by side. Touch targets are at least
    44 px. A message's body is never styled here — it renders in its own sandboxed frame (design §6.4, D7).
-   The shell's own rules arrive with Phase 2 (docs/build-specs/sso-shell.md).
    ========================================================================== */
 .btn-touch, .form-select.btn-touch, .form-control.btn-touch { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
 .form-select.btn-touch, .form-control.btn-touch { display: block; }
@@ -56,3 +55,44 @@ label.btn-touch { display: flex; }
 .empty-state { display: flex; align-items: center; gap: 1rem; }
 .empty-state .avatar-text { flex: 0 0 auto; }
 .coming-card { border-style: dashed; }
+
+/* ==========================================================================
+   MaluMail, Phase 2 (2026-10-12) — the shell (docs/build-specs/sso-shell.md). The bottom tab bar carries Inbox, Search, Compose and Me on
+   a phone; THE MAILBOX RAIL (the theme's offcanvas from the header's menu button) takes over from 992 px. The command bar sits above the
+   tab bar. Ported from Restaurant Inventory's shell, its site switcher left out (MaluMail's scope is none).
+   ========================================================================== */
+.app-tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1031; height: 56px; display: flex; background: var(--bs-body-bg, #fff);
+    border-top: 1px solid rgba(0,0,0,.1); box-shadow: 0 -2px 10px rgba(0,0,0,.05); }
+.app-tabbar .app-tab { flex: 1 1 0; min-width: 0; min-height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    color: var(--bs-secondary-color, #6c757d); font-size: 11px; font-weight: 600; text-decoration: none; }
+.app-tabbar .app-tab i { font-size: 18px; }
+.app-tabbar .app-tab.active { color: var(--bs-primary, #3454d1); }
+html.app-skin-dark .app-tabbar { background: #1b2431; border-top-color: rgba(255,255,255,.1); }
+@media (max-width: 991.98px) { #assistant-bar { bottom: 56px; padding: 8px 12px; } .app-has-tabbar { padding-bottom: 140px; } }
+#assistant-bar #assistant-send { display: none; }
+#assistant-bar .assistant-form.in-use #assistant-send, #assistant-bar .assistant-form:focus-within #assistant-send { display: inline-flex; }
+.header-role { min-width: 0; max-width: 44vw; }
+@media (min-width: 992px) { .header-role { max-width: 28rem; } }
+#header-search { max-width: 220px; }
+#header-search .form-control { min-height: 36px; }
+.nxl-navbar .nxl-caption { margin-top: .25rem; }
+
+/* APPLICATION SWITCHER (shared/app-switcher.php, K31): a head link with a menu. */
+.nxl-header .header-right .nxl-head-link.header-helpdesk { width: auto; gap: 6px; padding-left: 14px; padding-right: 14px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+.header-apps-menu { min-width: 260px; }
+.header-apps-menu .header-apps-list { max-height: calc(100vh - 260px); overflow-y: auto; }
+.header-apps-menu .dropdown-item.active { background: var(--bs-primary-bg-subtle, rgba(59, 130, 246, .12)); color: inherit; cursor: default; }
+
+/* RECORD PICKER (app/picker.php, shared/picker-rows.php, assets/js/record-picker.js): the one modal that chooses a record. */
+.record-picker-field .record-picker-open { display: flex; align-items: center; min-width: 0; cursor: pointer; min-height: 44px; }
+.record-picker-field .record-picker-open .record-picker-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.record-picker-field .record-picker-open:disabled { cursor: default; opacity: 1; }
+.record-picker-field .btn { min-height: 44px; }
+#record-picker .record-picker-search { position: sticky; top: 0; z-index: 2; background: var(--bs-modal-bg, #fff); }
+html.app-skin-dark #record-picker .record-picker-search { background: #0f172a; }
+#record-picker .record-picker-row { min-height: 44px; padding-top: .625rem; padding-bottom: .625rem; }
+#record-picker .record-picker-row.active .record-picker-detail, #record-picker .record-picker-row.active .badge { color: inherit !important; }
+#record-picker .record-picker-detail { color: var(--bs-secondary-color); }
+.rail-count { min-width: 1.5rem; text-align: right; }
+.rail-views .nxl-link { padding-top: .35rem; padding-bottom: .35rem; font-size: 13px; }
+.notice-card #notice-text { max-width: 60rem; }

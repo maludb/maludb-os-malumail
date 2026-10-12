@@ -31,7 +31,11 @@ circuit breaker. `tests/mailer/run.sh` proves it with 62 checks against a fake M
 
 `tests/phase1/check_specs.sh` shows the documents agree, and `tests/phase0/schema.sh` passes 514 checks over db/001–015.
 
-Phase 1 was approved by the owner as written on 2026-10-11. Next: Phase 2, the shell.
+Phase 1 was approved by the owner as written on 2026-10-11.
+
+**Phase 2, the shell, is built** (2026-10-12): the mailbox rail, the tab bar, the notice gate, tokens, the trail, the mail service's
+client, and one placeholder for every screen a slice has not built yet. `tests/phase2/run.sh` proves it under php -S and under a real
+Apache (`ML_APP=apache`), with headless Chromium at 375 and 1280 pixels. Next: slice 1.
 
 ## Documents
 

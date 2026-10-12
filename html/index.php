@@ -1,16 +1,17 @@
 <?php
 declare(strict_types=1);
-/** / — home. Phase 0: a placeholder that proves the sign-on landed (who you are, the roles the kernel sent); the shell and the home screen are Phase 2 (docs/build-specs/sso-shell.md). */
+/** / — home (screen `home`): the default mailbox's Inbox — the person's own, else the first they open; else the no-mailbox card. */
 require_once dirname(__DIR__) . '/app/bootstrap.php';
 require_login();
-$pdo = db();
-$me = current_member();
-if (!is_member_here()) {                       // admitted by the kernel with no MaluMail role (a read grant, a role MaluMail does not publish): told why
+if (!is_member_here()) {                       // admitted by the kernel with no MaluMail role: told why
     refuse(403, right_refusal('mail.use'));
 }
-log_screen_view($pdo, 'home');
-$roles = $pdo->query('SELECT r.role_key, r.name FROM ml_roles r WHERE r.role_key = ANY (ml_member_roles(app_current_member_id())) ORDER BY r.sort_order')->fetchAll();
+$box = ml_default_mailbox();
 if (wants_json()) {
-    respond_screen(['member_id' => (int) $me['id'], 'display_name' => $me['display_name'], 'roles' => array_column($roles, 'role_key'), 'phase' => 'Phase 0: the shell is Phase 2']);
+    respond_screen(['mailbox_id' => $box !== null ? (int) $box['id'] : null, 'location' => $box !== null ? '/m/' . (int) $box['id'] . '/v/inbox' : null]);
 }
-echo view('home/placeholder.php', ['me' => $me, 'roles' => $roles]);
+if ($box !== null) {
+    redirect('/m/' . (int) $box['id'] . '/v/inbox');
+}
+log_screen_view(db(), 'home');
+render_screen(app_name(), view('home/no-mailbox.php', ['admins' => ml_mail_admin_names()]), ['screen' => 'home', 'activeNav' => 'tab-inbox']);

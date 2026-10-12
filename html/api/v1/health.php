@@ -26,7 +26,16 @@ $out['storage'] = is_dir($dir) && is_writable($dir) ? 'ok' : 'missing';
 // the mail service and the image door (design §6.1, §6.4; their own units): whether their loopback ports answer — informational here,
 // never a failure of this health (the screens say "mail is not reachable right now" on their own; the mail service's own health,
 // with each mailbox's sync and credential state, is its door's).
-foreach (['mailer' => 'ML_MAILER_PORT', 'images' => 'ML_IMAGES_PORT'] as $name => $key) {
+// the mail service answers its own /health (counts only — app/mailer.php's mailer_health()): up, or down; the image door is a socket check
+require_once APP_ROOT . '/app/mailer.php';
+if ((int) env('ML_MAILER_PORT', '0') <= 0) {
+    $out['mailer'] = 'unconfigured';
+} else {
+    $mh = mailer_health();
+    $out['mailer'] = $mh !== null && ($mh['status'] ?? '') === 'up' ? 'ok' : 'down';
+    $out['mailer_credentials_failed'] = $mh['credentials_failed'] ?? null;
+}
+foreach (['images' => 'ML_IMAGES_PORT'] as $name => $key) {
     $port = (int) env($key, '0');
     if ($port <= 0) {
         $out[$name] = 'unconfigured';

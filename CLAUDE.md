@@ -123,6 +123,16 @@ customer key nor the sealing secret** — the proof checks it.
   `template`, `identity`, `member`, `person`, `agent`, `owner`, `overseer`, `primary_overseer`, `department`): the kernel's actions server
   resolves them registry-wide.
 
+## Phase 2 (2026-10-12, the shell BUILT) — `docs/build-specs/sso-shell.md`
+- `bash tests/phase2/run.sh` (php -S) and `ML_APP=apache bash tests/phase2/run.sh` (a user-level Apache rendering the deploy vhost):
+  scratch `ml_dev2`, four seeded mailboxes (`priya@`, `dana@`, `sales@` shared at view with Dana, `expert@` overseen by Priya), the
+  notice acknowledged by all but Dana; `shell.php` 79, `vhost.php` 43/47, `browser.mjs` 28 (Playwright from `/var/www/web/node_modules`).
+- **A screen no slice has built is answered by `html/placeholder.php`** (the router's and the vhost's fallback): a slice that builds a
+  screen adds its file and the placeholder stops answering it. Its gate is `screen_gate()` in `app/features/shell/nav.php` — keep the
+  real screen's gate the same.
+- **The notice gate** is `notice_gate()` (end of `app/bootstrap.php`); a new always-reachable page joins `notice_exempt()`.
+- A directory's index is a rewrite in the vhost, never mod_dir's (its internal redirect meets the placeholder fallback).
+
 ## Numbers
 Ports `APP_INTERNAL_PORT=8199`, `MCP_RECORDS_PORT=8852`, `MCP_ACTIVITY_PORT=8853`, `ML_MAILER_PORT=8854`, `ML_IMAGES_PORT=8855`;
 scratch 9201 (the app), 9202 (the fake kernel), 9203 (the fake MaluDB + MaluMail REST), 9204–9205 (the MCP servers), 9206 (the

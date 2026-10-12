@@ -86,9 +86,13 @@ require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/directory.php';
 require_once __DIR__ . '/mail.php';
 require_once __DIR__ . '/api/kernel.php';
-// The shell's navigation, the switcher and the record picker are Phase 2's (docs/build-specs/sso-shell.md); the kit stands without them.
 // The mail service (services/mailer/) is a separate process and the ONLY holder of open credentials: PHP reaches mail through its
-// signed loopback door (Phase 2's app/mailer.php), never IMAP, SMTP or the Mailbox MCP itself (design §6.1).
+// signed loopback door (app/mailer.php), never IMAP, SMTP or the Mailbox MCP itself (design §6.1).
+require_once __DIR__ . '/mailer.php';
+require_once __DIR__ . '/switcher.php';                  // the application switcher (K31)
+require_once __DIR__ . '/features/mail/wall.php';        // the wall as the pages meet it: ml_require_mailbox(), ml_rail()
+require_once __DIR__ . '/features/shell/nav.php';        // the rail, the tabs, the bell, the notice gate, the placeholders (Phase 2)
+require_once __DIR__ . '/picker.php';                    // the record picker (plugin 0.8.0)
 
 // A JSON caller (the kernel's actions server, an approval replay) never receives PHP's own
 // error output — a 500 it can parse instead of an HTML fragment.
@@ -189,3 +193,6 @@ if (PHP_SAPI !== 'cli') {
         session_touch(db(), session_id());
     }
 }
+
+// The monitoring notice stands between a person and their mail until they acknowledge its current version (sso-shell.md Divergence 2).
+notice_gate();

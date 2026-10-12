@@ -1,6 +1,6 @@
 {
     "generated_from": "docs/malumail-action-manifest.md",
-    "generated_at": "2026-10-11T20:20:37+00:00",
+    "generated_at": "2026-10-12T13:21:58+00:00",
     "screens": {
         "home": {
             "screen": "home",
@@ -17,7 +17,7 @@
             "section": "The shell (Phase 2 — sso-shell)",
             "when": "the business's mail-monitoring notice, and to acknowledge it (on first use, and when its version changes)",
             "params": [],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "my-trail": {
@@ -29,7 +29,7 @@
                 "since",
                 "mailbox"
             ],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "tokens-list": {
@@ -38,7 +38,7 @@
             "section": "The shell (Phase 2 — sso-shell)",
             "when": "my tokens for the two read MCP servers: label, last used, revoke; mint a new one (shown once)",
             "params": [],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "admin-domains": {
@@ -504,7 +504,7 @@
             "who": "`mail.use`",
             "agent": false,
             "record_id": "the acknowledgement",
-            "built": false
+            "built": true
         },
         "mail_token_mint": {
             "action": "mail_token_mint",
@@ -531,7 +531,7 @@
             "who": "`tokens.own`",
             "agent": false,
             "record_id": "the token",
-            "built": false
+            "built": true
         },
         "mail_token_revoke": {
             "action": "mail_token_revoke",
@@ -552,7 +552,7 @@
             "who": "`tokens.own` · own",
             "agent": false,
             "record_id": "the token",
-            "built": false
+            "built": true
         },
         "mail_domains_serve_set": {
             "action": "mail_domains_serve_set",

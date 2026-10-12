@@ -107,9 +107,8 @@ check "$(curl -s -o /dev/null -w '%{http_code}' $APP/api/v1/health)" "200" "heal
 check "$(curl -s $APP/api/v1/health | php -r '$h = json_decode(stream_get_contents(STDIN), true); echo ($h["application"] ?? "?") . ":" . ($h["storage"] ?? "?") . ":" . ($h["mailer"] ?? "?") . ":" . ($h["images"] ?? "?");')" "malumail:ok:down:down" "…naming the application malumail, its attachment store writable, the mail service and the image door down — reported, never a failure of this health"
 url27=$(php bin/dev_handoff.php 27)
 check "$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' -c "$TMP/jar27" "$url27")" "302 $APP/" "a signed hand-off token opens a session (302 to /)"
-home27=$(curl -s -b "$TMP/jar27" "$APP/")
-has "$home27" 'id="home-member">SMOKE Marco<' "the home placeholder names the signed-in member"
-has "$home27" 'id="home-roles">Mail user, Mail admin<' "…and the roles the kernel sent, by their names"
+check "$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' -b "$TMP/jar27" "$APP/")" "302 $APP/notice?next=%2F" "the session is Marco's: home sends him to the notice he has not read (Phase 2's gate)"
+has "$(curl -s -b "$TMP/jar27" "$APP/notice")" 'id="header-user-name">SMOKE Marco<' "…whose page names the signed-in member"
 check "$(curl -s -o /dev/null -w '%{http_code}' "$url27")" "403" "the same token a second time is refused (replay)"
 check "$(curl -s -o /dev/null -w '%{http_code}' "$(HANDOFF_TTL=-120 php bin/dev_handoff.php 26)")" "403" "an expired token is refused"
 bad_url=$(APP_KEY=other php bin/dev_handoff.php 26 | sed "s#$APP##")
@@ -131,7 +130,7 @@ check "$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' -c "$TMP/jarn" "
 check "$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' -c "$TMP/jarx" "$(php bin/dev_handoff.php 26)&next=https://evil.example/")" "302 $APP/" "…and on / when it is not"
 
 echo "== CSRF"
-tok=$(curl -s -b "$TMP/jar27" "$APP/" | sed -n 's/.*name="csrf_token" value="\([a-f0-9]*\)".*/\1/p' | head -1)
+tok=$(curl -s -b "$TMP/jar27" "$APP/my/trail" | sed -n 's/.*name="csrf_token" value="\([a-f0-9]*\)".*/\1/p' | head -1)
 check "$(curl -s -o /dev/null -w '%{http_code}' -b "$TMP/jar27" -X POST "$APP/logout.php")" "403" "a POST without a CSRF token is refused"
 check "$(curl -s -o /dev/null -w '%{http_code}' -b "$TMP/jar27" -X POST -d 'csrf_token=deadbeef' "$APP/logout.php")" "403" "a POST with a bad CSRF token is refused"
 check "$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' -X POST -d 'csrf_token=x' "$APP/")" "302 https://app.example.invalid/launcher?app=malumail" "an anonymous POST to a screen goes to the launcher (there is no login form here)"
@@ -175,7 +174,7 @@ php bin/directory_sync.php >/dev/null 2>&1; check "$?" "0" "the change feed appl
 check "$(curl -s -o /dev/null -w '%{http_code}' -b "$TMP/jar29" "$APP/")" "302" "a grant the kernel revoked shuts the door within one sync"
 check "$(sql "select ended_by from member_sessions where member_id = 29 order by created_at desc limit 1") $(sql "select capability is null from members where id = 29")" "directory t" "…the session ended by the directory and the mirror holds no grant"
 check "$(curl -s -o /dev/null -w '%{http_code}' "$(HANDOFF_NO_GRANT=1 php bin/dev_handoff.php 29)")" "403" "…and a hand-off whose claims now carry no grant is refused (the kernel's claims are the authority)"
-tok26=$(curl -s -c "$TMP/jar26" -b "$TMP/jar26" -o /dev/null "$(php bin/dev_handoff.php 26)"; curl -s -b "$TMP/jar26" "$APP/" | sed -n 's/.*name="csrf_token" value="\([a-f0-9]*\)".*/\1/p' | head -1)
+tok26=$(curl -s -c "$TMP/jar26" -b "$TMP/jar26" -o /dev/null "$(php bin/dev_handoff.php 26)"; curl -s -b "$TMP/jar26" "$APP/my/trail" | sed -n 's/.*name="csrf_token" value="\([a-f0-9]*\)".*/\1/p' | head -1)
 check "$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' -b "$TMP/jar26" -X POST -d "csrf_token=$tok26" "$APP/logout.php")" "302 https://app.example.invalid/launcher" "MaluMail's own sign-out (POST + CSRF) goes back to the launcher"
 check "$(curl -s -o /dev/null -w '%{http_code}' -b "$TMP/jar26" "$APP/")" "302" "…and the session is over"
 

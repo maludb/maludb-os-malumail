@@ -1356,4 +1356,28 @@ questions in one sitting and changed none:
   test domain (MM7, asked early); a partly refused agent message counts as sent for the conversation cap, only accepted recipients
   becoming known; "reply to the agent" keeps the draft held.
 
-  **NEXT:** Phase 2, the shell (`docs/build-specs/sso-shell.md`). **People's existing mailboxes wait on MM1.**
+  **THEN:** Phase 2, the shell (`docs/build-specs/sso-shell.md`). **People's existing mailboxes wait on MM1.**
+
+- **2026-10-12, PHASE 2 THE SHELL BUILT AND PROVEN** (`docs/build-specs/sso-shell.md`; ported from Restaurant Inventory's shell, no
+  site switcher):
+  - **The layout:** the rail in place of a sidebar — the caller's mailboxes by the wall (`mcp_mailboxes`, `my_level <> 'none'`: their
+    own person mailbox first, then shared, then agent), the current one's views under it, unread `—` until slice 2's sync; Oversight
+    only for one who decides for a mailbox, Templates, Admin for a super-admin, Notifications; the header's search per mailbox; the
+    phone's tab bar Inbox · Search · Compose · Me; the bell, the command bar (with the mailbox), the record picker (member, agent,
+    department, mailbox) and the application switcher.
+  - **The notice gate** (`notice_gate()` at the end of the bootstrap): a person who has not acknowledged the current version is sent to
+    `/notice`, a JSON caller answered 403 `notice_unacknowledged`; exempt: the notice, tokens, the trail, notifications, sign-out and
+    sign-on; never an action token, never one MaluMail does not admit (the screen refuses them with the reason).
+  - **Built screens:** home (the default mailbox's Inbox, else why none is open and the Mail admins' names), the notice, tokens (the
+    secret shown once, SHA-256 kept, revoke one's own only), my trail; `app/mailer.php` the mail service's signed client
+    (`MailerRefused`, `MailerDown`) and `/api/v1/health`'s `mailer` ok/down.
+  - **Placeholders:** ONE controller, `html/placeholder.php`, the fallback of the vhost and the router — it finds the screen by the
+    registry's URL templates, applies its right and mailbox level (a mailbox one cannot open is 404, never 403), and names the screen,
+    what it will do and its slice; a POST or JSON 501 `not_built`; a path that is no screen 404.
+  - **The vhost:** a directory's index (`/`, `/pick/`) is named by a rewrite — left to mod_dir, the internal redirect met the
+    placeholder fallback and answered 404 (found by the Apache run).
+  - **The proof:** `tests/phase2/run.sh` on scratch `ml_dev2` — 79 shell checks, the URL rules 43 under php -S and 47 under a
+    user-level Apache rendering `deploy/apache-malumail.conf`, Playwright 28 at 375 and 1280 and with JavaScript off, the registry and
+    `approvals[]` checks; the kit 101 (its home checks moved to the shell's), the schema 514, the specs 98, the mail service 62.
+
+  **NEXT:** slice 1. **People's existing mailboxes wait on MM1.**
