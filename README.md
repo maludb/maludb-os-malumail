@@ -35,7 +35,12 @@ Phase 1 was approved by the owner as written on 2026-10-11.
 
 **Phase 2, the shell, is built** (2026-10-12): the mailbox rail, the tab bar, the notice gate, tokens, the trail, the mail service's
 client, and one placeholder for every screen a slice has not built yet. `tests/phase2/run.sh` proves it under php -S and under a real
-Apache (`ML_APP=apache`), with headless Chromium at 375 and 1280 pixels. Next: slice 1.
+Apache (`ML_APP=apache`), with headless Chromium at 375 and 1280 pixels.
+
+**Slice 1, domains, mailboxes and forwarding, is built** (2026-10-12), the CRUD exemplar: a Mail admin serves domains, creates and
+connects mailboxes (a person's password shown once and never stored; an agent's or a shared mailbox's sealed by the mail service and
+never shown), suspends, resizes and resets them, and manages forwarding addresses. `tests/phase3/slice1/run.sh` proves it under php -S
+and Apache. Next: slice 2, the mail service and the list.
 
 ## Documents
 

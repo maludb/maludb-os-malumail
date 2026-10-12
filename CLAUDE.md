@@ -133,6 +133,16 @@ customer key nor the sealing secret** — the proof checks it.
 - **The notice gate** is `notice_gate()` (end of `app/bootstrap.php`); a new always-reachable page joins `notice_exempt()`.
 - A directory's index is a rewrite in the vhost, never mod_dir's (its internal redirect meets the placeholder fallback).
 
+## Slice 1 (2026-10-12, domains, mailboxes and forwarding BUILT — THE CRUD EXEMPLAR) — `docs/build-specs/domains-mailboxes.md`
+- `bash tests/phase3/slice1/run.sh` (php -S) and `ML_APP=apache bash tests/phase3/slice1/run.sh`: scratch `ml_dev1`, Phase 2's servers with
+  the IMAP fixture on (`ML_WITH_IMAP=1`); `admin.php` 66, `browser.mjs` 28. Copy its shape for every later slice: `app/features/<f>/` one
+  file of helpers and queries, `app/views/<f>/`, `html/<f>/` controllers (`index.php`, `form.php` for /new, `view.php` for /{id}) and one
+  handler per action (`ml_handler_begin()`, the right, `require_human()` on a people row, the database's function in `ml_guard()` or the
+  mail service through `admin_mailer()`, `log_activity()`, `ml_done()`).
+- **A password is the mail service's**: create/connect/reset go through `services/mailer/admin_flows.py`; PHP holds only a PERSON's new
+  password, for the one redirect that shows it (`admin_reveal_once()`/`admin_take_revealed()`), never in JSON.
+- The IMAP fixture accepts what the fake Mailbox MCP issued (`--passwords`): a reset changes what logs in, as at MaluMail.
+
 ## Numbers
 Ports `APP_INTERNAL_PORT=8199`, `MCP_RECORDS_PORT=8852`, `MCP_ACTIVITY_PORT=8853`, `ML_MAILER_PORT=8854`, `ML_IMAGES_PORT=8855`;
 scratch 9201 (the app), 9202 (the fake kernel), 9203 (the fake MaluDB + MaluMail REST), 9204–9205 (the MCP servers), 9206 (the

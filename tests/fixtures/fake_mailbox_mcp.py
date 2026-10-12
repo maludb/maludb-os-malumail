@@ -6,7 +6,8 @@ the content tools answer as the real server would, but the mail service must nev
 
 Hosted domains: business.example (the proofs serve it) and elsewhere.example (hosted by the same MaluMail customer, NOT served by
 the application — the wall). Every password it issues is written to <control>/passwords.jsonl, so a proof can show the sealed box
-opens to it and that it appears nowhere else. Switches, as files in <control>: `key-refused` (403, a key without Mailbox MCP),
+opens to it and that it appears nowhere else; the IMAP fixture reads the same file
+(--passwords), so a reset password logs in as it would at MaluMail. Switches, as files in <control>: `key-refused` (403, a key without Mailbox MCP),
 `down` (500). A mailbox created with local part `renamed` answers its password under another name (`initial_password`) — the
 fail-closed check.
 """
@@ -23,9 +24,12 @@ LOCK = threading.Lock()
 STATE = {
     "domains": [{"domain": "business.example", "receiving": True, "spf": True, "dkim": True, "dmarc": True},
                 {"domain": "elsewhere.example", "receiving": True, "spf": True, "dkim": False, "dmarc": False}],
-    "mailboxes": {"pat@business.example": {"active": True, "quota_gib": 2}},
+    "mailboxes": {"pat@business.example": {"active": True, "quota_gib": 2},
+                  "info@business.example": {"active": True, "quota_gib": 2},          # at MaluMail, not yet in the webmail (connect)
+                  "desk@business.example": {"active": True, "quota_gib": 2}},          # an intake mailbox: Help Desk's webhook (connect proposes)
     "aliases": {},
-    "webhooks": {"pat@business.example": {"url": "https://helpdesk.example/hook", "active": True, "secret": "whsec_fake"}},
+    "webhooks": {"pat@business.example": {"url": "https://helpdesk.example/hook", "active": True, "secret": "whsec_fake"},
+                 "desk@business.example": {"url": "https://helpdesk.business.example/api/inbound/malumail", "active": True, "secret": "whsec_desk"}},
 }
 CONTENT_TOOLS = {"list_messages", "read_message", "search_messages", "send_message", "move_message", "mark_message"}
 

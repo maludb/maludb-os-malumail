@@ -8,7 +8,8 @@ only what it answers. Mailboxes are five folders like MaluMail's (INBOX, Drafts,
 
   imap_server.py --users users.json --cert c.pem --key k.pem --port-file p --stats stats.json [--port 0] [--inbox 12]
 
-users.json: {"address": {"password": "…", "mode": "ok" | "busy"}} — `busy` answers every login NO [UNAVAILABLE]. Every login
+users.json: {"address": {"password": "…", "mode": "ok" | "busy"}} — `busy` answers every login NO [UNAVAILABLE]. With
+--passwords, the fake Mailbox MCP's issued passwords (create, reset) replace users.json's for their address, as at MaluMail. Every login
 attempt is counted in stats.json ({"address": {"attempts": n, "ok": n}}), so a proof can show a refused credential was tried once.
 """
 
@@ -53,8 +54,8 @@ def synthetic(n: int, address: str) -> list[bytes]:
 
 
 class Server:
-    def __init__(self, users: dict, stats_path: Path, inbox: int):
-        self.users, self.stats_path = users, stats_path
+    def __init__(self, users: dict, stats_path: Path, inbox: int, passwords: Path | None = None):
+        self.users, self.stats_path, self.passwords = users, stats_path, passwords
         self.stats = {a: {"attempts": 0, "ok": 0} for a in users}
         self.boxes = {}
         for i, address in enumerate(sorted(users)):
@@ -67,16 +68,33 @@ class Server:
     def _save(self):
         self.stats_path.write_text(json.dumps(self.stats))
 
+    def _issued(self, user: str) -> str | None:
+        """The password the fake Mailbox MCP last issued for this address (a create or a reset), which replaces any earlier one."""
+        if self.passwords is None or not self.passwords.exists():
+            return None
+        last = None
+        for line in self.passwords.read_text().splitlines():
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if row.get("address") == user:
+                last = row.get("password")
+        return last
+
     def login(self, user: str, password: str) -> str:
         """ok · busy · failed"""
         s = self.stats.setdefault(user, {"attempts": 0, "ok": 0})
         s["attempts"] += 1
         u = self.users.get(user)
+        issued = self._issued(user)
         if u and u.get("mode") == "busy":
             result = "busy"
-        elif u and u.get("password") == password:
+        elif (issued is not None and issued == password) or (issued is None and u and u.get("password") == password):
             result = "ok"
             s["ok"] += 1
+            if user not in self.boxes:                    # a mailbox MaluMail created or reset since: its five folders, empty
+                self.boxes[user] = {name: Folder(name, special, 2000 + len(self.boxes)) for name, special in FOLDERS}
         else:
             result = "failed"
         self._save()
@@ -247,8 +265,9 @@ async def main():
     ap.add_argument("--port-file", required=True)
     ap.add_argument("--stats", required=True)
     ap.add_argument("--inbox", type=int, default=12)
+    ap.add_argument("--passwords", default=None, help="the fake Mailbox MCP's passwords.jsonl: the latest issued per address wins")
     a = ap.parse_args()
-    server = Server(json.loads(Path(a.users).read_text()), Path(a.stats), a.inbox)
+    server = Server(json.loads(Path(a.users).read_text()), Path(a.stats), a.inbox, Path(a.passwords) if a.passwords else None)
     ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
     ctx.load_cert_chain(a.cert, a.key)
     srv = await asyncio.start_server(lambda r, w: session(server, r, w), "127.0.0.1", a.port, ssl=ctx)

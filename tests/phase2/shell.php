@@ -121,11 +121,11 @@ foreach ($reg['screens'] as $id => $s) {
 ok($wrong === [], "Priya: $n placeholder screens answer 200 (403 for the admin's, 404 for a policy of her person mailbox)" . ($wrong ? ': ' . implode('; ', array_slice($wrong, 0, 6)) : ''));
 $wrong = [];
 foreach ($reg['screens'] as $id => $s) {
-    if (!str_starts_with($id, 'admin')) { continue; }
+    if (!str_starts_with($id, 'admin') || !empty($s['built'])) { continue; }      // a built screen answers by its own rules (its slice's proof)
     $r = page($jo, $fill($s['url'], ['mailbox' => $expert, 'alias' => 3]));
     if ($r['code'] !== 200 || !str_contains($r['body'], 'builds this screen')) { $wrong[] = "$id {$r['code']}"; }
 }
-ok($wrong === [], 'the Mail admin: every admin screen\'s placeholder' . ($wrong ? ': ' . implode('; ', $wrong) : ''));
+ok($wrong === [], 'the Mail admin: every admin screen not yet built answers its placeholder' . ($wrong ? ': ' . implode('; ', $wrong) : ''));
 ok(page($jp, "/m/$dana/v/inbox")['code'] === 404 && page($jp, "/m/$dana/settings")['code'] === 404 && page($jp, '/m/999999/v/inbox')['code'] === 404,
    'a mailbox the caller cannot open answers 404 — Dana\'s and a missing one alike (never 403: an address never leaks)');
 ok(page($jo, "/m/$priya/v/inbox")['code'] === 404, 'the Mail admin: a person\'s mailbox is 404 too');

@@ -134,10 +134,6 @@ s, j, text = call("/v1/admin/create_mailbox", 1, {"domain": "business.example", 
 renamed = [p["password"] for p in passwords() if p["address"] == "renamed@business.example"]
 check(s == 502 and j["error"]["code"] == "protocol" and renamed and renamed[0] not in text,
       "a reply with the password under a name not foreseen is refused, and the password goes nowhere (fail closed)", text[:160])
-s, j, text = call("/v1/admin/reset_mailbox_password", 1, {"address": "pat@business.example"})
-reset = [p["password"] for p in passwords() if p["address"] == "pat@business.example"]
-check(s == 200 and reset and reset[-1] not in text and seal.open_sealed(SECRET, base64.b64decode(j["result"]["credential"]["sealed"])) == reset[-1],
-      "a reset's new password is sealed the same way")
 s, j, text = call("/v1/admin/get_mailbox_webhook", 1, {"address": "pat@business.example"})
 check(s == 200 and "secret" not in j["result"] and "whsec_fake" not in text, "a webhook's secret is stripped from any reply")
 s, j, _ = call("/v1/admin/create_alias", 1, {"domain": "business.example", "local_part": "sales", "forwards_to": ["pat@business.example"]})
@@ -227,6 +223,77 @@ s, j, _ = call(f"/v1/mailboxes/{mb['pat@business.example']}/probe", 1, base="htt
 p.terminate(); p.wait()
 check(s == 502 and j["error"]["code"] == "connect_failed", "a server that cannot be reached backs off (connect_failed)")
 
+# ---- slice 1: create, connect and reset decided by the mailbox's kind (admin_flows.py) -----------------------------------------
+def issued(address):
+    return [p["password"] for p in passwords() if p["address"] == address]
+
+
+s, j, text = call("/v1/admin/mailboxes/create", 1, {"domain": "business.example", "local_part": "scheduler", "kind": "agent", "display_name": "Scheduler",
+                                                    "owner": 3, "primary_overseer": 2, "quota_gib": 3})
+r = j.get("result") or {}
+sched_pw = issued("scheduler@business.example")
+check(s == 200 and r.get("kind") == "agent" and "revealed" not in r and sched_pw and sched_pw[0] not in text,
+      "slice 1: an agent's mailbox is created at MaluMail and here, its password never answered", text[:200])
+sched = r.get("mailbox_id")
+check(sql(f"select b.kind || ',' || b.owner_member_id || ',' || b.primary_overseer_id || ',' || c.status || ',' || (b.quota_bytes / 1073741824) "
+          f"from mailboxes b join mailbox_credentials c on c.id = b.credential_id where b.id = {sched or 0}") == "agent,3,2,ok,3",
+      "…in one transaction: owner the agent, the primary overseer, the sealed credential live, the quota recorded")
+check(seal.open_sealed(SECRET, bytes.fromhex(sql(f"select encode(c.ciphertext, 'hex') from mailboxes b join mailbox_credentials c on c.id = b.credential_id where b.id = {sched or 0}"))) == (sched_pw[0] if sched_pw else ""),
+      "…and the stored box opens to the password MaluMail issued")
+s, j, text = call(f"/v1/mailboxes/{sched}/probe", 1)
+check(s == 200, "…and it logs in at the IMAP fixture (the issued password is the one Dovecot holds)", text[:160])
+
+s, j, text = call("/v1/admin/mailboxes/create", 1, {"domain": "business.example", "local_part": "robin", "kind": "person", "display_name": "Robin",
+                                                    "owner": 2, "quota_gib": 2})
+r = j.get("result") or {}
+robin_pw = issued("robin@business.example")
+check(s == 200 and robin_pw and r.get("revealed") == robin_pw[0], "a person's mailbox: the new password answered ONCE as revealed (for their devices)")
+check(sql(f"select (credential_id is null)::text || ',' || (select count(*) from mailbox_credentials where mailbox_id = {r.get('mailbox_id') or 0}) from mailboxes where id = {r.get('mailbox_id') or 0}") == "true,0",
+      "…and nothing is stored for it (D3: no credential for a person's mailbox until MM1)")
+
+s, j, _ = call("/v1/admin/mailboxes/create", 1, {"domain": "business.example", "local_part": "lonely", "kind": "agent", "owner": 3})
+check(s == 422 and "oversees" in j["error"]["message"], "an agent's mailbox with no overseer is refused before MaluMail is asked")
+s, j, _ = call("/v1/admin/mailboxes/create", 1, {"domain": "business.example", "local_part": "wrongowner", "kind": "person", "owner": 3})
+check(s == 422 and "belongs to a person" in j["error"]["message"], "a person's mailbox owned by an agent is refused before MaluMail is asked")
+s, j, _ = call("/v1/admin/mailboxes/create", 1, {"domain": "elsewhere.example", "local_part": "x", "kind": "shared"})
+check(s == 422 and "does not serve" in j["error"]["message"], "a mailbox on an unserved domain is refused")
+s, j, _ = call("/v1/admin/mailboxes/create", 2, {"domain": "business.example", "local_part": "x", "kind": "shared"})
+check(s == 403, "a Mail user cannot create a mailbox")
+check(not issued("lonely@business.example") and not issued("wrongowner@business.example") and not issued("x@business.example"),
+      "none of the refused creates reached MaluMail")
+
+s, j, text = call("/v1/admin/mailboxes/connect", 1, {"address": "info@business.example", "kind": "shared", "display_name": "Info"})
+r = j.get("result") or {}
+info_pw = issued("info@business.example")
+check(s == 200 and r.get("probe") == "ok" and info_pw and info_pw[-1] not in text,
+      "connecting an existing shared mailbox resets its password at MaluMail, stores it sealed and logs in with it", text[:200])
+s, j, text = call("/v1/admin/mailboxes/connect", 1, {"address": "desk@business.example", "kind": "shared", "display_name": "Desk"})
+r = j.get("result") or {}
+check(s == 200 and r.get("intake_proposed") == "helpdesk" and sql(f"select intake_proposed from mailboxes where id = {r.get('mailbox_id') or 0}") == "helpdesk",
+      "a mailbox with Help Desk's webhook is PROPOSED as Help Desk's intake (a Mail admin confirms)", text[:200])
+s, j, _ = call("/v1/admin/mailboxes/connect", 1, {"address": "ghost@business.example", "kind": "shared"})
+check(s == 422 and "has no mailbox" in j["error"]["message"], "connecting a mailbox MaluMail does not have is refused")
+info_id = sql("select id from mailboxes where address = 'info@business.example'")
+s, j, text = call("/v1/admin/mailboxes/connect", 1, {"address": "info@business.example", "kind": "shared"})
+check(s == 200 and (j.get("result") or {}).get("reconnected") and j["result"].get("probe") == "ok" and issued("info@business.example")[-1] not in text
+      and sql(f"select string_agg(status, ',' order by id) from mailbox_credentials where mailbox_id = {info_id}") == "revoked,ok",
+      "connecting one already here RECONNECTS it: a new password at MaluMail, stored, the old revoked, probed", text[:200])
+s, j, _ = call("/v1/admin/mailboxes/connect", 1, {"address": "robin@business.example", "kind": "person"})
+check(s == 422 and "MM1" in j["error"]["message"], "a person's mailbox is never reconnected (it waits on MM1)")
+
+s, j, text = call("/v1/admin/reset_mailbox_password", 1, {"address": "pat@business.example"})
+reset = issued("pat@business.example")
+check(s == 200 and reset and j["result"].get("revealed") == reset[-1] and "credential" not in j["result"],
+      "a reset of a PERSON's mailbox (the kind read from the database) reveals the new password once, stores nothing")
+before = sql(f"select count(*) from mailbox_credentials where mailbox_id = {sched or 0}")
+s, j, text = call("/v1/admin/reset_mailbox_password", 1, {"address": "scheduler@business.example"})
+again = issued("scheduler@business.example")
+check(s == 200 and again and again[-1] not in text and "revealed" not in j["result"] and j["result"].get("credential", {}).get("stored") is True,
+      "a reset of an AGENT's mailbox never answers the password: it is sealed and stored")
+check(sql(f"select string_agg(status, ',' order by id) from mailbox_credentials where mailbox_id = {sched or 0}") == "revoked,ok" and before == "1",
+      "…the old credential revoked, the new one live")
+
+
 # ---- configuration, the passes, the listening address, the log ----------------------------------------------------------------
 try:
     Config.load({**ENV, **MENV, "APP_ENV": "prod", "ML_TLS_CA_FILE": "/tmp/ca.pem"})
@@ -242,8 +309,9 @@ except ConfigError:
 check(refused, "a door key shorter than 32 characters is refused at start")
 time.sleep(1.5)
 h = httpx.get(BASE + "/health", timeout=10).json()
-check(h["passes"]["sync"]["last_run_at"] and h["passes"]["sync"]["mailboxes"] == 2 and h["passes"]["outbox"]["due"] == 0,
-      "the empty passes run: the sync pass counts 2 mailboxes it will keep in step (pat, busy — not the failed clerk), the outbox 0 due",
+syncable = int(sql("select count(*) from mailboxes m join mailbox_credentials c on c.id = m.credential_id where m.active and c.status = 'ok'"))
+check(h["passes"]["sync"]["last_run_at"] and h["passes"]["sync"]["mailboxes"] == syncable and syncable >= 2 and h["passes"]["outbox"]["due"] == 0,
+      f"the empty passes run: the sync pass counts the {syncable} mailboxes with a live credential (not the failed clerk), the outbox 0 due",
       json.dumps(h["passes"]))
 check(h["credentials_failed"] == 1, "health counts the one failed credential")
 ss = subprocess.run(["ss", "-ltnH", "sport = :9206"], capture_output=True, text=True).stdout

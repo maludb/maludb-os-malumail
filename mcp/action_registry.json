@@ -1,6 +1,6 @@
 {
     "generated_from": "docs/malumail-action-manifest.md",
-    "generated_at": "2026-10-12T13:21:58+00:00",
+    "generated_at": "2026-10-12T14:04:50+00:00",
     "screens": {
         "home": {
             "screen": "home",
@@ -47,7 +47,7 @@
             "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
             "when": "MaluMail's hosted domains for the customer key: which this business serves, which are internal, SPF/DKIM/DMARC as last read",
             "params": [],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "admin-mailboxes": {
@@ -61,7 +61,7 @@
                 "state",
                 "q"
             ],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "admin-mailbox-new": {
@@ -75,7 +75,7 @@
                 "kind",
                 "owner"
             ],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "admin-mailbox-view": {
@@ -84,7 +84,7 @@
             "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
             "when": "one mailbox for a Mail admin: suspend or reactivate, quota, reset the password (a person's shown once), connect or reconnect the webmail, the credential's state, intake owner, share with applications, overseers",
             "params": [],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "admin-aliases": {
@@ -97,7 +97,7 @@
                 "outside",
                 "q"
             ],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "admin-alias-new": {
@@ -109,7 +109,7 @@
                 "domain",
                 "local_part"
             ],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "admin-alias-view": {
@@ -118,7 +118,7 @@
             "section": "Domains, mailboxes and forwarding (slice 1 — the CRUD exemplar)",
             "when": "one forwarding address: edit its destinations, delete it",
             "params": [],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "mailbox-view": {
@@ -585,7 +585,7 @@
             "who": "`domains.manage`",
             "agent": false,
             "record_id": "the domain",
-            "built": false
+            "built": true
         },
         "mail_mailbox_create": {
             "action": "mail_mailbox_create",
@@ -648,7 +648,7 @@
             "who": "`mailboxes.manage`",
             "agent": false,
             "record_id": "the mailbox",
-            "built": false
+            "built": true
         },
         "mail_mailbox_connect": {
             "action": "mail_mailbox_connect",
@@ -699,7 +699,7 @@
             "who": "`mailboxes.manage`",
             "agent": false,
             "record_id": "the mailbox",
-            "built": false
+            "built": true
         },
         "mail_mailbox_update": {
             "action": "mail_mailbox_update",
@@ -744,7 +744,7 @@
             "who": "`mailboxes.manage`",
             "agent": false,
             "record_id": "the mailbox",
-            "built": false
+            "built": true
         },
         "mail_mailbox_suspend": {
             "action": "mail_mailbox_suspend",
@@ -771,7 +771,7 @@
             "who": "`mailboxes.manage`",
             "agent": false,
             "record_id": "the mailbox",
-            "built": false
+            "built": true
         },
         "mail_mailbox_reactivate": {
             "action": "mail_mailbox_reactivate",
@@ -792,7 +792,7 @@
             "who": "`mailboxes.manage`",
             "agent": false,
             "record_id": "the mailbox",
-            "built": false
+            "built": true
         },
         "mail_mailbox_quota_set": {
             "action": "mail_mailbox_quota_set",
@@ -819,7 +819,7 @@
             "who": "`mailboxes.manage`",
             "agent": false,
             "record_id": "the mailbox",
-            "built": false
+            "built": true
         },
         "mail_mailbox_password_reset": {
             "action": "mail_mailbox_password_reset",
@@ -840,7 +840,7 @@
             "who": "`mailboxes.manage`",
             "agent": false,
             "record_id": "the mailbox",
-            "built": false
+            "built": true
         },
         "mail_alias_create": {
             "action": "mail_alias_create",
@@ -879,7 +879,7 @@
             "who": "`aliases.manage`",
             "agent": false,
             "record_id": "the alias",
-            "built": false
+            "built": true
         },
         "mail_alias_update": {
             "action": "mail_alias_update",
@@ -912,7 +912,7 @@
             "who": "`aliases.manage`",
             "agent": false,
             "record_id": "the alias",
-            "built": false
+            "built": true
         },
         "mail_alias_delete": {
             "action": "mail_alias_delete",
@@ -933,7 +933,7 @@
             "who": "`aliases.manage`",
             "agent": false,
             "record_id": "the alias",
-            "built": false
+            "built": true
         },
         "mail_archive": {
             "action": "mail_archive",

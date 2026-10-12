@@ -24,7 +24,7 @@ for f in db/[0-9]*.sql; do
 done
 echo " $n migrations applied to $DB"
 $PSQL -d "$DB" -f db/proof/phase0_proof.sql
-for proof in db/proof/phase1_*.sql; do
+for proof in db/proof/phase1_*.sql db/proof/slice*_*.sql; do
   [ -f "$proof" ] || continue
   echo "== $proof"
   $PSQL -d "$DB" -f "$proof"

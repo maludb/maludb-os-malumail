@@ -34,7 +34,24 @@ case "${1:-}" in
     rm -f "$STATE/mcp.port"
     "$PY" -I "$ROOT/tests/fixtures/fake_mailbox_mcp.py" --key "$KEY" --port-file "$STATE/mcp.port" --log "$STATE/mcp.jsonl" --control "$STATE/mcp" >"$STATE/mcp.out" 2>&1 & echo $! > "$STATE/mcp.pid"
     for i in $(seq 1 50); do [ -s "$STATE/mcp.port" ] && break; sleep 0.1; done
-    ML_MAILER_PORT=$P_MAILER MALUMAIL_MCP_URL="http://127.0.0.1:$(cat "$STATE/mcp.port")/mcp" ML_DEV_ENV="$ENVF" \
+    IMAPENV=()
+    if [ "${ML_WITH_IMAP:-0}" = "1" ]; then
+      # slice 1 on: the IMAP fixture under a scratch certificate authority; a password the fake Mailbox MCP issues (create, reset) is the one
+      # it accepts, as at MaluMail (tests/fixtures/imap_server.py --passwords)
+      mkdir -p "$STATE/tls"
+      if [ ! -s "$STATE/tls/imap.pem" ]; then
+        openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=MaluMail proof CA" -keyout "$STATE/tls/ca.key" -out "$STATE/tls/ca.pem" 2>/dev/null
+        openssl req -newkey rsa:2048 -nodes -subj "/CN=127.0.0.1" -keyout "$STATE/tls/imap.key" -out "$STATE/tls/imap.csr" 2>/dev/null
+        printf 'subjectAltName=IP:127.0.0.1,DNS:localhost\n' > "$STATE/tls/san.ext"
+        openssl x509 -req -in "$STATE/tls/imap.csr" -CA "$STATE/tls/ca.pem" -CAkey "$STATE/tls/ca.key" -CAcreateserial -days 2 -extfile "$STATE/tls/san.ext" -out "$STATE/tls/imap.pem" 2>/dev/null
+      fi
+      echo '{}' > "$STATE/imap-users.json"; rm -f "$STATE/imap.port"
+      "$PY" -I "$ROOT/tests/fixtures/imap_server.py" --users "$STATE/imap-users.json" --cert "$STATE/tls/imap.pem" --key "$STATE/tls/imap.key" \
+        --port-file "$STATE/imap.port" --stats "$STATE/imap-stats.json" --passwords "$STATE/mcp/passwords.jsonl" >"$STATE/imap.out" 2>&1 & echo $! > "$STATE/imap.pid"
+      for i in $(seq 1 50); do [ -s "$STATE/imap.port" ] && break; sleep 0.1; done
+      IMAPENV=(ML_IMAP_HOST=127.0.0.1 "ML_IMAP_PORT=$(cat "$STATE/imap.port")" "ML_TLS_CA_FILE=$STATE/tls/ca.pem")
+    fi
+    env "${IMAPENV[@]}" ML_MAILER_PORT=$P_MAILER MALUMAIL_MCP_URL="http://127.0.0.1:$(cat "$STATE/mcp.port")/mcp" ML_DEV_ENV="$ENVF" \
       "$PY" -I "$ROOT/services/mailer/server.py" >"$STATE/mailer.log" 2>&1 & echo $! > "$STATE/mailer.pid"
     if [ "${ML_APP:-php}" = "apache" ]; then
       mkdir -p "$STATE/apache"

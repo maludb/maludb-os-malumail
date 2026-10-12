@@ -73,6 +73,32 @@ class Store:
                 "mailbox). Store a new credential for the mailbox to start again.", mailbox_id)
             return int(told or 0)
 
+    async def member_kind(self, member_id: int) -> str | None:
+        return await self.pool.fetchval("SELECT member_kind FROM members WHERE id = $1 AND status = 'active'", member_id)
+
+    async def mailbox_by_address(self, address: str):
+        return await self.pool.fetchrow("SELECT id, kind, owner_member_id FROM mailboxes WHERE address = $1", address.lower())
+
+    async def create_mailbox_rows(self, actor: int, address: str, display: str, kind: str, owner: int | None, primary: int | None,
+                                  others: list[int], quota_bytes: int | None, box: bytes | None, label: str, intake_proposed: str | None) -> int:
+        """The mailbox, its overseers' full rows and (agent/shared) its sealed credential — ONE transaction, the database's own functions."""
+        async with self.pool.acquire() as c, c.transaction():
+            await c.execute("SELECT set_config('app.member_id', $1, true)", str(actor))
+            mb = await c.fetchval("SELECT ml_mailbox_create($1, $2, $3, $4, $5, $6, $7)", actor, address, display, kind, owner,
+                                  primary if kind == "agent" else None, quota_bytes)
+            for o in others:
+                await c.execute("SELECT ml_permission_grant($1, $2, 'member', $3, 'full')", mb, actor, o)
+            if box is not None:
+                await c.fetchval("SELECT ml_credential_store($1, $2, 'mailbox_password', $3, $4)", mb, actor, box, label)
+            if intake_proposed is not None:
+                await c.execute("UPDATE mailboxes SET intake_proposed = $2 WHERE id = $1", mb, intake_proposed)
+            return int(mb)
+
+    async def credential_store(self, mailbox_id: int, actor: int, box: bytes, label: str) -> int:
+        async with self.pool.acquire() as c, c.transaction():
+            await c.execute("SELECT set_config('app.member_id', $1, true)", str(actor))
+            return int(await c.fetchval("SELECT ml_credential_store($1, $2, 'mailbox_password', $3, $4)", mailbox_id, actor, box, label))
+
     async def log_admin_call(self, actor: int, tool: str, target: str | None, ok: bool, error: str | None) -> None:
         await self.pool.execute(
             """INSERT INTO activity_log (actor_member_id, source, action, entity_type, after)

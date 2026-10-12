@@ -1380,4 +1380,27 @@ questions in one sitting and changed none:
     user-level Apache rendering `deploy/apache-malumail.conf`, Playwright 28 at 375 and 1280 and with JavaScript off, the registry and
     `approvals[]` checks; the kit 101 (its home checks moved to the shell's), the schema 514, the specs 98, the mail service 62.
 
-  **NEXT:** slice 1. **People's existing mailboxes wait on MM1.**
+- **2026-10-12, SLICE 1 BUILT — domains, mailboxes and forwarding, THE CRUD EXEMPLAR** (`docs/build-specs/domains-mailboxes.md`; the owner:
+  "Please begin"). 7 screens and 11 actions (the registry: 11 of 45 screens, 14 of 67 actions built).
+  - **The screens:** domains as cards (serve, internal or outside, MaluMail's SPF/DKIM/DMARC as last read); mailboxes as cards (kind,
+    owner or overseers, credential, sync, intake chips; filters); one full page to create a mailbox at MaluMail or connect an existing
+    one (the kind shows only its own fields); a mailbox's page (settings, intake confirmed from MaluMail's proposal, quota, reset,
+    reconnect, suspend/reactivate); forwarding addresses as cards with Outside flagged, made and changed on one page.
+  - **The mail service does what holds a password** (`services/mailer/admin_flows.py`): create and connect write the rows in one
+    transaction; **what a reset reveals is read from the mailbox's kind in the database** — a person's new password once, never stored
+    (shown on the mailbox's page for one load; never in JSON or under an action token); an agent's or a shared mailbox's sealed and
+    stored, never answered. **Connect on a mailbox already here RECONNECTS it** (a new credential, the old revoked, probed) — the
+    mailbox page's Reconnect. A mailbox's own webhook at MaluMail proposes its intake reader; a Mail admin confirms it.
+  - **db/016**: `ml_mailbox_quota_set()`, `ml_alias_cache_put()`/`_drop()` (MaluMail is the record; the cache is what the screens and §5's
+    internal test read), `ml_domain_flags_save()` — every administrative write keeps a right in SQL; `db/proof/slice1_admin.sql` 22.
+  - **Decided while building:** a suspension is MaluMail's `set_mailbox_active false` AND the row's; a Mail admin is refused (not
+    ignored) when sending "share with applications" for a person's mailbox; an outside destination is typed back; the spec's
+    `new.php` files are the router's `form.php` (the estate's canonical URLs).
+  - **The proof:** `tests/phase3/slice1/run.sh` — 66 HTTP checks and 28 in headless Chromium at 375 and 1280, under php -S and under
+    a user-level Apache; every password the fake issued searched for in every page, JSON answer, log and the activity log (found only
+    on the once-shown page). The IMAP fixture accepts the passwords the fake Mailbox MCP issues (`--passwords`), as MaluMail's server
+    would; `tests/phase2/servers.sh` starts it with `ML_WITH_IMAP=1`. Spec step 9 (live, on the test domain) is skipped until a customer
+    key scoped to the test domain exists (MM7) — never the production key. The mail service 80 (was 62), the schema 536, the kit 101,
+    Phase 2 79/43/28 and 79/47/28, the specs green.
+
+  **NEXT:** slice 2, the mail service and the list (the first exemplar). **People's existing mailboxes wait on MM1.**

@@ -2,7 +2,10 @@
 secret key and MaluMail's customer key. It listens on loopback, 127.0.0.1:ML_MAILER_PORT, behind the signed door (door.py).
 
   GET  /health                          up, the database, credential and outbox counts, the passes' last runs — counts only, unsigned
-  POST /v1/admin/{tool}                 one Mailbox MCP administration call for the acting member (mailbox_mcp.py's policy)
+  POST /v1/admin/{tool}                 one Mailbox MCP administration call for the acting member (mailbox_mcp.py's policy);
+                                        a reset answers what the mailbox's kind allows (admin_flows.after_reset)
+  POST /v1/admin/mailboxes/create      slice 1: MaluMail's create_mailbox + the rows in one transaction (admin_flows.create)
+  POST /v1/admin/mailboxes/connect     slice 1: an existing mailbox registered, reset if agent/shared, probed (admin_flows.connect)
   POST /v1/mailboxes/{id}/probe         log in to the mailbox with its sealed credential: capabilities, folders, INBOX's counts;
                                         an authentication failure trips the circuit breaker (store.trip_breaker)
 
@@ -40,6 +43,7 @@ from starlette.responses import JSONResponse  # noqa: E402
 from starlette.routing import Route  # noqa: E402
 
 from services.mailer import door, imap, mailbox_mcp, seal  # noqa: E402
+from services.mailer.admin_flows import Flows  # noqa: E402
 from services.mailer.config import Config, ConfigError  # noqa: E402
 from services.mailer.store import Store  # noqa: E402
 
@@ -127,6 +131,8 @@ def build_app(cfg: Config) -> Starlette:
         try:
             result = await mailbox_mcp.admin_call(state["http"], cfg.mcp_url, cfg.customer_key, public_key, tool, args,
                                                   may=lambda right: store.member_may(actor, right), served=store.domain_served)
+            if tool == "reset_mailbox_password":           # what a reset reveals: the mailbox's kind decides (slice 1, admin_flows.py)
+                result = await state["flows"].after_reset(actor, str(args.get("address", "")).strip().lower(), result)
         except mailbox_mcp.McpError as e:
             if e.kind not in ("forbidden", "policy"):
                 await store.log_admin_call(actor, tool, target, False, str(e)[:300])
@@ -136,6 +142,31 @@ def build_app(cfg: Config) -> Starlette:
         await store.log_admin_call(actor, tool, target, True, None)
         log.info("admin %s for member %s", tool, actor)
         return JSONResponse({"ok": True, "result": result})
+
+    async def flow(request: Request, name: str):
+        got = await signed(request)
+        if isinstance(got, JSONResponse):
+            return got
+        actor, args = got
+        store: Store = state["store"]
+        target = str(args.get("domain") or args.get("address") or "")[:200]
+        try:
+            result = await getattr(state["flows"], name)(actor, args)
+        except mailbox_mcp.McpError as e:
+            if e.kind not in ("forbidden", "policy"):
+                await store.log_admin_call(actor, f"mailboxes_{name}", target, False, str(e)[:300])
+            log.info("admin mailboxes/%s for member %s refused: %s", name, actor, e.kind)
+            status = {"forbidden": 403, "policy": 422, "refused": 422, "unconfigured": 503, "created_at_malumail_only": 409}.get(e.kind, 502)
+            return refuse(status, e.kind, str(e))
+        await store.log_admin_call(actor, f"mailboxes_{name}", target, True, None)
+        log.info("admin mailboxes/%s for member %s", name, actor)
+        return JSONResponse({"ok": True, "result": result})
+
+    async def create(request: Request):
+        return await flow(request, "create")
+
+    async def connect(request: Request):
+        return await flow(request, "connect")
 
     async def probe(request: Request):
         got = await signed(request)
@@ -196,6 +227,7 @@ def build_app(cfg: Config) -> Starlette:
     async def lifespan(app):
         state["store"] = await Store.open(cfg.db_dsn)
         state["http"] = httpx.AsyncClient(trust_env=False)
+        state["flows"] = Flows(cfg, state["store"], state["http"], public_key)
         tasks = {asyncio.create_task(run_passes())}            # held, or the loop may collect it (Boards' finding)
         try:
             yield
@@ -207,6 +239,8 @@ def build_app(cfg: Config) -> Starlette:
 
     return Starlette(routes=[
         Route("/health", health, methods=["GET"]),
+        Route("/v1/admin/mailboxes/create", create, methods=["POST"]),
+        Route("/v1/admin/mailboxes/connect", connect, methods=["POST"]),
         Route("/v1/admin/{tool:str}", admin, methods=["POST"]),
         Route("/v1/mailboxes/{mailbox:int}/probe", probe, methods=["POST"]),
     ], lifespan=lifespan)

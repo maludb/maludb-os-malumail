@@ -55,7 +55,7 @@ SQL
 
 KEY=$(val "$MENV" MALUMAIL_MAILBOX_API_KEY)
 "$PY" -I "$ROOT/tests/fixtures/fake_mailbox_mcp.py" --key "$KEY" --port-file "$TMP/mcp.port" --log "$TMP/mcp.jsonl" --control "$TMP/mcp" & PIDS+=($!)
-"$PY" -I "$ROOT/tests/fixtures/imap_server.py" --users "$TMP/users.json" --cert "$TMP/imap.pem" --key "$TMP/imap.key" --port-file "$TMP/imap.port" --stats "$TMP/imap-stats.json" & PIDS+=($!)
+"$PY" -I "$ROOT/tests/fixtures/imap_server.py" --users "$TMP/users.json" --cert "$TMP/imap.pem" --key "$TMP/imap.key" --port-file "$TMP/imap.port" --stats "$TMP/imap-stats.json" --passwords "$TMP/mcp/passwords.jsonl" & PIDS+=($!)
 "$PY" -I "$ROOT/tests/fixtures/imap_server.py" --users "$TMP/users.json" --cert "$TMP/rogue.pem" --key "$TMP/rogue.key" --port-file "$TMP/rogue.port" --stats "$TMP/rogue-stats.json" & PIDS+=($!)
 for f in mcp.port imap.port rogue.port; do for _ in $(seq 50); do [ -s "$TMP/$f" ] && break; sleep 0.1; done; done
 
