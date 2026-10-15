@@ -1,6 +1,6 @@
 {
     "generated_from": "docs/malumail-action-manifest.md",
-    "generated_at": "2026-10-12T16:36:48+00:00",
+    "generated_at": "2026-10-15T13:23:28+00:00",
     "screens": {
         "home": {
             "screen": "home",
@@ -154,7 +154,7 @@
             "params": [
                 "message"
             ],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "message-original": {
@@ -163,7 +163,7 @@
             "section": "Reading (slice 3 — the second exemplar)",
             "when": "one message's headers and source, and the `.eml` download",
             "params": [],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "compose": {
@@ -966,7 +966,7 @@
             "who": "`mail.use` · triage",
             "agent": true,
             "record_id": "the first conversation",
-            "built": false
+            "built": true
         },
         "mail_move": {
             "action": "mail_move",
@@ -1005,7 +1005,7 @@
             "who": "`mail.use` · triage",
             "agent": true,
             "record_id": "the first conversation",
-            "built": false
+            "built": true
         },
         "mail_trash": {
             "action": "mail_trash",
@@ -1038,7 +1038,7 @@
             "who": "`mail.use` · triage",
             "agent": true,
             "record_id": "the first conversation",
-            "built": false
+            "built": true
         },
         "mail_spam": {
             "action": "mail_spam",
@@ -1071,7 +1071,7 @@
             "who": "`mail.use` · triage",
             "agent": true,
             "record_id": "the first conversation",
-            "built": false
+            "built": true
         },
         "mail_not_spam": {
             "action": "mail_not_spam",
@@ -1104,7 +1104,7 @@
             "who": "`mail.use` · triage",
             "agent": true,
             "record_id": "the first conversation",
-            "built": false
+            "built": true
         },
         "mail_flag": {
             "action": "mail_flag",
@@ -1149,7 +1149,7 @@
             "who": "`mail.use` · triage",
             "agent": true,
             "record_id": "the first conversation",
-            "built": false
+            "built": true
         },
         "mail_mark_read": {
             "action": "mail_mark_read",
@@ -1188,7 +1188,7 @@
             "who": "`mail.use` · view",
             "agent": true,
             "record_id": "the first conversation",
-            "built": false
+            "built": true
         },
         "mail_delete_forever": {
             "action": "mail_delete_forever",
@@ -1215,7 +1215,7 @@
             "who": "`mail.use` · triage",
             "agent": true,
             "record_id": "the first conversation",
-            "built": false
+            "built": true
         },
         "mail_trash_empty": {
             "action": "mail_trash_empty",
@@ -1242,7 +1242,7 @@
             "who": "`mail.use` · triage",
             "agent": true,
             "record_id": "the mailbox",
-            "built": false
+            "built": true
         },
         "mail_images_allow": {
             "action": "mail_images_allow",
@@ -1269,7 +1269,7 @@
             "who": "`mail.use` · full",
             "agent": false,
             "record_id": "the mailbox",
-            "built": false
+            "built": true
         },
         "mail_sensitive_set": {
             "action": "mail_sensitive_set",
@@ -1302,7 +1302,7 @@
             "who": "`mail.use` · triage",
             "agent": false,
             "record_id": "the first conversation",
-            "built": false
+            "built": true
         },
         "mail_draft_save": {
             "action": "mail_draft_save",

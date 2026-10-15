@@ -159,6 +159,36 @@ customer key nor the sealing secret** — the proof checks it.
 - Phase 2's and the mailer suite's proofs follow built screens (a built screen answers by its own slice's proof; the mailer suite pauses
   its seeded mailboxes so no watcher logs in beside the probe).
 
+## Slice 3 (2026-10-15, reading BUILT — THE SECOND EXEMPLAR) — `docs/build-specs/reading.md`, `reading-and-rendering.md`, `mail-service.md` §4–§5
+- `bash tests/phase3/slice3/run.sh` (php -S) and `ML_APP=apache …`: scratch `ml_dev3`, five seeded mailboxes, the IMAP fixture grown
+  (`UID MOVE` with `COPYUID`, Content-IDs in `BODYSTRUCTURE`), the image door on 9207 under its socket stand-in (`--port`) admitting ONE loopback
+  image fixture through `ML_IMAGES_TEST_ALLOW` (`tests/phase3/slice3/image_fixture.py` on 9208 — started AFTER the servers, whose start kills
+  every pid in the state directory); `door.py` (the service), `reading.php` (the pages and the eleven actions), `browser.mjs` (Chromium),
+  `live.py` (MaluMail's test mailboxes, only with `ML_LIVE_CREDENTIALS`); door 101, reading 117, browser 60 under both. `ML_S3_HOLD=1` leaves the servers up for development.
+- **Every page that shows mail copies `html/m/thread.php` + `app/features/mail/reading.php`**: the conversation from `mcp_messages` (the wall in the
+  view), each OPEN message's body asked of the mail service ONCE (`fetch`, form `html`, cached there so the frame's own request costs no second
+  read), the banners from the index and the fetch, attachments through the signed part door, **the eleven actions through ONE runner**
+  `mail_action_run()` (targets by `ml_thread_targets()`, `ml_mutation_refusal()` here first so the page says why, one `mutate` call, one activity
+  row with the count, the landing with Undo). A view holder's and an intake mailbox's reads are per person (`mail_viewer_reads`), never a `\Seen`.
+- **The three layers** (`reading-and-rendering.md`): the sanitiser gained the link-host rule (`title` = the host; a text naming another host gets
+  ` (host)` and counts in `deceptive_links`); `html/m/body.php` answers the sandboxed body under the exact CSP (a 16-byte nonce; the height line
+  the only script); `html/p.php` and `html/img.php` are the two public doors — the token (`ML_PART_KEY`, one hour, bound to the member and the
+  message, `app/features/mail/links.php`) is the authority, the member's level re-checked on every use, inline ONLY for a raster image by its
+  bytes, an HTML or SVG part `application/octet-stream` attachment; `services/images/door.py` fetches a remote image for a person who asked
+  (a name resolved once and pinned, global addresses only, three redirects, 5 MB, four raster types by magic, 15 s).
+- **The mail service** (`services/mailer/mime_read.py`, `extract.py`; `server.py` routes `fetch` · `part` · `raw` · `mutate`, **strict**: a Mail
+  admin's role opens no mailbox's content): `fetch` forms `html` · `plain` · `text` (the agent's text — quotes and signatures cut, hidden content
+  counted, links as `text [→ host]`) · `headers`; parts and the raw message streamed in 1 MB partials; every op one IMAP command per folder, the index
+  updated in the same request; `409 moved` on a stale UIDVALIDITY (and the folder queued for a re-read); `409 not_live` for a mailbox with no watcher.
+- `mcp/records_server.py` holds `find_threads`, `thread_read`, `message_read`, `message_headers`, `find_attachments`, `attachment_read` (text of
+  plain/csv/calendar, PDF through `pdftotext`, `.docx`/`.xlsx` through the standard library — never another type's content); `mcp/server_common.py`
+  holds `fence_untrusted()` (the ONE fence; Phase 4's tools wrap every string that came in a message).
+- The kit's `ml_guard()` now answers the schema's `42501` → 403 and `22023` → 422 in their own sentences (`DB_SENTENCE_CODES`); the proofs' `ok()`
+  takes a detail printed on failure.
+- **A feature file the bootstrap loads for every request shares one function namespace with every feature a controller requires**: a helper
+  named twice (reading's `pg_text_array` beside admin's) is a redeclaration fatal on the admin pages alone — prefix a global helper (`ml_…`)
+  and run every earlier suite before committing (the regressions found it: Phase 2 and slice 1).
+
 ## Numbers
 Ports `APP_INTERNAL_PORT=8199`, `MCP_RECORDS_PORT=8852`, `MCP_ACTIVITY_PORT=8853`, `ML_MAILER_PORT=8854`, `ML_IMAGES_PORT=8855`;
 scratch 9201 (the app), 9202 (the fake kernel), 9203 (the fake MaluDB + MaluMail REST), 9204–9205 (the MCP servers), 9206 (the

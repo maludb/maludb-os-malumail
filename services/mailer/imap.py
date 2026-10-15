@@ -333,7 +333,8 @@ def walk_structure(bs):
         leaves.append({"part": prefix or "1", "type": typ, "subtype": sub, "params": params,
                        "encoding": _text(node[5]).lower() if len(node) > 5 and node[5] else "7bit",
                        "size": int(node[6]) if len(node) > 6 and isinstance(node[6], int) else 0,
-                       "disposition": disp, "filename": dparams.get("filename") or params.get("name")})
+                       "disposition": disp, "filename": dparams.get("filename") or params.get("name"),
+                       "content_id": _text(node[3]) if len(node) > 3 and node[3] else None})
 
     visit(bs, "")
     return leaves
@@ -422,3 +423,61 @@ def create_folder(client, name: str) -> bool:
         return True
     except (IMAPClientError, imaplib.IMAP4.error):
         return False
+
+
+# ================================================================================================================================
+# SLICE 3 — mutations on a pool connection (docs/build-specs/mail-service.md §5): one IMAP command per folder touched, UIDs grouped.
+# The caller SELECTs the folder read-write first (select(…, readonly=False)) and holds the mailbox's lock.
+
+_COPYUID = re.compile(r"COPYUID\s+(\d+)\s+([0-9:,]+)\s+([0-9:,]+)", re.I)
+
+
+def uid_set(uids) -> str:
+    """A UID set, ranges collapsed (1,2,3,7 → 1:3,7)."""
+    out = []
+    run: list[int] = []
+    for u in sorted(set(int(x) for x in uids)):
+        if run and u == run[-1] + 1:
+            run.append(u)
+            continue
+        if run:
+            out.append(f"{run[0]}:{run[-1]}" if len(run) > 1 else str(run[0]))
+        run = [u]
+    if run:
+        out.append(f"{run[0]}:{run[-1]}" if len(run) > 1 else str(run[0]))
+    return ",".join(out)
+
+
+def store_flags(client, uids, flag: str, add: bool) -> None:
+    """UID STORE set ±FLAGS.SILENT (flag) on the selected folder."""
+    typ, data, _u = raw(client, "UID", "STORE", uid_set(uids), ("+" if add else "-") + "FLAGS.SILENT", f"({flag})")
+    if typ != "OK":
+        raise IMAPClientError(f"UID STORE failed: {_text(data[0] if data else b'')}")
+
+
+def move(client, uids, folder: str) -> dict[int, int]:
+    """UID MOVE set "folder" → {old uid: new uid} from the COPYUID response code (RFC 6851 + 4315)."""
+    typ, data, _u = raw(client, "UID", "MOVE", uid_set(uids), folder_name_out(folder))
+    if typ != "OK":
+        raise IMAPClientError(f"UID MOVE failed: {_text(data[0] if data else b'')}")
+    text = " ".join(_text(d) for d in (data or []))
+    m = _COPYUID.search(text)
+    if not m:
+        # also in the untagged OK some servers send before the tagged line
+        for line in _u.get("OK", []):
+            m = _COPYUID.search(_text(_flatten(line)))
+            if m:
+                break
+    if not m:
+        return {}
+    src = sorted(parse_uid_set(m.group(2)))
+    dst = sorted(parse_uid_set(m.group(3)))
+    return dict(zip(src, dst))
+
+
+def expunge_uids(client, uids) -> None:
+    """UID STORE +FLAGS.SILENT (\\Deleted), then UID EXPUNGE set (UIDPLUS) — only what was named goes."""
+    store_flags(client, uids, "\\Deleted", True)
+    typ, data, _u = raw(client, "UID", "EXPUNGE", uid_set(uids))
+    if typ != "OK":
+        raise IMAPClientError(f"UID EXPUNGE failed: {_text(data[0] if data else b'')}")

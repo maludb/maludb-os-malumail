@@ -244,6 +244,29 @@ def final_pass(html: str, image_urls: set[str]) -> str:
 
 # ---- pass 2 ---------------------------------------------------------------------------------------------------------------------
 
+_TEXT_HOST = re.compile(r"^(?:[a-z][a-z0-9+.\-]*://)?(?:[^/@\s]+@)?([a-z0-9.\-]+\.[a-z]{2,})(?:[/:?#]|$)", re.I)
+
+
+def _link_host(href: str) -> str:
+    """The host a link opens (http/https only; a mailto or a fragment has none)."""
+    m = re.match(r"^https?://([^/?#]+)", href.strip(), re.I)
+    if not m:
+        return ""
+    host = m.group(1).rsplit("@", 1)[-1].split(":")[0].lower().strip(".")
+    return host[4:] if host.startswith("www.") else host
+
+
+def _text_host(text: str) -> str:
+    """The host a link's visible text NAMES, when it looks like a URL or a domain (reading-and-rendering.md §1, slice 3); else ''."""
+    t = text.strip()
+    if not t or " " in t or len(t) > 300:
+        return ""
+    m = _TEXT_HOST.match(t)
+    if not m:
+        return ""
+    host = m.group(1).lower().strip(".")
+    return host[4:] if host.startswith("www.") else host
+
 @dataclass
 class Sanitised:
     html: str
@@ -253,6 +276,7 @@ class Sanitised:
     cid_refs: list[str] = field(default_factory=list)        # the Content-IDs the body shows
     image_urls: set[str] = field(default_factory=set)        # the image sources pass 2 wrote (the part door, placeholders)
     unstable: bool = False                                   # pass 3 never settled: the text alone was kept
+    deceptive_links: int = 0                                 # links whose visible text names another host than they open (slice 3)
 
 
 def _dimension(attrs: dict, decls: list[tuple[str, str]], name: str) -> Optional[float]:
@@ -272,6 +296,8 @@ class _Pass2(HTMLParser):
         self.cid_url, self.remote_image_url, self.r = cid_url, remote_image_url, result
         self.out: list[str] = []
         self.skip = 0
+        self._link: dict | None = None                       # the open <a>: its host and the text seen inside it (slice 3's link-host rule)
+        self._link_text: list[str] = []
 
     def _emit(self, tag: str, attrs: dict) -> None:
         parts = [f"<{tag}"]
@@ -320,6 +346,11 @@ class _Pass2(HTMLParser):
             a = self._image(a)
             if a is None:
                 return
+        if tag == "a":
+            host = _link_host(a.get("href") or "")
+            if host:
+                a["title"] = host                               # a hover shows where the link really goes
+            self._link, self._link_text = {"host": host}, []
         self._emit(tag, a)
 
     def handle_startendtag(self, tag, attrs):
@@ -332,9 +363,18 @@ class _Pass2(HTMLParser):
             self.skip -= 1
             return
         self.out.append(f"</{tag}>")
+        if tag == "a" and self._link is not None:
+            text = "".join(self._link_text).strip()
+            shown = _text_host(text)
+            if self._link["host"] and shown and shown != self._link["host"]:
+                self.r.deceptive_links += 1
+                self.out.append(_html.escape(f" ({self._link['host']})", quote=False))
+            self._link = None
 
     def handle_data(self, data):
         if not self.skip:
+            if self._link is not None:
+                self._link_text.append(data)
             self.out.append(_html.escape(data, quote=False))
 
 

@@ -43,7 +43,7 @@ from pathlib import Path
 
 CAPS_PRE = "IMAP4rev1 LITERAL+ ID ENABLE AUTH=PLAIN"
 CAPS = ("IMAP4rev1 LITERAL+ ID ENABLE IDLE CONDSTORE QRESYNC SPECIAL-USE LIST-EXTENDED LIST-STATUS NOTIFY BINARY PREVIEW QUOTA "
-        "UIDPLUS")
+        "UIDPLUS MOVE")
 FOLDERS = [("INBOX", ""), ("Drafts", "\\Drafts"), ("Sent", "\\Sent"), ("Junk", "\\Junk"), ("Trash", "\\Trash")]
 QUOTA_KB = 1048576
 CRLF = b"\r\n"
@@ -178,7 +178,8 @@ def bodystructure(part) -> str:
     body = payload.encode("utf-8", "surrogateescape") if isinstance(payload, str) else bytes(payload or b"")
     enc = (part.get("Content-Transfer-Encoding") or "7bit").lower()
     maintype, subtype = part.get_content_maintype(), part.get_content_subtype()
-    head = f"{q(maintype)} {q(subtype)} {_params(part)} NIL NIL {q(enc)} {len(body)}"
+    cid = part.get("Content-ID")
+    head = f"{q(maintype)} {q(subtype)} {_params(part)} {q(cid) if cid else 'NIL'} NIL {q(enc)} {len(body)}"
     if maintype == "text":
         return f"({head} {body.count(b'\\n')} NIL {_disposition(part)} NIL NIL)"
     return f"({head} NIL {_disposition(part)} NIL NIL)"
@@ -247,7 +248,7 @@ class Server:
         self.users, self.stats_path, self.passwords = users, stats_path, passwords
         self.stats = {a: {"attempts": 0, "ok": 0} for a in users}
         self.stats["_"] = {"seen_by_fetch": 0, "stores": [], "notify_sets": 0, "notify_refused": 0, "idles": 0, "selects": 0,
-                           "commands": 0, "connections": 0}
+                           "commands": 0, "connections": 0, "moves": [], "expunges": [], "creates": []}
         self.refuse_notify = no_notify
         self.boxes = {}
         self.sessions: set = set()
@@ -829,6 +830,8 @@ class Session:
                 send(f"{tag} NO [ALREADYEXISTS] Mailbox exists")
                 return
             box[name] = Folder(name, "")
+            server.stats["_"]["creates"].append({"user": self.user, "folder": name})
+            server.mark()
             send(f"{tag} OK CREATE completed")
         elif cmd in ("SELECT", "EXAMINE"):
             f = box.get(args[0]) if args else None
@@ -877,11 +880,56 @@ class Session:
                     f.highestmodseq += 1
                     f.expunged.append((m["uid"], f.highestmodseq))
                     send(f"* VANISHED {m['uid']}" if self.qresync else f"* {i - removed} EXPUNGE")
+                    server.stats["_"]["expunges"].append({"user": self.user, "folder": f.name, "uid": m["uid"]})
                     removed += 1
                 else:
                     keep.append(m)
             f.messages = keep
+            for other in server.sessions:
+                if other is not self and other.user == self.user and other.selected is f:
+                    pass                                          # a real server tells them at their next command; QRESYNC catches up
+            server.mark()
             send(f"{tag} OK EXPUNGE completed")
+        elif cmd == "MOVE":                                       # slice 3: UID MOVE set "folder" → [COPYUID validity src dst] (RFC 6851, 4315)
+            f = self.selected
+            if f is None or self.readonly or not uid_mode or len(args) < 2:
+                send(f"{tag} NO Not selected read-write, or not a UID MOVE")
+                return
+            to = box.get(args[1])
+            if to is None:
+                send(f"{tag} NO [TRYCREATE] No such mailbox")
+                return
+            ids = seqset(args[0], f.messages[-1]["uid"] if f.messages else 0)
+            chosen = [(i + 1, m) for i, m in enumerate(f.messages) if m["uid"] in ids]
+            src, dst = [], []
+            for i, m in reversed(chosen):
+                f.messages.pop(i - 1)
+                f.highestmodseq += 1
+                f.expunged.append((m["uid"], f.highestmodseq))
+                n = to.add(m["raw"], set(m["flags"]), m["internaldate"])
+                src.append(m["uid"]); dst.append(n["uid"])
+                server.stats["_"]["moves"].append({"user": self.user, "from": f.name, "to": to.name, "uid": m["uid"], "new_uid": n["uid"]})
+                for other in list(server.sessions):          # the other sessions (the watcher) hear of it as from another client
+                    if other is self or other.user != self.user:
+                        continue
+                    if other.selected is f:
+                        other.push(f"* VANISHED {m['uid']}" if other.qresync else f"* {i} EXPUNGE")
+                    elif other.notify:
+                        st = f.status()
+                        other.push(f"* STATUS {q(f.name)} (MESSAGES {st['MESSAGES']} UIDNEXT {st['UIDNEXT']} UNSEEN {st['UNSEEN']} HIGHESTMODSEQ {st['HIGHESTMODSEQ']})")
+                    if other.selected is to:
+                        other.push(f"* {len(to.messages)} EXISTS")
+                    elif other.notify:
+                        st = to.status()
+                        other.push(f"* STATUS {q(to.name)} (MESSAGES {st['MESSAGES']} UIDNEXT {st['UIDNEXT']} UNSEEN {st['UNSEEN']} HIGHESTMODSEQ {st['HIGHESTMODSEQ']})")
+            src.reverse(); dst.reverse()
+            if src and self.qresync:
+                send(f"* VANISHED {','.join(map(str, src))}")
+            server.mark()
+            if src:
+                send(f"{tag} OK [COPYUID {to.uidvalidity} {','.join(map(str, src))} {','.join(map(str, dst))}] Move completed")
+            else:
+                send(f"{tag} OK Move completed (nothing matched)")
         elif cmd == "NOTIFY":
             if args and str(args[0]).upper() == "NONE":
                 self.notify = False

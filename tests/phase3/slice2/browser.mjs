@@ -75,7 +75,9 @@ for (const [w, h, tag] of [[375, 740, 'phone'], [1280, 800, 'desk']]) {
   await page.click('#mail-select-all-page');
   const n = await page.locator('.mail-row .mail-select:not(:disabled)').count();
   ok((await page.textContent('#mail-selected-count')).trim() === `${n} selected` && await page.isChecked('#mail-select-page'), `"Select all on this page" (${tag})`);
-  ok((await page.locator('#mail-bulk-form .mail-bulk-action').count()) === 0, `…and no action button whose handler is not built yet (decision 3) (${tag})`);
+  const builtActions = Object.values(JSON.parse(fs.readFileSync(new URL('../../../mcp/action_registry.json', import.meta.url), 'utf8')).actions).filter((a) => a.built).map((a) => a.action);
+  const bulkIds = await page.locator('#mail-bulk-form .mail-bulk-action').evaluateAll((els) => els.map((e) => e.id.replace('mail-bulk-', '')));
+  ok(bulkIds.every((a) => builtActions.includes(a)), `…and only action buttons whose handler is built (decision 3; ${bulkIds.length} built, ${tag})`);
   await page.screenshot({ path: `${SHOTS}/${tag}-selected.png` });
   await page.click('#mail-select-none');
   ok(!(await visible(page, '#mail-bulk-form')), `Clear hides it again (${tag})`);

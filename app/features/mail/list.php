@@ -395,7 +395,10 @@ function mail_list_respond(PDO $pdo, array $box, string $view, ?array $folder): 
     $data = ['box' => $box, 'view' => $view, 'folder' => $folder, 'page' => $page, 'unread' => $unread, 'title' => $title, 'status' => $status,
              'tz' => member_timezone(), 'poll' => [(int) $poll[0], (int) $poll[1]],
              'density' => ($settings['density'] ?? '') === 'compact' ? 'compact' : 'comfortable',
-             'base' => $folder !== null ? '/m/' . $id . '/f/' . (int) $folder['id'] : '/m/' . $id . '/v/' . $view];
+             'base' => $folder !== null ? '/m/' . $id . '/f/' . (int) $folder['id'] : '/m/' . $id . '/v/' . $view,
+             // an action's landing (reading.md, slice 3): the notice and, after an archive / move / trash / spam, the Undo
+             'notice' => function_exists('mail_action_notice') ? mail_action_notice($_GET['notice'] ?? null, (int) ($_GET['n'] ?? 0)) : null,
+             'undo' => isset($_GET['undo']) ? array_values(array_filter(array_map('intval', explode(',', (string) $_GET['undo'])))) : null];
     $count = $view === 'inbox' && $folder === null ? (int) db_value($pdo, 'SELECT ml_unread_count(:mb)', ['mb' => $id]) : 0;
     $pageTitle = ($count > 0 ? '(' . $count . ') ' : '') . $title . ' — ' . $box['address'];
     if (is_htmx_request() && ($_SERVER['HTTP_HX_TARGET'] ?? '') === 'mail-list') {

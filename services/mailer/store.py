@@ -306,3 +306,88 @@ class Store:
             """SELECT (SELECT count(*) FROM mail_messages WHERE text_indexed_at IS NULL) AS text_due,
                       (SELECT count(*) FROM mailboxes WHERE sync_state = 'failed') AS failing""")
         return dict(row)
+
+    # ============================================================================================================================
+    # SLICE 3 — reading and mutations (docs/build-specs/mail-service.md §4–§5). The door computes every level itself; the index is
+    # updated in the same request as the IMAP command (decision 7).
+
+    async def message_ref(self, mailbox_id: int, message_id: int):
+        """A message row with its folder's name and the folder's CURRENT uidvalidity (a mismatch is `moved`)."""
+        return await self.pool.fetchrow(
+            """SELECT m.id, m.message_key_id, m.folder_id, m.uidvalidity, m.uid, m.thread_id, m.from_address::text AS from_address,
+                      m.subject, f.name AS folder, f.special_use, f.uidvalidity AS folder_uidvalidity
+                 FROM mail_messages m JOIN mail_folders f ON f.id = m.folder_id
+                WHERE m.mailbox_id = $1 AND m.id = $2""", mailbox_id, message_id)
+
+    async def ref_by_parts(self, mailbox_id: int, folder_id: int, uidvalidity: int, uid: int):
+        return await self.pool.fetchrow(
+            """SELECT m.id, m.message_key_id, m.folder_id, m.uidvalidity, m.uid, m.thread_id, m.from_address::text AS from_address,
+                      m.subject, f.name AS folder, f.special_use, f.uidvalidity AS folder_uidvalidity
+                 FROM mail_messages m JOIN mail_folders f ON f.id = m.folder_id
+                WHERE m.mailbox_id = $1 AND m.folder_id = $2 AND m.uidvalidity = $3 AND m.uid = $4""", mailbox_id, folder_id, uidvalidity, uid)
+
+    async def folder_rows_by_id(self, mailbox_id: int) -> dict:
+        rows = await self.pool.fetch("SELECT id, name, special_use, uidvalidity FROM mail_folders WHERE mailbox_id = $1", mailbox_id)
+        return {int(r["id"]): r for r in rows}
+
+    async def mutation_refusal(self, mailbox_id: int, actor: int, on_behalf: int | None, folder_id: int | None, op: str) -> str | None:
+        return await self.pool.fetchval("SELECT ml_mutation_refusal($1, $2, $3, $4, $5)", mailbox_id, actor, on_behalf, folder_id, op)
+
+    async def read_mode(self, mailbox_id: int, actor: int, on_behalf: int | None) -> str:
+        return str(await self.pool.fetchval("SELECT ml_read_mode($1, $2, $3)", mailbox_id, actor, on_behalf) or "none")
+
+    async def rows_for_targets(self, mailbox_id: int, targets: list) -> list:
+        """[[folder_id, uidvalidity, uid]] → the rows the index holds for them (a target the index no longer has is left out)."""
+        out = []
+        for t in targets:
+            try:
+                fid, v, uid = int(t[0]), int(t[1]), int(t[2])
+            except (TypeError, ValueError, IndexError):
+                continue
+            r = await self.ref_by_parts(mailbox_id, fid, v, uid)
+            if r is not None:
+                out.append(r)
+        return out
+
+    async def rows_for_messages(self, mailbox_id: int, ids: list[int]) -> list:
+        out = []
+        for i in ids:
+            r = await self.message_ref(mailbox_id, int(i))
+            if r is not None:
+                out.append(r)
+        return out
+
+    async def set_flag(self, ids: list[int], column: str, value: bool) -> int:
+        if column not in ("seen", "flagged"):
+            raise ValueError(column)
+        res = await self.pool.execute(f"UPDATE mail_messages SET {column} = $2 WHERE id = ANY ($1::bigint[]) AND {column} IS DISTINCT FROM $2", ids, value)
+        return int(res.split()[-1])
+
+    async def messages_moved(self, moved: list[tuple[int, int, int, int]]) -> None:
+        """[(message id, folder id, uidvalidity, new uid)] → ml_message_moved() each (ids and keys kept)."""
+        async with self.pool.acquire() as c, c.transaction():
+            for mid, fid, v, uid in moved:
+                await c.execute("SELECT ml_message_moved($1, $2, $3, $4)", mid, fid, v, uid)
+
+    async def delete_rows(self, ids: list[int]) -> int:
+        res = await self.pool.execute("DELETE FROM mail_messages WHERE id = ANY ($1::bigint[])", ids)
+        return int(res.split()[-1])
+
+    async def folder_uids(self, folder_id: int) -> list:
+        return await self.pool.fetch("SELECT id, uidvalidity, uid FROM mail_messages WHERE folder_id = $1 ORDER BY uid", folder_id)
+
+    async def ensure_folder_row(self, mailbox_id: int, name: str, special_use: str) -> int:
+        row = await self.pool.fetchrow(
+            """INSERT INTO mail_folders (mailbox_id, name, delimiter, special_use) VALUES ($1, $2, '.', $3)
+               ON CONFLICT (mailbox_id, name) DO UPDATE SET special_use = COALESCE(mail_folders.special_use, EXCLUDED.special_use)
+               RETURNING id""", mailbox_id, name, special_use)
+        return int(row["id"])
+
+    async def set_folder_uidvalidity(self, folder_id: int, uidvalidity: int) -> None:
+        await self.pool.execute("UPDATE mail_folders SET uidvalidity = $2 WHERE id = $1 AND uidvalidity IS NULL", folder_id, uidvalidity)
+
+    async def mailbox_identities(self, mailbox_id: int) -> set[str]:
+        rows = await self.pool.fetch(
+            """SELECT lower(address::text) AS a FROM mailboxes WHERE id = $1
+               UNION SELECT lower(address::text) FROM mail_identities WHERE mailbox_id = $1""", mailbox_id)
+        return {r["a"] for r in rows}

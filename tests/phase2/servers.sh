@@ -58,6 +58,12 @@ case "${1:-}" in
     fi
     env "${IMAPENV[@]}" ML_MAILER_PORT=$P_MAILER MALUMAIL_MCP_URL="http://127.0.0.1:$(cat "$STATE/mcp.port")/mcp" ML_DEV_ENV="$ENVF" \
       "$PY" -I "$ROOT/services/mailer/server.py" >"$STATE/mailer.log" 2>&1 & echo $! > "$STATE/mailer.pid"
+    # slice 3: the image door on 9207 (its socket stand-in: --port), admitting the proof's loopback image fixture alone
+    # (ML_IMAGES_TEST_ALLOW, refused in production); P_IMAGE_FIXTURE names the fixture's port when a proof started one
+    if [ "${ML_WITH_IMAGES:-0}" = "1" ]; then
+      env -i PATH="$PATH" APP_ENV=dev ${P_IMAGE_FIXTURE:+ML_IMAGES_TEST_ALLOW=127.0.0.1:$P_IMAGE_FIXTURE} \
+        "$PY" -I "$ROOT/services/images/door.py" --port "${P_IMAGES:-9207}" >"$STATE/images.log" 2>&1 & echo $! > "$STATE/images.pid"
+    fi
     if [ "${ML_APP:-php}" = "apache" ]; then
       mkdir -p "$STATE/apache"
       python3 - "$ROOT" "$STATE/apache" <<'PY'

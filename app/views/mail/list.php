@@ -11,6 +11,14 @@ $base = $folder !== null ? '/m/' . $id . '/f/' . (int) $folder['id'] : '/m/' . $
 ?>
 <?= view('shared/header.php', ['id' => 'mail-list', 'title' => $title, 'crumbs' => [[$box['display_name'] !== '' ? $box['display_name'] : $box['address'], '/m/' . $id . '/v/inbox'], [$title, null]]]) ?>
 <div class="main-content mail-list-page" id="mail-page">
+    <?php if (!empty($notice)): ?><?= view('shared/banner.php', ['notice' => $notice]) ?><?php endif; ?>
+    <?php if (!empty($undo)): ?>
+        <form method="post" action="/mail/move" class="alert alert-light d-flex align-items-center gap-2 mb-3" id="mail-undo-form" hx-post="/mail/move" hx-target="#page-content">
+            <?= csrf_field() ?><input type="hidden" name="mailbox" value="<?= $id ?>"><input type="hidden" name="return_to" value="<?= e($base) ?>">
+            <?php foreach ($undo as $u): ?><input type="hidden" name="restore[]" value="<?= (int) $u ?>"><?php endforeach; ?>
+            <span>Done.</span><button type="submit" class="btn btn-sm btn-link p-0" id="mail-undo">Undo</button>
+        </form>
+    <?php endif; ?>
     <?= view('mail/partials/rows.php', ['box' => $box, 'view' => $view, 'folder' => $folder, 'page' => $page, 'unread' => $unread, 'title' => $title,
         'status' => $status, 'tz' => $tz, 'poll' => $poll, 'density' => $density, 'base' => $base]) ?>
 </div>

@@ -1429,4 +1429,46 @@ questions in one sitting and changed none:
     the poll's 204 query 3 ms (a whole HTTP page ~300–400 ms on this host, whose floor is ~75 ms). Slice 1 66/28 both modes, Phase 2
     79/43/28 and 79/47/28, the mail service 80, the kit 101, the schema 554, the specs 98, the registry check green.
 
-  **NEXT:** slice 3, reading. **People's existing mailboxes wait on MM1.**
+- **2026-10-15, SLICE 3 BUILT — reading, THE SECOND EXEMPLAR** (`docs/build-specs/reading.md`, `reading-and-rendering.md`,
+  `mail-service.md` §4–§5; the owner: "Push MaluMail and start slice 3"). 2 screens, 11 actions (the registry: 15 of 45 screens, 25 of 67
+  actions built).
+  - **The mail service** (`services/mailer/mime_read.py`, `extract.py`; `server.py`'s `fetch` · `part` · `raw` · `mutate`, strict — a
+    Mail admin's role opens no mailbox's content): the header summary and the part list with decoded sizes (BINARY.SIZE); `fetch` forms
+    html (the sanitiser, the part and image links minted there under `ML_PART_KEY`, an in-memory cache keyed by the member),
+    plain, text (the agent's: quotes and signatures cut, hidden content counted, links as `text [→ host]`) and headers; parts and the
+    raw message streamed in 1 MB partials; mutations one IMAP command per folder (`UID MOVE` with `COPYUID`, `UID STORE ±FLAGS.SILENT`,
+    `\Deleted` + `UID EXPUNGE`; Archive created on first use), the index updated in the same request, `ml_mutation_refusal()` per
+    folder first; `409 moved` on a stale UIDVALIDITY, `409 not_live` for a mailbox with no watcher.
+  - **The three layers** (§6.4): the sanitiser's link-host rule (`title` = the real host; a text naming another host gets ` (host)`
+    and counts in `deceptive_links`); `html/m/body.php` under the exact Content-Security-Policy with a per-response nonce, the height
+    line its only script, framed without `allow-same-origin`; the part door `html/p.php` and the image door's front `html/img.php` on
+    the public allow-list — the signed link the authority (one hour, bound to the member and the message, the level re-checked on
+    every use), inline only for a raster image by its bytes, an HTML or SVG part an octet-stream attachment; `services/images/door.py`
+    (a name resolved once and pinned, global addresses only, three redirects, 5 MB, four raster types by magic, 15 s; the socket from
+    systemd or `--port` for the proofs; `ML_IMAGES_TEST_ALLOW` one loopback fixture, refused in production).
+  - **The pages**: the conversation (earlier messages collapsed, opened in place by their partial; the banners for outside, mismatch,
+    DMARC, the spam score, Reply-To elsewhere, deceptive links, hidden content, automated; Show images and Always show from a proven
+    sender; attachments with previews; Archive · Delete · More at 375, a toolbar at 1280; Gmail's keyboard; j/k in the list's order;
+    a button for another slice's action only once built), the Original and the `.eml`; opening marks read by `ml_read_mode()` — a
+    view holder and everyone on an intake mailbox for themselves, never a `\Seen`.
+  - **The eleven actions** through ONE runner (`mail_action_run()`): archive (the Inbox's copies), move (Sent and Drafts left), trash
+    (all but drafts), spam (received only), not spam, star (the latest message), mark read (whole) / unread (the latest), delete
+    forever and empty Trash or Spam (Trash and Spam only; an agent's pause is the kernel's deletion approval), always show images (a
+    full holder, people only), sensitive (triage, people only, anchored on a message key); `matching` archives every conversation a
+    search finds (≤ 1,000); Undo puts mail back by kind — received → Inbox, sent → Sent; one activity row per request with the count.
+  - **The records queries** (`mcp/records_server.py`): find_threads, thread_read, message_read, message_headers, find_attachments,
+    attachment_read; `fence_untrusted()` in `server_common.py` (Phase 4 wraps every string that came in a message).
+  - **Decided while building:** a Mail admin's `settings.manage` reaches `sync`/`status`/`quota` but never `fetch`/`part`/`raw`/`mutate`
+    (strict); the RFC 3676 `-- ` signature rule runs only once the quoted history is cut (Gmail writes the signature before the quote);
+    the mark-read handler's per-person path uses ops of its own (`seen_viewer`, `unseen_viewer`) so a server flag never filters a view
+    holder's marks; the page shows what opening did (the open messages read, so "Mark unread" is offered); an action's `did` counts the
+    conversations it TOUCHED, not every one a search named; the kit's `ml_guard()` answers `42501` → 403 and `22023` → 422 in the schema's
+    sentences; the conversation's cards are white with WCAG-AA muted text, the banners light with a coloured border (the theme's soft
+    badges fail 4.5:1 at 13 px); the DOMPurify payloads are proven as DELIVERED MAIL (nothing runs, nothing loads from the frame) rather
+    than through a test build of the body's wrapper — the sanitiser suite already proves the wrapper over the raw payloads.
+  - **The proof:** `tests/phase3/slice3/run.sh` — door 101, reading 117, browser 60 under php -S and under Apache; the sanitiser suite
+    53 (three link-host checks added); the live step waits on the owner's handoff file. Found by the proofs: the loopback image
+    fixture's `/loop<n>` route swallowed `/loopback` (a fixture defect); the servers' start kills every pid in the state directory (the
+    fixture starts after them); an Inbox re-read after a UIDVALIDITY reset gives rows new ids (a proof resolves by subject after it).
+
+  **NEXT:** slice 4, writing (THE THIRD EXEMPLAR). **People's existing mailboxes wait on MM1.**

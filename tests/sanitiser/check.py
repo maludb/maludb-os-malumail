@@ -206,6 +206,16 @@ raw, r = benign("inline-image.html")
 check('src="data:image/png;base64,' in r.html and not r.remote_images, "inline image: a raster data URI is shown as it came")
 check('colspan="2"' in r.html and "border-collapse" in r.html and r.html.count("<td") == 6, "inline image: the table keeps its spans and borders")
 
+# the link-host rule (reading-and-rendering.md §1, added by slice 3): every link titled with its real host; a link whose visible text
+# names ANOTHER host gets " (host)" appended as text and is counted; ordinary words get the title alone; the output stays a fixed point
+r = clean('<p>Sign in at <a href="https://evil.example/login">https://bank.example/login</a>, see <a href="https://ok.example/x">our site</a> '
+          'or <a href="http://www.bank.example/">www.bank.example</a>, write to <a href="mailto:a@b.example">a@b.example</a>.</p>')
+check(r.deceptive_links == 1 and "</a> (evil.example)" in r.html and 'title="evil.example"' in r.html,
+      "links: a text naming another host gets the real host appended and is counted")
+check('title="ok.example"' in r.html and "(ok.example)" not in r.html and "(bank.example)" not in r.html and "(b.example)" not in r.html,
+      "links: ordinary words get the title alone; a text naming the same host, or a mailto, adds nothing")
+check(not walk(r) and S.final_pass(r.html, r.image_urls) == r.html and not r.unstable, "links: the output is still clean and a fixed point")
+
 # ---- 4. timings ------------------------------------------------------------------------------------------------------------------
 
 unit = open(os.path.join(HERE, "corpus", "benign", "newsletter.html"), encoding="utf-8").read()

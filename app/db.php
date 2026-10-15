@@ -62,7 +62,7 @@ function db_message(Throwable $e, string $fallback): string
  * record that does not (no_data_found). Carried from Sales CRM's kit (found in its Phase 2, 2026-10-09: a kit that read only P0001
  * answered 500 to every other refusal; Inventory found the check_violation half the same day).
  */
-const DB_SENTENCE_CODES = ['P0001', '23514', '23505', '23503', 'P0002'];
+const DB_SENTENCE_CODES = ['P0001', '23514', '23505', '23503', 'P0002', '42501', '22023'];   // + insufficient_privilege and invalid_parameter_value: the schema RAISEs sentences under them (slice 3)
 
 /** The first column of the first row, or null. */
 function one_value(PDO $pdo, string $sql, array $args = []): mixed

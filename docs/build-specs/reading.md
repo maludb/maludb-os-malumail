@@ -191,6 +191,15 @@ mute (slice 5); the list and the poll (slice 2); retention of Trash and Spam (Ex
 5. **Mark read reads the whole conversation; mark unread un-reads the latest message** (Gmail).
 6. **A button for another slice's action appears only when that action is built** — the page is honest at every step of the build.
 
+7. **BUILT 2026-10-15** (decided while building; the record in design §16): the mail service's content calls are STRICT — a Mail admin's
+   role reaches `sync`/`status`/`quota` but never a mailbox's `fetch`, `part`, `raw` or `mutate`; a mailbox with no watcher (no working
+   credential, paused, suspended) answers `409 not_live` and the page says the body is not available; the `-- ` signature rule runs only
+   once the quoted history is cut; the per-person read path has ops of its own (`seen_viewer`, `unseen_viewer`); an action's `did` counts
+   the conversations it touched; the page shows the open messages as read; Undo is a `restore[]` of message ids on `mail_move` (received →
+   Inbox, sent → Sent); the DOMPurify payloads are proven as delivered mail in the real frame, not through a test build of `body.php`.
+8. **`attachment_read`'s `.docx` and `.xlsx`** are read with the standard library's zipfile and the two formats' XML (no python-docx or
+   openpyxl in the venv); PDF text through the host's `pdftotext`.
+
 ## Open questions
 
 - None.

@@ -11,7 +11,11 @@ $r = page($j, "/m/$priya/v/inbox");
 ok($r['code'] === 200 && str_contains($r['body'], 'data-screen="mailbox-view"'), "/m/{mailbox}/v/{view} reaches its screen (slice 2 built it)");
 $r = page($j, "/m/$priya/f/3");
 ok($r['code'] === 404 && str_contains($r['body'], 'No such folder'), "/m/{mailbox}/f/{folder} reaches its screen (no such folder here: its own 404)");
-foreach (["/m/$priya/label/2", "/m/$priya/t/9", "/m/$priya/msg/3.1.7/original", "/m/$priya/drafts/4", "/m/$priya/people/jon%40acme.example",
+// slice 3 built thread-view and message-original: their routes answer their own screens now (a missing conversation / message: the screen's 404)
+$r = page($j, "/m/$priya/t/9");
+ok($r['code'] === 404 && str_contains($r['body'], 'moved or was deleted'), "/m/{mailbox}/t/{thread} reaches its screen (slice 3 built it: no such conversation, its own 404)");
+ok(page($j, "/m/$priya/msg/3.1.7/original")['code'] === 404, "/m/{mailbox}/msg/{message}/original reaches its screen (slice 3 built it)");
+foreach (["/m/$priya/label/2", "/m/$priya/drafts/4", "/m/$priya/people/jon%40acme.example",
           "/m/$priya/identities/new", "/m/$priya/identities/2/edit", "/m/$priya/access/new", "/m/$priya/search", "/m/$priya/access-log", "/oversight/review/5", "/oversight/review/5/edit",
           '/templates/new', '/templates/7/edit', '/search', '/notifications', '/settings/notifications'] as $p) {
     $r = page($j, $p);

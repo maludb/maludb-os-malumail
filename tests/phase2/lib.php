@@ -14,7 +14,7 @@ $GLOBALS['passes'] = 0;
 define('BASE', 'http://127.0.0.1:' . (getenv('P_APP') ?: '9201'));
 const APP = 'malumail';
 function need(string $k): string { $v = getenv($k); if ($v === false || $v === '') { fwrite(STDERR, "$k is not set — run tests/phase2/run.sh\n"); exit(2); } return $v; }
-function ok(bool $c, string $l): void { $GLOBALS[$c ? 'passes' : 'fails']++; echo ($c ? '  ok   ' : '  FAIL ') . $l . "\n"; }
+function ok(bool $c, string $l, string $d = ''): void { $GLOBALS[$c ? 'passes' : 'fails']++; echo ($c ? '  ok   ' : '  FAIL ') . $l . ($c || $d === '' ? '' : ' — ' . $d) . "\n"; }
 function finish(): never { echo $GLOBALS['fails'] ? "{$GLOBALS['fails']} FAILED ({$GLOBALS['passes']} passed)\n" : "all {$GLOBALS['passes']} passed\n"; exit($GLOBALS['fails'] ? 1 : 0); }
 function pdo(): PDO {
     static $p = null;

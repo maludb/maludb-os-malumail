@@ -88,3 +88,96 @@ function mailer_health(float $timeout = 1.0): ?array
     $doc = is_string($raw) && $status === 200 ? json_decode($raw, true) : null;
     return is_array($doc) ? $doc : null;
 }
+
+/**
+ * A streamed answer from the mail service (`part`, `raw` — mail-service.md §10): the call is signed as mailer_call()'s; the service's
+ * status and headers reach $onHeaders(status, headers) once the first bytes are in hand (so the caller can sniff them — reading-and-
+ * rendering.md §3: inline only for a raster image, by the bytes); $onHeaders answers false to stop (the caller refused), else the body
+ * is handed to $onChunk(bytes) in the order it arrives. The session is released first (DocCloud's rule). Throws MailerDown when nothing
+ * answers; a non-2xx status reaches $onHeaders with the decoded error body in $headers['__error'].
+ */
+function mailer_stream(string $path, int $actorMemberId, array $args, callable $onHeaders, callable $onChunk, ?int $onBehalf = null, int $timeout = 300): void
+{
+    $key = (string) env('ML_MAILER_KEY', '');
+    if ($key === '' || (int) env('ML_MAILER_PORT', '0') <= 0) {
+        throw new MailerDown('The mail service is not configured on this server.');
+    }
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
+    $body = json_encode(['actor' => $actorMemberId, 'on_behalf' => $onBehalf, 'args' => (object) $args], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    $headers = [];
+    $status = 0;
+    $started = false;
+    $head = '';
+    $stopped = false;
+    $errorBody = '';
+    $ch = curl_init(mailer_base() . $path);
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true, CURLOPT_POSTFIELDS => $body, CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_TIMEOUT => $timeout,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'X-ML-Mailer: ' . mailer_sign($key, 'POST', $path, $body)],
+        CURLOPT_HEADERFUNCTION => static function ($c, string $line) use (&$headers, &$status): int {
+            if (preg_match('#^HTTP/\S+\s+(\d{3})#', $line, $m)) {
+                $status = (int) $m[1];
+            } elseif (str_contains($line, ':')) {
+                [$n, $v] = explode(':', $line, 2);
+                $headers[strtolower(trim($n))] = trim($v);
+            }
+            return strlen($line);
+        },
+        CURLOPT_WRITEFUNCTION => static function ($c, string $data) use (&$started, &$head, &$stopped, &$errorBody, &$headers, &$status, $onHeaders, $onChunk): int {
+            if ($stopped) {
+                return -1;
+            }
+            if ($status >= 300) {
+                $errorBody .= $data;
+                return strlen($data);
+            }
+            if (!$started) {
+                $head .= $data;
+                if (strlen($head) < 16) {
+                    return strlen($data);
+                }
+                $started = true;
+                $headers['__head'] = $head;
+                if ($onHeaders($status, $headers) === false) {
+                    $stopped = true;
+                    return -1;
+                }
+                if ($onChunk($head) === false) {
+                    $stopped = true;
+                    return -1;
+                }
+                return strlen($data);
+            }
+            if ($onChunk($data) === false) {
+                $stopped = true;
+                return -1;
+            }
+            return strlen($data);
+        },
+    ]);
+    $ok = curl_exec($ch);
+    $errno = curl_errno($ch);
+    curl_close($ch);
+    if ($status === 0) {
+        throw new MailerDown();
+    }
+    if ($status >= 300) {
+        $doc = json_decode($errorBody, true);
+        $err = is_array($doc['error'] ?? null) ? $doc['error'] : [];
+        $headers['__error'] = ['code' => (string) ($err['code'] ?? 'refused'), 'message' => (string) ($err['message'] ?? 'The mail service refused that.')];
+        $onHeaders($status, $headers);
+        return;
+    }
+    if (!$started) {                                         // a body shorter than 16 bytes (or empty): hand it over whole
+        $started = true;
+        $headers['__head'] = $head;
+        if ($onHeaders($status, $headers) !== false && $head !== '') {
+            $onChunk($head);
+        }
+    }
+    if ($ok === false && $errno !== 0 && !$stopped) {
+        $headers['__short'] = true;                          // the stream ended early: the caller's output is already partly sent
+    }
+}
