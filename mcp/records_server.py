@@ -796,3 +796,143 @@ async def agent_mail_policy_get(pool: asyncpg.Pool, caller: Caller, mailbox) -> 
 
 TOOLS.update({"review_queue": review_queue, "review_get": review_get, "agent_mail_summary": agent_mail_summary, "oversight_summary": oversight_summary,
               "unscreened_mail": unscreened_mail, "agent_mail_policy_get": agent_mail_policy_get})
+
+
+# ================================================================================================================================
+# SLICE 6 — search, labels, folders and templates (docs/build-specs/search-labels-snooze.md "MCP tools this slice makes real"):
+# mail_search, find_labels, find_templates, records_search (find_folders was slice 2's). Subjects, snippets and names are mail content:
+# Phase 4's tool wraps them in fence_untrusted(); the SQL is ml_search() (db/014), the wall inside it — an agent never finds a sensitive
+# conversation — and the same grouping the Search screen makes: a conversation once, at its newest matching message.
+
+_SEARCH_CURSOR = re.compile(r"^([0-9]{1,18})\.([0-9]{1,18})$")
+SEARCH_WALK = 5000
+
+
+async def mail_search(pool: asyncpg.Pool, caller: Caller, q: str, mailbox=None, before: str | None = None, limit: int = 25) -> dict:
+    """Gmail's operators over one mailbox, or every mailbox the caller may open. An operator it does not know is searched as words and named
+    in `unknown_operators`; `bad_query` only for a malformed date, period or size (or a cursor that is not one). Answers conversations, each
+    with the matching message ids, how many matched, and the cursor `before` for the next page."""
+    limit = max(1, min(100, int(limit or 25)))
+    q = (q or "").strip()
+    if not q:
+        return bad("q is what to look for: words, quoted phrases and Gmail's operators")
+    cur = None
+    if before:
+        m = _SEARCH_CURSOR.match(before)
+        if not m:
+            return bad("before is the cursor a previous page answered")
+        cur = (int(m.group(1)), int(m.group(2)))
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        mid = None
+        if mailbox is not None and mailbox != "":
+            mid = await _mailbox_id(con, mailbox)
+            if mid is None:
+                return not_found()
+        unknown = list(await con.fetchval("SELECT ml_search_unknown($1::text)", q) or [])
+        reps: dict = {}
+        seen = 0
+        try:
+            for off in range(0, SEARCH_WALK, 500):
+                rows = await con.fetch(
+                    """SELECT message_id, thread_id, mailbox_id, (extract(epoch FROM received_at) * 1000000)::bigint AS us, rank
+                         FROM ml_search($1::text, $2::bigint, 500, $3::integer)""", q, mid, off)
+                for r in rows:
+                    k = ("t", r["thread_id"]) if r["thread_id"] is not None else ("m", r["message_id"])
+                    rep = reps.setdefault(k, {"message": r["message_id"], "us": r["us"], "mailbox": r["mailbox_id"], "thread": r["thread_id"],
+                                             "matched": [], "rank": -1.0, "best": r["message_id"]})
+                    rep["matched"].append(r["message_id"])
+                    if float(r["rank"]) > rep["rank"]:
+                        rep["rank"], rep["best"] = float(r["rank"]), r["message_id"]
+                seen += len(rows)
+                if len(rows) < 500:
+                    break
+        except (asyncpg.DataError, asyncpg.PostgresError) as e:
+            if getattr(e, "sqlstate", "") in ("22007", "22008", "22023", "22P02", "22003"):
+                return bad(str(e).splitlines()[0] if getattr(e, "sqlstate", "") == "22023" else
+                           "A date is YYYY-MM-DD, a period 7d, 3m or 1y, a size 500K or 2M: one of those could not be read.")
+            raise
+        reps_l = list(reps.values())
+        if cur is not None:
+            reps_l = [r for r in reps_l if r["us"] < cur[0] or (r["us"] == cur[0] and r["message"] < cur[1])]
+        more = len(reps_l) > limit
+        reps_l = reps_l[:limit]
+        out = []
+        owners: dict = {}
+        for r in reps_l:
+            t = await con.fetchrow("SELECT subject, participants, last_message_at, message_count, flagged FROM mcp_threads WHERE id = $1", r["thread"]) if r["thread"] else None
+            b = await con.fetchrow("SELECT snippet FROM mcp_messages WHERE id = $1", r["best"])
+            box = owners.get(r["mailbox"]) or owners.setdefault(r["mailbox"], await con.fetchrow("SELECT address, owner_member_id FROM mcp_mailboxes WHERE id = $1", r["mailbox"]))
+            labels = await con.fetch(
+                """SELECT DISTINCT g.id AS label_id, g.label FROM mcp_messages m JOIN mcp_message_labels l ON l.message_key_id = m.message_key_id
+                     JOIN mcp_labels g ON g.id = l.tag_id AND g.archived_at IS NULL WHERE m.thread_id = $1""", r["thread"]) if r["thread"] else []
+            out.append({"thread_id": r["thread"], "mailbox_id": r["mailbox"], "mailbox": box["address"] if box else None, "subject": t["subject"] if t else None,
+                        "participants": list(t["participants"] or []) if t else [], "last_message_at": t["last_message_at"] if t else None,
+                        "message_count": t["message_count"] if t else 1, "matched": len(r["matched"]), "messages": r["matched"][:20], "message": r["best"],
+                        "snippet": (b["snippet"] if b else None), "labels": [dict(x) for x in labels], "cursor": f"{r['us']}.{r['message']}"})
+        for mbx, box in owners.items():
+            if box is not None and box["owner_member_id"] != caller.member_id:
+                await _log_read(con, caller, mbx, "mail_search")
+    return {"ok": True, "conversations": out, "unknown_operators": unknown, "capped": seen >= SEARCH_WALK, "before": out[-1]["cursor"] if (more and out) else None}
+
+
+async def find_labels(pool: asyncpg.Pool, caller: Caller, mailbox, q: str = "", limit: int = 25) -> dict:
+    """Resolver: a mailbox's labels with the number of conversations carrying each."""
+    limit = max(1, min(100, int(limit or 25)))
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        mid = await _mailbox_id(con, mailbox)
+        if mid is None:
+            return not_found()
+        rows = await con.fetch(
+            """SELECT g.id AS label_id, g.label, g.colour, count(DISTINCT m.thread_id) AS conversations
+                 FROM mcp_labels g LEFT JOIN mcp_message_labels l ON l.tag_id = g.id LEFT JOIN mcp_messages m ON m.message_key_id = l.message_key_id AND m.mailbox_id = g.mailbox_id
+                WHERE g.mailbox_id = $1 AND g.archived_at IS NULL AND ($2 = '' OR g.label ILIKE '%' || $2 || '%')
+                GROUP BY g.id, g.label, g.colour ORDER BY lower(g.label) LIMIT $3""", mid, (q or "").strip(), limit)
+    return {"ok": True, "mailbox_id": mid, "labels": [dict(r) for r in rows]}
+
+
+async def find_templates(pool: asyncpg.Pool, caller: Caller, q: str = "", limit: int = 25, with_body: bool = False) -> dict:
+    """Resolver: the caller's own canned replies and the shared ones (the body only on request)."""
+    limit = max(1, min(100, int(limit or 25)))
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        rows = await con.fetch(
+            """SELECT template_id, name, subject, shared, owner_member_id = $4 AS mine, usage_count, CASE WHEN $3 THEN body END AS body
+                 FROM mcp_templates WHERE ($1 = '' OR name ILIKE '%' || $1 || '%' OR subject ILIKE '%' || $1 || '%')
+                ORDER BY (owner_member_id = $4) DESC, lower(name) LIMIT $2""", (q or "").strip(), limit, bool(with_body), caller.member_id)
+    out = []
+    for r in rows:
+        d = dict(r)
+        if not with_body:
+            d.pop("body", None)
+        out.append(d)
+    return {"ok": True, "templates": out}
+
+
+async def records_search(pool: asyncpg.Pool, caller: Caller, q: str, limit: int = 10) -> dict:
+    """The guarded search across what the caller may open: mailboxes, conversations by subject, correspondents, folders, labels, templates —
+    each hit with its kind and id (the id to pass to the tool that takes that kind). `limit` is per kind."""
+    limit = max(1, min(25, int(limit or 10)))
+    q = (q or "").strip()
+    if not q:
+        return bad("q is what to look for")
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        hits = []
+        for r in await con.fetch("SELECT id, address, display_name FROM mcp_mailboxes WHERE my_level <> 'none' AND (address ILIKE '%'||$1||'%' OR display_name ILIKE '%'||$1||'%') ORDER BY address LIMIT $2", q, limit):
+            hits.append({"kind": "mailbox", "id": r["id"], "label": r["address"], "detail": r["display_name"]})
+        for r in await con.fetch("SELECT t.id, t.mailbox_id, t.subject FROM mcp_threads t WHERE t.subject ILIKE '%'||$1||'%' ORDER BY t.last_message_at DESC LIMIT $2", q, limit):
+            hits.append({"kind": "conversation", "id": r["id"], "label": r["subject"], "mailbox_id": r["mailbox_id"]})
+        for r in await con.fetch("SELECT id, mailbox_id, address, name FROM mcp_correspondents WHERE address ILIKE '%'||$1||'%' OR name ILIKE '%'||$1||'%' ORDER BY last_seen_at DESC NULLS LAST LIMIT $2", q, limit):
+            hits.append({"kind": "correspondent", "id": r["id"], "label": r["address"], "detail": r["name"], "mailbox_id": r["mailbox_id"]})
+        for r in await con.fetch("SELECT id, mailbox_id, name FROM mcp_folders WHERE name ILIKE '%'||$1||'%' ORDER BY name LIMIT $2", q, limit):
+            hits.append({"kind": "folder", "id": r["id"], "label": r["name"], "mailbox_id": r["mailbox_id"]})
+        for r in await con.fetch("SELECT id, mailbox_id, label FROM mcp_labels WHERE archived_at IS NULL AND label ILIKE '%'||$1||'%' ORDER BY label LIMIT $2", q, limit):
+            hits.append({"kind": "label", "id": r["id"], "label": r["label"], "mailbox_id": r["mailbox_id"]})
+        for r in await con.fetch("SELECT template_id, name, subject FROM mcp_templates WHERE name ILIKE '%'||$1||'%' OR subject ILIKE '%'||$1||'%' ORDER BY name LIMIT $2", q, limit):
+            hits.append({"kind": "template", "id": r["template_id"], "label": r["name"], "detail": r["subject"]})
+    return {"ok": True, "hits": hits}
+
+
+TOOLS.update({"mail_search": mail_search, "find_labels": find_labels, "find_templates": find_templates, "records_search": records_search})

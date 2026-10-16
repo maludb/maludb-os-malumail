@@ -167,3 +167,22 @@ html.app-skin-dark #record-picker .record-picker-search { background: #0f172a; }
 .mail-compose.mail-dropping { outline: 2px dashed var(--bs-primary); outline-offset: 4px; }
 .mail-compose .mail-editor-toolbar .btn.active { background: var(--bs-primary-bg-subtle); }
 .mail-compose-page .text-muted, .mail-compose-page .form-text, #identity-form .form-text { color: #5b6573 !important; }   /* 4.5:1 at 12 px (WCAG AA) */
+
+/* slice 6: the bulk bar's Label and Snooze panels (a <details> below the bar, no modal), the search results, the label swatches */
+.mail-bar-panel summary { list-style: none; cursor: pointer; }
+.mail-bar-panel summary::-webkit-details-marker { display: none; }
+.mail-bar-panel[open] { flex-basis: 100%; }
+.mail-bar-form { max-width: 28rem; }
+.mail-label-choices { max-height: 12rem; overflow-y: auto; }
+.label-swatch { display: inline-block; width: 1rem; height: 1rem; border-radius: 50%; vertical-align: middle; border: 1px solid rgba(0, 0, 0, .15); }
+.swatch-pick input { position: absolute; opacity: 0; }
+.swatch-pick label { display: inline-block; width: 2rem; height: 2rem; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+.swatch-pick input:checked + label { border-color: var(--bs-body-color, #212529); }
+.swatch-pick input:focus-visible + label { outline: 2px solid var(--bs-primary, #0d6efd); outline-offset: 2px; }
+/* slice 6: WCAG AA contrast on the new screens (muted text on the page's grey at 12 px, inline code, the danger outline, the soft info badge) */
+#search-page .text-muted, #folders-content .text-muted, #labels-content .text-muted, #templates-content .text-muted,
+#template-new-content .text-muted, #template-edit-content .text-muted, .mail-bar-form .text-muted { color: #5b6573 !important; }
+#search-page code { color: #a3235f; }
+#folders-content .btn-outline-danger, #labels-content .btn-outline-danger, #template-edit-content .btn-outline-danger { color: #b02a37; border-color: #b02a37; }
+#templates-content .badge.text-info, #search-page .badge.text-info { color: #0a6e76 !important; }
+#templates-content .badge.text-secondary, #search-page .badge.text-secondary, #folders-content .badge.text-secondary { color: #4b5563 !important; }

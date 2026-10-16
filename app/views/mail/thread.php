@@ -50,8 +50,16 @@ if ($canTriage) {
     }
 }
 $more[] = $act('mark-read', $anyUnread ? 'act-read' : 'act-unread', $anyUnread ? 'Mark read' : 'Mark unread', $anyUnread ? 'feather-eye' : 'feather-eye-off', ['read' => $anyUnread ? 'yes' : 'no']);
-foreach (['mail_label' => ['act-label', 'Label', 'feather-tag'], 'mail_snooze' => ['act-snooze', 'Snooze', 'feather-clock']] as $a => [$id, $label, $icon]) {
-    if ($canTriage && ml_action_built($a)) { $more[] = '<a class="btn btn-sm btn-light btn-touch" id="' . $id . '" href="/m/' . $mb . '/' . substr($a, 5) . '?thread=' . $tid . '"><i class="' . $icon . ' me-1"></i>' . $label . '</a>'; }
+$panels = '';                                                // Label and Snooze: a <details> form each, once (not in the doubled More menu)
+foreach (['mail_label' => ['act-label', 'Label', 'feather-tag', 'label'], 'mail_snooze' => ['act-snooze', 'Snooze', 'feather-clock', 'snooze']] as $a => [$pid, $plabel, $picon, $kind]) {
+    if (!$canTriage || !ml_action_built($a)) {
+        continue;
+    }
+    $ep = '/mail/' . $kind;
+    $panels .= '<details class="mail-thread-panel" id="' . $pid . '-panel"><summary class="btn btn-sm btn-light btn-touch" id="' . $pid . '"><i class="' . $picon . ' me-1"></i>' . $plabel . '</summary>'
+        . '<form method="post" action="' . $ep . '" hx-post="' . $ep . '" hx-target="#page-content" class="card card-body p-2 mt-1 mail-bar-form" id="' . $pid . '-form">' . csrf_field()
+        . '<input type="hidden" name="mailbox" value="' . $mb . '"><input type="hidden" name="thread[]" value="' . $tid . '"><input type="hidden" name="return_to" value="' . e($listUrl) . '"><input type="hidden" name="view" value="' . e($view) . '">'
+        . ($kind === 'label' ? view('mail/label-form.php', ['mb' => $mb, 'ep' => $ep, 'pfx' => 'thread-label', 'fa' => '']) : view('mail/snooze-form.php', ['ep' => $ep, 'pfx' => 'thread-snooze', 'fa' => ''])) . '</form></details>';
 }
 $isMuted = $t['muted'] === true || $t['muted'] === 't';
 if ($canTriage && ml_action_built('mail_mute')) {
@@ -89,6 +97,8 @@ $more[] = '<button type="button" class="btn btn-sm btn-light btn-touch" id="act-
             <details class="mail-actions-more" id="mail-actions-more"><summary class="btn btn-sm btn-light btn-touch"><i class="feather-more-horizontal me-1"></i>More</summary>
                 <div class="mail-more-menu"><?= implode('', $more) ?></div></details>
         </div>
+        <?php if ($panels !== ''): ?><div class="d-flex flex-wrap gap-2 w-100" id="mail-thread-panels"><?= $panels ?></div><?php endif; ?>
+        <?php if (!empty($woke)): ?><span class="badge bg-soft-warning text-warning fw-normal" id="mail-thread-woke"><i class="feather-clock me-1"></i>Back from snooze</span><?php endif; ?>
         <?php if ($labels !== []): ?><div class="d-flex flex-wrap gap-1 ms-md-auto" id="mail-thread-labels"><?php foreach ($labels as $l): ?><span class="badge bg-soft-primary text-primary fw-normal"><?= e($l['label']) ?></span><?php endforeach; ?></div><?php endif; ?>
         <?php if ($t['sensitive']): ?><span class="badge bg-soft-secondary text-secondary fw-normal" id="mail-thread-sensitive"><i class="feather-lock me-1"></i>Sensitive — no agent reads it</span><?php endif; ?>
         <?php if ($box['kind'] === 'agent' && $t['taken_over_by'] !== null): ?><span class="badge bg-soft-warning text-warning fw-normal" id="mail-thread-taken-over"><i class="feather-user-check me-1"></i>Taken over by a person</span><?php endif; ?>

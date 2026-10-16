@@ -530,9 +530,10 @@ def build_app(cfg: Config) -> Starlette:
     async def raw_call(request: Request):
         return await stream_call(request, whole=True)
 
-    MUTATE_OPS = ("seen", "unseen", "flag", "unflag", "move", "archive", "trash", "spam", "not_spam", "delete_forever", "trash_empty")
+    MUTATE_OPS = ("seen", "unseen", "flag", "unflag", "move", "archive", "trash", "spam", "not_spam", "delete_forever", "trash_empty", "snooze",
+                  "folder_create", "folder_rename", "folder_delete")
     REFUSAL_OP = {"seen": "seen", "unseen": "unseen", "flag": "flag", "unflag": "unflag", "move": "move", "archive": "archive",
-                  "trash": "trash", "spam": "spam", "not_spam": "move", "delete_forever": "delete_forever", "trash_empty": "delete_forever"}
+                  "trash": "trash", "spam": "spam", "not_spam": "move", "delete_forever": "delete_forever", "trash_empty": "delete_forever", "snooze": "snooze"}
 
     async def mutate_call(request: Request):
         got = await mailbox_call(request, "view", strict=True)
@@ -543,6 +544,8 @@ def build_app(cfg: Config) -> Starlette:
         op = str(args.get("op") or "")
         if op not in MUTATE_OPS:
             return refuse(422, "bad_request", "op is one of " + ", ".join(MUTATE_OPS) + ".")
+        if op.startswith("folder_"):
+            return await folder_op(op, actor, on_behalf, args, mailbox_id)
         folders = await store.folder_rows_by_id(mailbox_id)
         by_special = {r["special_use"]: int(fid) for fid, r in folders.items() if r["special_use"]}
         rows: list = []
@@ -566,7 +569,7 @@ def build_app(cfg: Config) -> Starlette:
             return JSONResponse({"ok": True, "result": {"done": True, "count": 0, "moved": [], "refused": []}})
         # where a move goes
         dest = None
-        if op in ("move", "archive", "trash", "spam", "not_spam"):
+        if op in ("move", "archive", "trash", "spam", "not_spam", "snooze"):
             if op == "move":
                 try:
                     dest = int(args.get("to_folder"))
@@ -575,12 +578,16 @@ def build_app(cfg: Config) -> Starlette:
                 if dest not in folders:
                     return refuse(404, "not_found", "No such folder in this mailbox.")
             else:
-                want = {"archive": "archive", "trash": "trash", "spam": "junk", "not_spam": "inbox"}[op]
+                want = {"archive": "archive", "trash": "trash", "spam": "junk", "not_spam": "inbox", "snooze": "snoozed"}[op]
                 dest = by_special.get(want)
-                if dest is None and want == "archive":
+                if dest is None and want in ("archive", "snoozed"):
                     dest = None                              # created on first use below
                 elif dest is None:
                     return refuse(422, "bad_request", "This mailbox has no such folder yet.")
+        if op == "snooze":
+            rows = [r for r in rows if r.get("special_use") == "inbox"]
+            if not rows:
+                return refuse(422, "refused", "Only mail in the Inbox is snoozed.")
         if op == "delete_forever":
             rows = [r for r in rows if r.get("special_use") in ("trash", "junk")]
             if not rows:
@@ -613,7 +620,8 @@ def build_app(cfg: Config) -> Starlette:
             w = watcher_of(mailbox_id)
         except NotLive:
             return not_live()
-        dest_name = folders[dest]["name"] if dest is not None else "Archive"
+        made_name, made_special = ("Snoozed", "snoozed") if op == "snooze" else ("Archive", "archive")
+        dest_name = folders[dest]["name"] if dest is not None else made_name
 
         def act(c):
             moved_out: list[tuple[int, int, int, int]] = []
@@ -621,9 +629,9 @@ def build_app(cfg: Config) -> Starlette:
             deleted: list[int] = []
             dest_id = dest
             dest_validity = None
-            if op in ("move", "archive", "trash", "spam", "not_spam") and dest_id is None:
-                imap.create_folder(c, "Archive")
-                dest_id = state["sync"].call(store.ensure_folder_row(mailbox_id, "Archive", "archive"))
+            if op in ("move", "archive", "trash", "spam", "not_spam", "snooze") and dest_id is None:
+                imap.create_folder(c, made_name)
+                dest_id = state["sync"].call(store.ensure_folder_row(mailbox_id, made_name, made_special))
             for fid, group in kept.items():
                 imap.select(c, folders[fid]["name"] if fid in folders else group[0]["folder"], readonly=False)
                 uids = [int(r["uid"]) for r in group]
@@ -675,6 +683,98 @@ def build_app(cfg: Config) -> Starlette:
         return JSONResponse({"ok": True, "result": {"done": True, "count": count, "op": op, "to_folder": dest_id,
                                                     "moved": [{"message": m, "ref": f"{f}.{v}.{u}"} for m, f, v, u in moved_out],
                                                     "deleted": deleted, "refused": _merge(refused)}})
+
+    # ---- SLICE 6: a mailbox's folders (search-labels-snooze.md "Query functions and mail-service calls") ----------------------------------
+    async def folder_op(op: str, actor: int, on_behalf, args: dict, mailbox_id: int):
+        """folder_create {name, parent?} · folder_rename {folder, name} · folder_delete {folder}: ml_mutation_refusal() first (triage; the
+        system folders keep their names), then ONE IMAP command; the index follows in the same request. A folder with mail in it is
+        never deleted (IMAP's DELETE would take the messages with it) — the sentence says how many."""
+        store: Store = state["store"]
+        folders = await store.folder_rows_by_id(mailbox_id)
+        delim = next((str(r["delimiter"]) for r in await store.folders(mailbox_id) if r["delimiter"]), ".")
+
+        def leaf_ok(text: str) -> str | None:
+            t = text.strip()
+            if not t or len(t) > 80 or any(ord(ch) < 32 for ch in t) or delim in t or t.startswith("/") or t != text:
+                return None
+            return t
+        fid = None
+        if op in ("folder_rename", "folder_delete"):
+            try:
+                fid = int(args.get("folder"))
+            except (TypeError, ValueError):
+                return refuse(422, "bad_request", "folder is a folder's id.")
+        why = await store.mutation_refusal(mailbox_id, actor, on_behalf, fid, op)
+        if why is not None:
+            return refuse(404 if why in ("No such mailbox.", "No such folder in this mailbox.") else 403, "forbidden", why)
+        names = {r["name"] for r in folders.values()}
+        if op == "folder_create":
+            leaf = leaf_ok(str(args.get("name") or ""))
+            if leaf is None:
+                return refuse(422, "bad_request", f"A folder's name is 1 to 80 characters without a '{delim}'.")
+            parent = str(args.get("parent") or "").strip()
+            if parent and parent not in names:
+                return refuse(422, "bad_request", "The folder to put it under does not exist.")
+            full = (parent + delim + leaf) if parent else leaf
+            if full.upper() == "INBOX" or full.upper().startswith("INBOX" + delim.upper()) or full in names:
+                return refuse(422, "refused", "This mailbox already has a folder called that.")
+            target = full
+        else:
+            row = folders.get(fid)
+            if row is None:
+                return refuse(404, "not_found", "No such folder in this mailbox.")
+            target = row["name"]
+            if op == "folder_rename":
+                leaf = leaf_ok(str(args.get("name") or ""))
+                if leaf is None:
+                    return refuse(422, "bad_request", f"A folder's name is 1 to 80 characters without a '{delim}'.")
+                head = target.rsplit(delim, 1)[0] + delim if delim in target else ""
+                full = head + leaf
+                if full in names:
+                    return refuse(422, "refused", "This mailbox already has a folder called that.")
+        try:
+            w = watcher_of(mailbox_id)
+        except NotLive:
+            return not_live()
+
+        def act(c):
+            if op == "folder_create":
+                if not imap.create_folder(c, full):
+                    raise RuntimeError("create refused")
+                return None
+            if op == "folder_rename":
+                imap.rename_folder(c, target, full)
+                return None
+            info = imap.select(c, target)                          # read-only: how many messages the server holds in it
+            imap.select(c, "INBOX")                                # a selected folder is not deleted
+            if int(info["exists"]) > 0:
+                return int(info["exists"])
+            imap.delete_folder(c, target)
+            return 0
+        try:
+            held = await on_pool(w, act, lock=True)
+        except Busy:
+            return refuse(503, "busy", "The mail server is busy for this mailbox; try again in a moment.", retry_after=5)
+        except Stopped:
+            return not_live()
+        except Exception as e:  # noqa: BLE001
+            log.info("%s for mailbox %s failed: %s", op, mailbox_id, type(e).__name__)
+            return refuse(502, "failed", "The mail server did not do that; nothing changed here.")
+        if op == "folder_delete":
+            if held:
+                return refuse(422, "refused", f"Move or delete its {held} message{'' if held == 1 else 's'} first.")
+            await store.folder_removed(mailbox_id, fid)
+            result = {"folder": fid}
+        elif op == "folder_create":
+            new_id = await store.ensure_folder_row(mailbox_id, full, None, delim)
+            state["sync"].request(mailbox_id, new_id, False, False)
+            result = {"folder": new_id, "name": full}
+        else:
+            await store.folder_renamed(mailbox_id, fid, target, full, delim)
+            state["sync"].request(mailbox_id, fid, False, False)
+            result = {"folder": fid, "name": full}
+        await store.touch(mailbox_id)
+        return JSONResponse({"ok": True, "result": {"done": True, "op": op, **result}})
 
     # ---- SLICE 4: drafts, sanitising for the composer, identities (mail-service.md §1, §6) ---------------------------------------------
     async def append_draft_call(request: Request):

@@ -93,15 +93,18 @@ if (wants_json()) {
                                                       'attachments' => $prefill['attachments'], 'quote_unavailable' => $prefill['quote_unavailable']] : null]);
 }
 $ignored = [];
+// a canned reply chosen on the Templates screen (slice 6): its subject and text start a new message (never over a draft or a reply)
+$tplId = request_integer('template');
+$tpl = $draft === null && $prefill === null && $tplId !== null ? ml_template_one($pdo, $tplId) : null;
 $sentDraft = $draft !== null && $draft['outbound_id'] !== null && in_array($draft['outbound_status'], ['queued', 'sending', 'sent', 'deferred', 'held'], true);
 $initial = [
     'identity' => $draft !== null ? $draft['identity_id'] : ($identities[0]['id'] ?? null),
     'to' => $draft !== null ? $draft['to_addresses'] : ($prefill['to'] ?? compose_addresses(request_string('to'), 'To', $ignored)),
     'cc' => $draft !== null ? $draft['cc_addresses'] : ($prefill['cc'] ?? []),
     'bcc' => $draft !== null ? $draft['bcc_addresses'] : [],
-    'subject' => $draft !== null ? (string) $draft['subject'] : ($prefill['subject'] ?? request_string('subject')),
+    'subject' => $draft !== null ? (string) $draft['subject'] : ($prefill['subject'] ?? ($tpl !== null && ($tpl['subject'] ?? '') !== '' ? (string) $tpl['subject'] : request_string('subject'))),
     'body_html' => $draft !== null ? $draft['body_html'] : null,
-    'body_text' => $draft !== null ? (string) $draft['body_text'] : request_string('body'),
+    'body_text' => $draft !== null ? (string) $draft['body_text'] : ($tpl !== null ? (string) $tpl['body'] : request_string('body')),
     'reply_to' => $draft !== null ? $draft['reply_to_key_id'] : ($prefill['reply_to_key_id'] ?? null),
     'in_reply_to' => $draft !== null ? $draft['in_reply_to'] : ($prefill['in_reply_to'] ?? null),
     'references' => $draft !== null ? ml_pg_text_array((string) $draft['references_ids']) : ($prefill['references_ids'] ?? []),
@@ -114,5 +117,5 @@ render_screen($title . ' — ' . $box['address'], view('compose/compose.php', [
     'box' => $box, 'mode' => $mode, 'draft' => $draft, 'sentDraft' => $sentDraft, 'prefill' => $prefill, 'initial' => $initial, 'identities' => $identities,
     'format' => $format, 'attachments' => $attachments, 'settings' => $settings, 'undo' => $undo, 'tz' => $tz, 'canSend' => $canSend,
     'isHuman' => $isHuman, 'delegate' => $delegate, 'internalDomains' => compose_internal_domains($pdo), 'schedule' => compose_schedule_choices($tz),
-    'conversation' => $conversation, 'level' => $level,
+    'conversation' => $conversation, 'level' => $level, 'templateId' => $tpl !== null ? (int) $tpl['template_id'] : null,
 ]), ['screen' => $screen, 'entity' => $draft !== null ? 'mail_draft' : 'mailbox', 'recordId' => $draft !== null ? (int) $draft['id'] : $mb, 'mailboxId' => $mb]);

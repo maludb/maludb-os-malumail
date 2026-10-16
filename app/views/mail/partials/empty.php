@@ -27,7 +27,8 @@ if ($cred === 'failed' || $state === 'failed') {
 } elseif ($unread) {
     $text = 'Nothing unread here.';
 } else {
-    $text = match ($folder !== null ? 'folder' : $view) {
+    $text = match (($label ?? null) !== null ? 'label' : ($folder !== null ? 'folder' : $view)) {
+        'label' => 'Nothing has this label yet.',
         'inbox' => 'Nothing new. Mail that arrives shows here within a few seconds.',
         'scheduled' => 'Nothing scheduled.',
         'outbox' => 'Nothing waiting to go.',

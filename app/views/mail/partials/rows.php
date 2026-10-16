@@ -4,6 +4,8 @@
  * element whole (outerHTML) and push the URL. Data: as app/views/mail/list.php, plus base (the page's path).
  */
 $id = (int) $box['id'];
+$label = $label ?? null;
+$matching = mail_view_matching($label !== null ? 'label' : ($folder !== null ? 'folder' : $view), $folder, $label, !empty($unread));
 $rows = $page['rows'];
 $first = $rows[0]['cursor'] ?? '';
 $q = static function (array $over) use ($unread): string {
@@ -17,8 +19,8 @@ $nav = static function (string $url, string $html, string $btnId): string {
     return '<a class="btn btn-sm btn-light btn-touch" id="' . e($btnId) . '" href="' . e($url) . '" hx-get="' . e($url) . '" hx-target="#mail-list" hx-swap="outerHTML" hx-push-url="' . e($url) . '">' . $html . '</a>';
 };
 ?>
-<div id="mail-list" class="mail-list density-<?= e($density) ?>" data-screen="<?= $folder !== null ? 'folder-view' : 'mailbox-view' ?>" data-mailbox="<?= $id ?>"
-     data-view="<?= e($folder !== null ? 'folder' : $view) ?>" data-folder="<?= $folder !== null ? (int) $folder['id'] : '' ?>" data-change-seq="<?= (int) $page['seq'] ?>"
+<div id="mail-list" class="mail-list density-<?= e($density) ?>" data-screen="<?= $label !== null ? 'label-view' : ($folder !== null ? 'folder-view' : 'mailbox-view') ?>" data-mailbox="<?= $id ?>"
+     data-view="<?= e($label !== null ? 'label' : ($folder !== null ? 'folder' : $view)) ?>" data-folder="<?= $folder !== null ? (int) $folder['id'] : '' ?>" data-label="<?= $label !== null ? (int) $label['id'] : '' ?>" data-matching="<?= e((string) $matching) ?>" data-change-seq="<?= (int) $page['seq'] ?>"
      data-top="<?= e($first) ?>" data-limit="<?= (int) $page['limit'] ?>" data-unread="<?= $unread ? '1' : '' ?>" data-base="<?= e($base) ?>"
      data-poll-visible="<?= (int) $poll[0] ?>" data-poll-hidden="<?= (int) $poll[1] ?>" data-title="<?= e($title . ' — ' . $box['address']) ?>">
     <div class="d-flex flex-wrap align-items-center gap-2 mb-2" id="mail-list-toolbar">
@@ -38,9 +40,9 @@ $nav = static function (string $url, string $html, string $btnId): string {
         </div>
     </div>
     <div id="mail-new-bar"></div>
-    <?= view('mail/partials/bulk-bar.php', ['box' => $box, 'folder' => $folder, 'view' => $view, 'total' => $page['total'], 'count' => count($rows)]) ?>
+    <?= view('mail/partials/bulk-bar.php', ['box' => $box, 'folder' => $folder, 'label' => $label, 'view' => $view, 'total' => $page['total'], 'count' => count($rows), 'matching' => $matching]) ?>
     <?php if ($rows === []): ?>
-        <?= view('mail/partials/empty.php', ['box' => $box, 'view' => $view, 'folder' => $folder, 'status' => $status, 'unread' => $unread]) ?>
+        <?= view('mail/partials/empty.php', ['box' => $box, 'view' => $view, 'folder' => $folder, 'label' => $label, 'status' => $status, 'unread' => $unread]) ?>
     <?php endif; ?>
     <div class="card mb-0<?= $rows === [] ? ' d-none' : '' ?>"><div class="list-group list-group-flush mail-rows" id="mail-rows" role="list">
         <?php foreach ($rows as $r): ?><?= view('mail/partials/row.php', ['r' => $r, 'box' => $box, 'view' => $view, 'tz' => $tz, 'oob' => false]) ?><?php endforeach; ?>

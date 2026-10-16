@@ -222,6 +222,37 @@ customer key nor the sealing secret** — the proof checks it.
 - **pdo_pgsql with native prepares refuses a named placeholder used twice** — name each use (`:mb`, `:mb2`).
 - **PHP here has no `intl`**: no `idn_to_utf8()`; a link's host is shown as parsed (an `xn--` name stays so — a look-alike shows as one).
 
+## Slice 6 (2026-10-16, search, labels, snooze, folders and templates BUILT) — `docs/build-specs/search-labels-snooze.md`
+- `bash tests/phase3/slice6/run.sh` (php -S) and `ML_APP=apache …`: scratch `ml_dev6`; the IMAP fixture grew `RENAME` and `DELETE` (a delete takes the
+  folder's mail with it, as Dovecot does — the service counts first); five LIVE mailboxes on the fixtures (priya in Europe/Berlin, dana, sales, the
+  Expert's, an intake) and five SEEDED straight into the index with no credential (big1/2/3 = 2,000 synthetic messages, hush, agentbox with one
+  sensitive conversation); `checks.php` (every operator against an independent SQL truth, the cursor over the whole estate, the wall, labels,
+  snooze and the worker's wake, folders, templates, the log vocabulary), `tools.py` (the five records queries), `browser.mjs` (375 and 1280, axe).
+  `ML_S6_HOLD=1` leaves the servers up — and a second `checks.php` run on a held database fails (the labels and folders it makes exist).
+- **A search groups messages into conversations at the NEWEST matching message** (`app/features/mail/search.php`, and `mail_search` in
+  `mcp/records_server.py` the same way): the walk is `ml_search()`'s offset form 500 messages at a time (cap 5,000), a conversation is met first at its
+  representative, the cursor `<µs>.<message id>` is a position in that order — so the pages repeat nothing and skip nothing. An unknown operator is
+  searched as words and named (`ml_search_unknown()`); only a malformed date, period or size is `bad_query` (the page answers 422 in words). Pass
+  `CAST(:x AS integer)` for ml_search's offset form — it has two overloads and a bare parameter is ambiguous.
+- **Labels sit on MESSAGE KEYS, in the index only** (`ml_label_apply()` — every key of each conversation — so a reply keeps the label);
+  `matching` (a search, ≤ 1,000 conversations) works on `mail_label` as on slice 3's actions; labels are fine on an intake mailbox.
+- **Snooze is the mail service's move plus the schema's state**: `mutate snooze` moves the Inbox copies to the Snoozed folder (the first sync makes
+  Archive and Snoozed on every live mailbox; special_use `snoozed` is recorded), `ml_thread_snooze()` keeps until / from / by on ONE anchor per
+  conversation, and the handler moves the mail FIRST and the state second (putting it back if the state is refused). The worker's `snoozes` pass
+  calls `ml_snoozes_due()` (db/019: stamps `woke_at`, the "Back from snooze" chip until the conversation is opened), `ml_snooze_mail_back()` (the
+  service's `move` back, then `unseen` on the latest message), a `snooze_woke` notice, and on an agent's mailbox an `agent_dispatches` row of kind
+  `snooze` whose turn carries ids only. A mail service that cannot be reached puts the snooze back for five minutes. Unsnooze is
+  `ml_thread_unsnooze()` (db/019) and the same move.
+- **Folders** are `mutate folder_create · folder_rename · folder_delete` (`ml_mutation_refusal()` first — the system folders keep their names —,
+  one IMAP command, the index following in the same request); a folder with mail in it is refused with its count, never deleted. Two forms of
+  one `<details>` choose labels and snooze times for the list's bulk bar AND the conversation (`label-form.php`, `snooze-form.php`).
+- **"Select all N" is a search**: the bar's field is `matching`, filled only when pressed, from `mail_view_matching()` (list.php) — Inbox `in:inbox`, a folder `in:"name"`,
+  a label `label:slug in:anywhere`; views with no exact search (starred, all mail, drafts, scheduled, outbox) show no button. Archive acts on Inbox copies only; from a folder use Delete or Move.
+- **Search pages cost the result set** (cursor-form walk, ≤ 5,000 messages) — ~300–440 ms on 5,000 messages; the 50-row fetch sets `jit = off` (the planner prices `ml_thread_state()` at 1,000 rows
+  and JIT-compiled it: 250 ms) and reads base tables behind the walled search. A canned reply's `usage_count` bumps in `send_answer()` from the composer's `template` field.
+- **Never in a log payload**: a label, folder, template or subject name — ids, counts, the wake time. Canned replies are a person's alone
+  (`require_human()` and the schema again); `compose?template=` fills the composer.
+
 ## Numbers
 Ports `APP_INTERNAL_PORT=8199`, `MCP_RECORDS_PORT=8852`, `MCP_ACTIVITY_PORT=8853`, `ML_MAILER_PORT=8854`, `ML_IMAGES_PORT=8855`;
 scratch 9201 (the app), 9202 (the fake kernel), 9203 (the fake MaluDB + MaluMail REST), 9204–9205 (the MCP servers), 9206 (the

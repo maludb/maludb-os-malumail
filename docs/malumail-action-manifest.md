@@ -250,8 +250,8 @@ Actions:
 | Action | Endpoint | Params | Undo | Confirm | Agent approval | Log event | Who | Agent | record_id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `mail_label` | `/mail/label.php` | **mailbox**, thread[], **label**, removed (yes to take the label off), matching (a search query — every conversation it finds up to 1000 instead of thread) | restore prior |  |  | `message.label` | `mail.use` · triage | yes | the first conversation |
-| `mail_snooze` | `/mail/snooze.php` | **mailbox**, **thread[]**, **until** (an ISO time) | mail_unsnooze |  |  | `thread.snooze` | `mail.use` · triage | yes | the first conversation |
-| `mail_unsnooze` | `/mail/unsnooze.php` | **mailbox**, **thread[]** | mail_snooze |  |  | `thread.unsnooze` | `mail.use` · triage | yes | the first conversation |
+| `mail_snooze` | `/mail/snooze.php` | **mailbox**, thread[], **until** (an ISO time), matching (a search query — every conversation it finds up to 1000 instead of thread) | mail_unsnooze |  |  | `thread.snooze` | `mail.use` · triage | yes | the first conversation |
+| `mail_unsnooze` | `/mail/unsnooze.php` | **mailbox**, thread[], matching (a search query — every conversation it finds up to 1000 instead of thread) | mail_snooze |  |  | `thread.unsnooze` | `mail.use` · triage | yes | the first conversation |
 | `mail_folder_create` | `/mail/folder-create.php` | **mailbox**, **name**, parent (an existing folder's name) | mail_folder_delete |  |  | `folder.create` | `mail.use` · triage | yes | the folder |
 | `mail_folder_rename` | `/mail/folder-rename.php` | **mailbox**, **folder**, **name** | restore prior |  |  | `folder.rename` | `mail.use` · triage | yes | the folder |
 | `mail_folder_delete` | `/mail/folder-delete.php` | **mailbox**, **folder** | — | ✔ | deletion | `folder.delete` | `mail.use` · triage | yes | the folder |

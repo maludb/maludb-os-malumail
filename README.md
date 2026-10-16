@@ -63,7 +63,13 @@ says so. `tests/phase3/slice4/run.sh` proves it under php -S and Apache against 
 on a card, review its held mail exactly as it would go out — every link with its real host, every reason in a sentence — and approve,
 edit, reject, ask the agent, or take the conversation over; they answer the mail that did not wake it, set its sending policy and pause it.
 Agents never decide (refused by the page and again by the database); the agent hears each decision in a chat turn that carries ids and a
-person's words, never mail text. `tests/phase3/slice5/run.sh` proves it under php -S and Apache. Next: slice 6.
+person's words, never mail text. `tests/phase3/slice5/run.sh` proves it under php -S and Apache.
+
+**Slice 6, search, labels, snooze, folders and templates, is built** (2026-10-16): Gmail's operators over one mailbox or every mailbox a
+person can open, each conversation once with its best snippet and paged by cursor without a repeat or a gap; labels on conversations (a `/`
+nests), from the list, the conversation or a whole search; snoozing a conversation out of the Inbox until a time in the person's own time
+zone, brought back unread by the worker with a chip (an agent's mailbox wakes the agent); a mailbox's IMAP folders made, renamed and deleted
+(never with mail in them); canned replies, shared or one's own. `tests/phase3/slice6/run.sh` proves it under php -S and Apache. Next: slice 7.
 
 ## Documents
 

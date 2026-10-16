@@ -1548,4 +1548,16 @@ questions in one sitting and changed none:
     contact held, approved, arriving at spike02 with `X-OS-Agent` and without `Auto-Submitted`). Phase 2 follows slice 5's screens; slices
     1–4 green both ways, the mail service 80, the kit 101, the schema 561, the specs 98, the registry check green.
 
-  **NEXT:** slice 6 (Sonnet 5.5 workers from here, D16). **People's existing mailboxes wait on MM1.**
+- **2026-10-16, SLICE 6 BUILT — search, labels, snooze, folders and templates** (`docs/build-specs/search-labels-snooze.md`; a Sonnet 5.5 worker, the planning model
+  verifies). 8 screens, 11 actions (the registry: 33 of 45 screens, 57 of 67 actions built).
+  - **Search** (`app/features/mail/search.php`, `html/m/search.php`, `html/search.php`): Gmail's operators through `ml_search()` — a conversation once, at its newest
+    matching message, the best-ranked message's snippet, the matched messages counted, the cursor `<µs>.<message id>` a position in that order (no repeat, no gap over a
+    1,614-conversation estate); an unknown operator searched as words and named, a malformed date, period or size 422 / `bad_query`; a non-owner's search is `mailbox.view`.
+  - **Labels** (`labels.php`): on message keys in the index only, a conversation showing any label of any of its messages; `matching` works as in slice 3.
+  - **Snooze and folders** (`folders.php`, `services/mailer/server.py`): `mutate snooze` and the three folder ops, the worker's `snoozes` pass (the wake — unread, a chip,
+    a notice, and on an agent's mailbox a dispatch of kind `snooze` and one turn of ids), `ml_thread_unsnooze()`. **db/019** adds `woke_at` for the chip.
+  - **Templates** (`templates.php`, `html/templates/`): canned replies as cards, shared or one's own, a person's alone; `compose?template=` fills the composer.
+  - **The tools:** `mail_search`, `find_labels`, `find_templates`, `records_search` in `mcp/records_server.py` (`find_folders` proven).
+  - **The proof:** `tests/phase3/slice6/run.sh` — checks 192 / 192, tools 31, browser 65 / 65 under php -S / Apache; the schema proof 12 more.
+
+  **NEXT:** slice 7 (Sonnet 5.5 workers, D16). **People's existing mailboxes wait on MM1.**

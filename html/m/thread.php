@@ -54,6 +54,11 @@ if ($one !== null && is_htmx_request()) {                     // a collapsed mes
     respond_not_found('No such message.');
 }
 log_screen_view($pdo, 'thread-view', $mb);
+// the "back from snooze" chip: shown on this opening, gone after it (db/019); a JSON reader does not open it
+$woke = !is_action_authed() && !wants_json() && db_bool($pdo, 'SELECT EXISTS (SELECT 1 FROM ml_woke_threads(CAST(:ids AS bigint[])))', ['ids' => '{' . $tid . '}']);
+if ($woke) {
+    $pdo->prepare('SELECT ml_woke_clear(:t)')->execute(['t' => $tid]);
+}
 ml_log_read($pdo, $mb, 'message.open', $tid, ['thread_id' => $tid, 'messages' => count($page['messages'])]);
 if (wants_json()) {
     respond_screen(['mailbox_id' => $mb, 'thread_id' => $tid, 'subject' => $page['thread']['subject'], 'message_count' => (int) $page['thread']['message_count'],
@@ -92,5 +97,5 @@ render_screen($subject . ' — ' . $box['address'], view('mail/thread.php', [
     'box' => $box, 't' => $page['thread'], 'messages' => $page['messages'], 'labels' => $page['labels'], 'tz' => member_timezone(), 'listUrl' => $listUrl,
     'prev' => $prev, 'next' => $next, 'keys' => ($settings['keyboard_shortcuts'] ?? true) !== false, 'notice' => $notice, 'undo' => $undo,
     'built' => ['mail_reply' => ml_action_built('mail_reply'), 'mail_reply_all' => ml_action_built('mail_reply_all'), 'mail_forward' => ml_action_built('mail_forward')],
-    'level' => (string) $box['my_level'], 'isOwner' => (int) ($box['owner_member_id'] ?? 0) === $me, 'view' => $view, 'folder' => $folder, 'folders' => $folders,
+    'woke' => $woke, 'level' => (string) $box['my_level'], 'isOwner' => (int) ($box['owner_member_id'] ?? 0) === $me, 'view' => $view, 'folder' => $folder, 'folders' => $folders,
 ]), ['screen' => 'thread-view', 'entity' => 'mail_thread', 'recordId' => $tid, 'mailboxId' => $mb]);

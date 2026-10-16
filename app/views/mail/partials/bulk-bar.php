@@ -12,13 +12,14 @@ $fromFolder = $folder !== null ? (int) $folder['id'] : '';
     <input type="hidden" name="mailbox" value="<?= (int) $box['id'] ?>">
     <input type="hidden" name="from_folder" value="<?= e((string) $fromFolder) ?>">
     <input type="hidden" name="view" value="<?= e($view) ?>">
-    <input type="hidden" name="all_matching" value="" id="mail-all-matching">
+    <input type="hidden" name="matching" value="" id="mail-all-matching">
     <span class="fw-semibold fs-13" id="mail-selected-count" aria-live="polite">0 selected</span>
     <button type="button" class="btn btn-sm btn-light btn-touch" id="mail-select-all-page">Select all on this page</button>
-    <?php if ($total > $count): ?>
+    <?php if ($total > $count && ($matching ?? null) !== null): ?>
         <button type="button" class="btn btn-sm btn-light btn-touch" id="mail-select-all-matching" data-total="<?= (int) $total ?>">Select all <?= $total > 10000 ? 'matching' : e(number_format($total)) ?></button>
     <?php endif; ?>
     <?php foreach ($actions as $a): ?>
+        <?php if (in_array($a['name'], ['mail_label', 'mail_snooze'], true)): ?><?= view('mail/partials/bar-panel.php', ['a' => $a, 'box' => $box]) ?><?php continue; endif; ?>
         <button type="submit" class="btn btn-sm btn-light btn-touch mail-bulk-action" formaction="<?= e(preg_replace('/\.php$/', '', $a['endpoint'])) ?>"
                 id="mail-bulk-<?= e($a['name']) ?>" hx-post="<?= e(preg_replace('/\.php$/', '', $a['endpoint'])) ?>" hx-target="#page-content"><i class="<?= e($a['icon']) ?> me-1"></i><?= e($a['label']) ?></button>
     <?php endforeach; ?>

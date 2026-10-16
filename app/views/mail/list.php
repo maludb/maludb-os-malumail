@@ -7,7 +7,9 @@
  *       tz, poll ([visible, hidden] seconds), density
  */
 $id = (int) $box['id'];
-$base = $folder !== null ? '/m/' . $id . '/f/' . (int) $folder['id'] : '/m/' . $id . '/v/' . $view;
+$label = $label ?? null;
+$unsnooze = $unsnooze ?? null;
+$base = $label !== null ? '/m/' . $id . '/label/' . (int) $label['id'] : ($folder !== null ? '/m/' . $id . '/f/' . (int) $folder['id'] : '/m/' . $id . '/v/' . $view);
 ?>
 <?= view('shared/header.php', ['id' => 'mail-list', 'title' => $title, 'crumbs' => [[$box['display_name'] !== '' ? $box['display_name'] : $box['address'], '/m/' . $id . '/v/inbox'], [$title, null]]]) ?>
 <div class="main-content mail-list-page" id="mail-page">
@@ -19,6 +21,13 @@ $base = $folder !== null ? '/m/' . $id . '/f/' . (int) $folder['id'] : '/m/' . $
             <span>Done.</span><button type="submit" class="btn btn-sm btn-link p-0" id="mail-undo">Undo</button>
         </form>
     <?php endif; ?>
-    <?= view('mail/partials/rows.php', ['box' => $box, 'view' => $view, 'folder' => $folder, 'page' => $page, 'unread' => $unread, 'title' => $title,
+    <?php if (!empty($unsnooze)): ?>
+        <form method="post" action="/mail/unsnooze" class="alert alert-light d-flex align-items-center gap-2 mb-3" id="mail-unsnooze-form" hx-post="/mail/unsnooze" hx-target="#page-content">
+            <?= csrf_field() ?><input type="hidden" name="mailbox" value="<?= $id ?>"><input type="hidden" name="return_to" value="<?= e($base) ?>">
+            <?php foreach ($unsnooze as $u): ?><input type="hidden" name="thread[]" value="<?= (int) $u ?>"><?php endforeach; ?>
+            <span>Snoozed.</span><button type="submit" class="btn btn-sm btn-link p-0" id="mail-unsnooze">Undo</button>
+        </form>
+    <?php endif; ?>
+    <?= view('mail/partials/rows.php', ['box' => $box, 'view' => $view, 'folder' => $folder, 'label' => $label, 'page' => $page, 'unread' => $unread, 'title' => $title,
         'status' => $status, 'tz' => $tz, 'poll' => $poll, 'density' => $density, 'base' => $base]) ?>
 </div>

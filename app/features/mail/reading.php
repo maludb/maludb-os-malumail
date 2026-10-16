@@ -25,14 +25,14 @@ const ML_OP_RULES = [
     'archive' => ['only' => ['inbox']], 'spam' => ['not' => ['sent', 'drafts', 'junk']], 'not_spam' => ['only' => ['junk']],
     'delete_forever' => ['only' => ['trash', 'junk']], 'trash' => ['not' => ['drafts', 'trash']], 'move' => ['not' => ['drafts', 'sent']],
     'seen' => ['not' => []], 'unseen' => ['not' => ['sent', 'drafts']], 'flag' => ['not' => []], 'unflag' => ['not' => []],
-    'seen_viewer' => ['not' => ['sent', 'drafts']], 'unseen_viewer' => ['not' => ['sent', 'drafts']],   // a view holder's own marks (mail_viewer_reads)
+    'seen_viewer' => ['not' => ['sent', 'drafts']], 'unseen_viewer' => ['not' => ['sent', 'drafts']], 'snooze' => ['only' => ['inbox']],   // a view holder's own marks (mail_viewer_reads)
 ];
 const ML_OP_VERB = ['archive' => 'Archived', 'move' => 'Moved', 'trash' => 'Deleted', 'spam' => 'Marked as spam', 'not_spam' => 'Marked not spam',
                     'flag' => 'Starred', 'unflag' => 'Unstarred', 'seen' => 'Marked read', 'unseen' => 'Marked unread', 'delete_forever' => 'Deleted forever',
                     'trash_empty' => 'Emptied'];
 const ML_OP_NOTHING = ['archive' => 'Nothing to archive here.', 'move' => 'Nothing to move here.', 'trash' => 'Nothing to delete here.', 'spam' => 'Nothing to mark as spam here.',
                        'not_spam' => 'Nothing here is in Spam.', 'flag' => 'Nothing to star here.', 'unflag' => 'Nothing to unstar here.', 'seen' => 'Nothing unread here.',
-                       'unseen' => 'Nothing to mark unread here.', 'delete_forever' => 'Nothing to delete here: delete forever takes mail from Trash or Spam.'];
+                       'unseen' => 'Nothing to mark unread here.', 'snooze' => 'Nothing to snooze here: only mail in the Inbox is snoozed.', 'delete_forever' => 'Nothing to delete here: delete forever takes mail from Trash or Spam.'];
 const ML_MATCHING_CAP = 1000;
 
 /** The person behind an agent's run (K38), when the kernel said so; null otherwise. */
@@ -592,7 +592,8 @@ function mail_action_notice(?string $key, int $n): ?array
         'spam' => ['success', 'Marked ' . $c . ' as spam.'], 'notspam' => ['success', 'Marked ' . $c . ' not spam.'],
         'starred' => ['success', 'Starred.'], 'unstarred' => ['success', 'Unstarred.'], 'read' => ['success', 'Marked read.'], 'unread' => ['success', 'Marked unread.'],
         'deleted' => ['success', 'Deleted forever: ' . $c . '.'], 'emptied' => ['success', 'Emptied: ' . $n . ($n === 1 ? ' message' : ' messages') . ' deleted forever.'],
-        'restored' => ['success', 'Put back.'], 'images' => ['success', 'Images from this sender will always show.'], 'noimages' => ['success', 'Images from this sender are asked for again.'],
+        'restored' => ['success', 'Put back.'], 'labeled' => ['success', 'Labelled ' . $c . '.'], 'unlabeled' => ['success', 'Took the label off ' . $c . '.'],
+        'snoozed' => ['success', 'Snoozed ' . $c . '.'], 'unsnoozed' => ['success', 'Brought back ' . $c . '.'], 'images' => ['success', 'Images from this sender will always show.'], 'noimages' => ['success', 'Images from this sender are asked for again.'],
         'sensitive' => ['success', 'Marked sensitive: no agent will read it.'], 'notsensitive' => ['success', 'No longer marked sensitive.'],
         'gone' => ['warning', 'This conversation moved or was deleted.'],
         default => null,

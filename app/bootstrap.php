@@ -94,6 +94,10 @@ require_once __DIR__ . '/features/mail/wall.php';        // the wall as the page
 require_once __DIR__ . '/features/shell/nav.php';        // the rail, the tabs, the bell, the notice gate, the placeholders (Phase 2)
 require_once __DIR__ . '/features/mail/list.php';        // the list: ml_mail_list() behind the screens, the rail's groups, the poll (slice 2)
 require_once __DIR__ . '/features/mail/reading.php';     // reading: the conversation, the fetch, the targets, the act, the eleven handlers' runner (slice 3)
+require_once __DIR__ . '/features/mail/search.php';       // search, labels and folders (slice 6): the queries the list's bar and the pages share
+require_once __DIR__ . '/features/mail/labels.php';
+require_once __DIR__ . '/features/mail/folders.php';
+require_once __DIR__ . '/features/mail/templates.php';
 require_once __DIR__ . '/features/compose/queries.php';  // writing: drafts, attachments, Send, identities (slice 4)
 require_once __DIR__ . '/features/compose/compose.php';  // writing: the prefill, the quote, the subject and recipient rules
 require_once __DIR__ . '/features/compose/present.php';

@@ -49,6 +49,9 @@ function send_answer(PDO $pdo, array $box, array $res, string $event, array $log
         $after['scheduled'] = true;
     }
     log_activity($pdo, $logEvent, 'outbound_email', $o, ['after' => $after, 'mailbox_id' => $mb]);
+    if ($status !== 'refused') {
+        ml_template_used($pdo, request_integer('template'));      // slice 6: a canned reply the composer started from counts once, when its message goes
+    }
     $tz = member_timezone();
     $land = return_path('/m/' . $mb . '/v/inbox');
     switch ($status) {

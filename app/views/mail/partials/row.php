@@ -33,6 +33,7 @@ $outState = ['deferred' => ['Trying again', 'warning'], 'failed' => ['Failed', '
         <span class="mail-who text-truncate"><?= e($who) ?><?php if ((int) $r['message_count'] > 1): ?> <span class="fw-normal text-muted fs-12 mail-count"><?= (int) $r['message_count'] ?></span><?php endif; ?></span>
         <span class="mail-what flex-grow-1 min-w-0 text-truncate">
             <?php if ($r['sensitive']): ?><i class="feather-lock me-1 text-muted mail-sensitive" role="img" title="Marked sensitive" aria-label="Marked sensitive"></i><?php endif; ?>
+            <?php if (!empty($r['woke'])): ?><span class="badge bg-soft-warning text-warning me-1 fw-normal mail-woke"><i class="feather-clock me-1"></i>Back from snooze</span><?php endif; ?>
             <?php foreach ($r['labels'] as $l): ?><span class="badge bg-soft-primary text-primary me-1 fw-normal mail-label"><?= e($l['label'] ?? '') ?></span><?php endforeach; ?>
             <span class="mail-subject"><?= e(($r['subject'] ?? '') !== '' ? $r['subject'] : '(no subject)') ?></span>
             <?php if (($r['snippet'] ?? '') !== ''): ?><span class="fw-normal text-muted mail-snippet"> — <?= e($r['snippet']) ?></span><?php endif; ?>

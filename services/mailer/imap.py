@@ -425,6 +425,20 @@ def create_folder(client, name: str) -> bool:
         return False
 
 
+def rename_folder(client, old: str, new: str) -> None:
+    """RENAME old new (slice 6). The server moves the folder's messages and its subfolders with it."""
+    typ, data, _u = raw(client, "RENAME", folder_name_out(old), folder_name_out(new))
+    if typ != "OK":
+        raise IMAPClientError(f"RENAME failed: {_text(data[0] if data else b'')}")
+
+
+def delete_folder(client, name: str) -> None:
+    """DELETE name (slice 6) — the server takes the folder's messages with it, so the caller has already counted them."""
+    typ, data, _u = raw(client, "DELETE", folder_name_out(name))
+    if typ != "OK":
+        raise IMAPClientError(f"DELETE failed: {_text(data[0] if data else b'')}")
+
+
 # ================================================================================================================================
 # SLICE 3 — mutations on a pool connection (docs/build-specs/mail-service.md §5): one IMAP command per folder touched, UIDs grouped.
 # The caller SELECTs the folder read-write first (select(…, readonly=False)) and holds the mailbox's lock.

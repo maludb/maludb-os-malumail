@@ -44,6 +44,14 @@ $item = static function (string $id, string $url, string $icon, string $label, s
                         <?php if ((int) $f['messages_unseen'] > 0): ?><span class="ms-auto fs-11 text-muted rail-count"><?= (int) $f['messages_unseen'] ?></span><?php endif; ?>
                     </a></li>
             <?php endforeach; ?>
+            <?php foreach ($railData['labels'] ?? [] as $l): $lurl = '/m/' . $id . '/label/' . (int) $l['id']; ?>
+                <li class="nxl-item" id="nav-label-<?= (int) $l['id'] ?>">
+                    <a class="nxl-link<?= $here === $lurl ? ' active' : '' ?>" href="<?= e($lurl) ?>" hx-get="<?= e($lurl) ?>" hx-target="#page-content" hx-swap="innerHTML" hx-push-url="<?= e($lurl) ?>" title="<?= e($l['label']) ?>">
+                        <span class="nxl-micon"><i class="feather-tag"<?= !empty($l['colour']) ? ' style="color:' . e($l['colour']) . '"' : '' ?>></i></span><span class="nxl-mtext text-truncate"><?= e($l['label']) ?></span></a></li>
+            <?php endforeach; ?>
+            <?php foreach ([['folders', 'Folders', 'feather-folder-plus'], ['labels', 'Labels', 'feather-tag']] as [$mid, $mlabel, $micon]): $murl = '/m/' . $id . '/' . $mid; ?>
+                <?= $item('manage-' . $mid, $murl, $micon, e($mlabel), '', $here === $murl) ?>
+            <?php endforeach; ?>
             </ul></li>
         <?php endif; ?>
     <?php endforeach; ?>

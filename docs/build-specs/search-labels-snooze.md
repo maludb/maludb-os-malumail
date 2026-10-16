@@ -183,3 +183,72 @@ Saved searches; labels mirrored to IMAP keywords (Extended, §11); filters that 
   `snooze_woke`.
 - **The IMAP fixture**: `CREATE`, `RENAME`, `DELETE` (deleting the folder's mail with it, as Dovecot does — the mail service refuses a
   non-empty folder before it asks).
+
+## Built and proven (2026-10-16)
+
+**Built:** the eight screens (`search`, `search-all`, `label-view`, `folders`, `labels`, `templates`, `template-new`, `template-edit`) and the eleven actions
+(`mail_label`, `mail_snooze`, `mail_unsnooze`, `mail_folder_create`, `mail_folder_rename`, `mail_folder_delete`, `mail_label_create`, `mail_label_update`,
+`mail_label_delete`, `mail_template_save`, `mail_template_delete`) — the registry: 33 of 45 screens, 57 of 67 actions built, `--check` green. Files beyond the
+spec's list: `app/views/mail/search-results.php` (the part Older swaps), `app/views/mail/partials/bar-panel.php` (the bulk bar's two panels, which hold
+`label-form.php` and `snooze-form.php` — the spec's two templates, used by the conversation page too), `db/019_snooze_chip.sql`, `db/proof/slice6_woke.sql`.
+The mail service gained `mutate` ops `snooze`, `folder_create`, `folder_rename`, `folder_delete` (`services/mailer/server.py`, `imap.py`, `store.py`); the IMAP
+fixture `RENAME` and `DELETE`; the records queries `mail_search`, `find_labels`, `find_templates`, `records_search` (and `find_folders`, slice 2's, proven here);
+the worker's `snoozes` pass and the `snooze` mail turn. The list's rows carry the "Back from snooze" chip, the rail lists the labels with links to Folders and
+Labels, the conversation page has Label and Snooze beside its actions, `compose?template=` fills the composer.
+
+**Proven** (`tests/phase3/slice6/run.sh`, php -S / Apache): checks 192 / 192, tools 31 / 31, browser 65 / 65; schema `db/proof/slice6_woke.sql` 12
+(`tests/phase0/schema.sh`). The checks run every operator of `ml_search` with and without `-` against an independent SQL truth over 700 synthetic messages
+(each result set equal, none empty), page the whole 1,614-conversation estate by cursor (each once, in the order its newest message came), prove the wall
+(Dana's and Priya's search-all, an agent never finding a sensitive conversation, `is:unread` for a view holder following her own reads, `mailbox.view` once per half
+hour), labels (create, three from the list and one by `matching`, the view's four, a reply keeping the label, rename, recolour, delete), snooze (Tomorrow 08:00 in
+Europe/Berlin stored as its UTC instant, the Snoozed folder on the fixture, the worker's wake — unread, the chip, a `snooze_woke` notice —, unsnooze, an intake
+mailbox refusing, an agent mailbox's wake as a dispatch and one turn carrying ids), folders (create under a parent, rename, delete when empty, refused with mail in it,
+Inbox and Sent refusing, a view holder refused, `mail_folder_delete` paused in the registry), canned replies (own and shared, read-only for another person, a Mail
+admin editing, an agent refused) and the log vocabulary (no label, folder, template or subject name in any payload). The browser proof walks every screen at 375 and
+1280 (no sideways scroll, axe clean), the bulk bar's Label (the filter) and Snooze (a typed date clearing the choices) with no modal, and the conversation's own two.
+
+**Found and fixed:**
+- **No place to keep the "back from snooze" chip.** `ml_snoozes_due()` (db/010) cleared the snooze and kept nothing; `db/019` adds `mail_thread_states.woke_at`, re-creates
+  `ml_snoozes_due()` to stamp it, and adds `ml_woke_threads()`, `ml_woke_clear()` (opening the conversation clears it) and `ml_thread_unsnooze()` (the same state change for
+  one conversation, behind triage). Additive; proven by `db/proof/slice6_woke.sql`.
+- **Two overloads of `ml_search`** (the offset form and the cursor form) made a bare parameter ambiguous (`function ml_search(unknown, bigint, integer, unknown) is not unique`):
+  the PHP and the proofs cast the offset to `integer`.
+- **A thread's subject is fixed when it is made**: a seeded message whose subject was changed afterwards did not take a reply into its conversation (`ml_thread_find()`
+  starts a new one when the subject changed) — the proof's reply carries the thread's own subject.
+- The first sync already makes Archive and Snoozed on every live mailbox (`watch.py`), so the service's create-by-name path for Snoozed is the fallback, not the first
+  snooze (the proof asserts the folder and its `special_use`, not that this snooze made it).
+
+**Decisions taken here (within the spec):**
+1. **A search groups at the newest matching message** and walks from the newest each page with `ml_search`'s CURSOR form, 500 messages a statement (cap 5,000 messages, then a line saying to narrow it) — a conversation is never
+   split across two pages, so the cursor is a position in the conversation order (`<µs>.<message id>`, µs because two messages of different mailboxes can share a millisecond).
+2. **Snooze moves the mail first and keeps the state second**, putting the mail back if the state is refused; the state's anchor is the conversation's latest Inbox message.
+3. **The wake acts as the person who snoozed** (the mailbox's owner when that person is gone); a service that cannot be reached puts the snooze back for five minutes.
+4. **Label accepts one id or a list** (`label[]`) so the bar's checkboxes work; the registry's `label` stays one parameter for the tools. The bar's "Take off" is the
+   same action with `removed`.
+5. **Folder names**: `parent` is an existing folder's full name; a name may not hold the server's delimiter; a folder with subfolders is deleted only when empty on the
+   server (IMAP leaves the subfolders), and the sentence is "Move or delete its N message(s) first".
+6. **The search page's "Label every conversation this search finds"** is the `matching` path as a form (up to 1,000 conversations); the bulk bar's own "Select all N" posts
+   slice 3's `all_matching`, which no handler reads yet — the proof uses `matching` directly, as slice 3's did.
+7. **Canned replies' "Used N times"** shows the column; nothing increments it yet (a GET never writes; Send would).
+8. **A shared canned reply's owner who left** reads "Owned by someone who left" and is changed by a Mail admin.
+
+### Review fixes (2026-10-16, after the first report)
+1. **"Select all N" acts on everything the view holds.** The bar's hidden field is `matching` (it was `all_matching`, which no handler read), filled by the script only when
+   Select all is pressed, with the view's own search from `mail_view_matching()` (`app/features/mail/list.php`): Inbox `in:inbox`, Sent `in:sent`, Spam `in:spam`, Trash
+   `in:trash`, Snoozed `is:snoozed`, a folder `in:"<name>"`, a label `label:<slug> in:anywhere` (a label view holds Trash and Spam too), each followed by ` is:unread` when the Unread-only filter is on. Starred, All mail, Drafts,
+   Scheduled and Outbox have no exact equivalent: no "Select all N" button there. The 1,000-conversation cap and the `matching: true` log flag stay. `mail_snooze` and
+   `mail_unsnooze` take `matching` too (manifest rows changed like `mail_label`'s). Proven in slice 6's checks section 9 on a live 60-message mailbox with 25 rows a page: Select all +
+   Move empties the Inbox, Select all + Archive from the folder view empties the folder, Select all + Delete from a label view moves the whole label to Trash; the browser proof
+   shows matching empty until Select all is pressed, `in:inbox` after, empty after Clear.
+2. **The search walk, measured** (5,000-message mailbox `big4`, php -S, section 10 of the checks, a whole search paged to the end): with the offset walk, page 1 took 723 ms and a
+   page past 1,000 conversations 515 ms for a common word (`plain`, 4,410 messages), 519 / 372 ms for `is:read`. The offset form re-sorted everything it skipped (339 ms of walk against
+   143 ms for the cursor form) — and a JIT compile of 250 ms was hiding in the 50-row fetch (the planner prices `ml_thread_state()` at 1,000 rows a call). Now: the walk uses the cursor
+   form and the page's fetch sets `jit = off` for its connection and reads the base tables the walled search already answered for: **`plain` page 1 391 ms, page 22 (past 1,050 conversations)
+   356 ms, slowest 420; `is:read` 278 / 262 ms, slowest 376** — every page under 500 ms, none repeated. The walk is still the whole result set (up to 5,000 messages) because a
+   conversation's matched count and its newest match need it; a page costs the result's size, not the page's.
+3. **"Used N times" counts.** The composer carries the template's id (`template` hidden field, set by `compose?template=`); `send_answer()` bumps `email_templates.usage_count` once when the
+   message is sent or scheduled or held (not refused), only for a template the sender sees (`ml_template_used()`); a plain UPDATE the application role already may make, no migration, and
+   nothing an agent may newly do (an agent keeps no templates; one that names a visible shared id would count it, which is a counter and no content).
+4. **The flaky slice 3 check.** `door.py` judged `mcp.read` with `o["log"] != "0"`, which a failed or empty `psql` read passes vacuously, and `reading.php` read the log once; both now
+   require an integer of at least 1 and `reading.php` polls the log (bounded, 10 s) for the row. The write itself is in the records query's own transaction, committed before it returns: no code
+   race was found; the flake was not reproduced in two further runs.

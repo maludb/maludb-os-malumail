@@ -432,7 +432,7 @@ check(o["attachment_read"]["ok"] and o["attachment_read"]["type"] == "applicatio
 check(o["attachment_html"]["ok"] and o["attachment_html"]["text"] is None and o["attachment_html"]["note"], "attachment_read of an HTML file: the name and size only, never its content")
 check(not o["expert_thread"]["ok"] and o["expert_thread"]["error"]["code"] == "not_found", "the Expert on Priya's conversation (no person behind the run): not_found")
 check(not o["expert_sensitive"]["ok"] and o["expert_sensitive"]["error"]["code"] == "not_found" and o["priya_sensitive"]["ok"], "a conversation marked sensitive: not_found to the agent, readable by its overseer")
-check(o["log"] != "0", "a records read of a mailbox not the caller's own wrote mcp.read")
+check(o["log"].isdigit() and int(o["log"]) >= 1, "a records read of a mailbox not the caller's own wrote mcp.read")
 
 print(f"{'all ' + str(PASSES) + ' passed' if not FAILS else str(FAILS) + ' FAILED (' + str(PASSES) + ' passed)'}")
 sys.exit(1 if FAILS else 0)

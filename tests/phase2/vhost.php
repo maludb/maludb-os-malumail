@@ -26,9 +26,20 @@ $r = page($j, "/m/$priya/identities/999999/edit");
 ok($r['code'] === 404 && str_contains($r['body'], 'No such identity'), "/m/{mailbox}/identities/{identity}/edit reaches its screen (slice 4 built it: its own 404)");
 // slice 5 built review-view and review-edit: their routes answer their own screens (a message no one holds: 404)
 ok(page($j, '/oversight/review/999999')['code'] === 404 && page($j, '/oversight/review/999999/edit')['code'] === 404, '/oversight/review/{outbound} and /edit reach their screens (slice 5 built them: its own 404)');
-foreach (["/m/$priya/label/2", "/m/$priya/people/jon%40acme.example",
-          "/m/$priya/access/new", "/m/$priya/search", "/m/$priya/access-log",
-          '/templates/new', '/templates/7/edit', '/search', '/notifications', '/settings/notifications'] as $p) {
+// slice 6 built search, label-view, the templates: their routes answer their own screens
+$r = page($j, "/m/$priya/label/2");
+ok($r['code'] === 404 && str_contains($r['body'], 'No such label'), '/m/{mailbox}/label/{label} reaches its screen (slice 6 built it: no such label, its own 404)');
+$r = page($j, "/m/$priya/search");
+ok($r['code'] === 200 && str_contains($r['body'], 'id="search-form"'), '/m/{mailbox}/search reaches its screen (slice 6 built it)');
+$r = page($j, '/search');
+ok($r['code'] === 200 && str_contains($r['body'], 'id="search-form"'), '/search reaches its screen (slice 6 built it)');
+$r = page($j, '/templates/new');
+ok($r['code'] === 200 && str_contains($r['body'], 'id="template-form"'), '/templates/new reaches its screen (slice 6 built it)');
+$r = page($j, '/templates/7/edit');
+ok($r['code'] === 404 && str_contains($r['body'], 'No such canned reply'), '/templates/{template}/edit reaches its screen (slice 6 built it: its own 404)');
+foreach (["/m/$priya/people/jon%40acme.example",
+          "/m/$priya/access/new", "/m/$priya/access-log",
+          '/notifications', '/settings/notifications'] as $p) {
     $r = page($j, $p);
     ok($r['code'] === 200 && str_contains($r['body'], 'builds this screen'), "$p reaches its screen's placeholder");
 }
@@ -45,7 +56,7 @@ if (getenv('ML_APP') === 'apache') {
     $base = 'http://127.0.0.1:' . (getenv('P_INTERNAL') ?: '9205');
     $i = req('GET', $base . '/api/v1/health');
     ok($i['code'] === 200 && json_decode($i['body'], true)['application'] === 'malumail', 'the internal vhost answers health the same');
-    ok(req('GET', $base . "/m/$priya/v/inbox", ['jar' => $j])['code'] === 200 && req('GET', $base . '/templates/7/edit', ['jar' => $j])['code'] === 200, '…and the mailbox routes and the placeholders');
+    ok(req('GET', $base . "/m/$priya/v/inbox", ['jar' => $j])['code'] === 200 && req('GET', $base . '/templates/new', ['jar' => $j])['code'] === 200, '…and the mailbox routes and the placeholders');
     $hdr = req('GET', '/api/v1/health')['headers'];
     $mod = is_file('/etc/apache2/mods-enabled/headers.load');
     ok($mod === (stripos($hdr, 'X-Content-Type-Options') !== false), 'the Header lines are ' . ($mod ? 'present with' : 'absent without') . ' mod_headers (the guard holds)');

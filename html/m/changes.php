@@ -16,14 +16,18 @@ $mailbox = (int) request_integer('mailbox');
 $since = (int) request_integer('since');
 $view = request_string('view', 'inbox');
 $folder = request_integer('folder');
-if ($folder === null && !isset(ML_VIEWS[$view])) {
+$label = request_integer('label');
+if ($label !== null) {
+    $view = 'label';
+}
+if ($folder === null && $label === null && !isset(ML_VIEWS[$view])) {
     respond_not_found('No such view.');
 }
 $ids = array_filter(array_map('intval', explode(',', request_string('ids'))), static fn (int $i): bool => $i > 0);
 $limit = (int) (request_integer('limit') ?? 50);
 $top = request_string('top');
 $changes = mail_changes($pdo, $mailbox, $since, $folder !== null ? 'folder' : $view, $folder, array_slice($ids, 0, 100), $top !== '' ? $top : null,
-                        $limit, request_string('unread') === '1');
+                        $limit, request_string('unread') === '1', $label);
 header('Cache-Control: no-store');
 if (is_array($changes) && !empty($changes['not_found'])) {
     respond_not_found('No such mailbox.');
@@ -40,7 +44,7 @@ if (wants_json()) {
                     'rows' => array_map('mail_row_json', $changes['rows'])]);
 }
 $box = ml_require_mailbox($mailbox, 'view');
-$here = $folder !== null ? '/m/' . $mailbox . '/f/' . $folder : '/m/' . $mailbox . '/v/' . $view;
+$here = $label !== null ? '/m/' . $mailbox . '/label/' . $label : ($folder !== null ? '/m/' . $mailbox . '/f/' . $folder : '/m/' . $mailbox . '/v/' . $view);
 $tz = member_timezone();
 $out = view('mail/partials/rail-counts.php', ['railData' => mail_rail($pdo, $mailbox), 'here' => $here, 'oob' => true]);
 foreach ($changes['rows'] as $r) {

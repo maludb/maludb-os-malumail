@@ -1,6 +1,6 @@
 {
     "generated_from": "docs/malumail-action-manifest.md",
-    "generated_at": "2026-10-16T15:19:28+00:00",
+    "generated_at": "2026-10-16T20:11:04+00:00",
     "screens": {
         "home": {
             "screen": "home",
@@ -280,7 +280,7 @@
                 "q",
                 "before"
             ],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "search-all": {
@@ -292,7 +292,7 @@
                 "q",
                 "before"
             ],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "label-view": {
@@ -303,7 +303,7 @@
             "params": [
                 "before"
             ],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "folders": {
@@ -312,7 +312,7 @@
             "section": "Search, labels, snooze, folders and templates (slice 6)",
             "when": "a mailbox's IMAP folders: create, rename, delete, counts",
             "params": [],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "labels": {
@@ -321,7 +321,7 @@
             "section": "Search, labels, snooze, folders and templates (slice 6)",
             "when": "a mailbox's labels: create, rename, colour, delete, counts",
             "params": [],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "templates": {
@@ -332,7 +332,7 @@
             "params": [
                 "q"
             ],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "template-new": {
@@ -344,7 +344,7 @@
                 "name",
                 "body"
             ],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "template-edit": {
@@ -353,7 +353,7 @@
             "section": "Search, labels, snooze, folders and templates (slice 6)",
             "when": "change or delete a canned reply",
             "params": [],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "mailbox-access": {
@@ -2256,7 +2256,7 @@
             "who": "`mail.use` · triage",
             "agent": true,
             "record_id": "the first conversation",
-            "built": false
+            "built": true
         },
         "mail_snooze": {
             "action": "mail_snooze",
@@ -2271,7 +2271,7 @@
                 },
                 {
                     "name": "thread",
-                    "required": true,
+                    "required": false,
                     "repeated": true,
                     "hint": ""
                 },
@@ -2280,6 +2280,12 @@
                     "required": true,
                     "repeated": false,
                     "hint": "an ISO time"
+                },
+                {
+                    "name": "matching",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "a search query — every conversation it finds up to 1000 instead of thread"
                 }
             ],
             "undo": "mail_unsnooze",
@@ -2289,7 +2295,7 @@
             "who": "`mail.use` · triage",
             "agent": true,
             "record_id": "the first conversation",
-            "built": false
+            "built": true
         },
         "mail_unsnooze": {
             "action": "mail_unsnooze",
@@ -2304,9 +2310,15 @@
                 },
                 {
                     "name": "thread",
-                    "required": true,
+                    "required": false,
                     "repeated": true,
                     "hint": ""
+                },
+                {
+                    "name": "matching",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "a search query — every conversation it finds up to 1000 instead of thread"
                 }
             ],
             "undo": "mail_snooze",
@@ -2316,7 +2328,7 @@
             "who": "`mail.use` · triage",
             "agent": true,
             "record_id": "the first conversation",
-            "built": false
+            "built": true
         },
         "mail_folder_create": {
             "action": "mail_folder_create",
@@ -2349,7 +2361,7 @@
             "who": "`mail.use` · triage",
             "agent": true,
             "record_id": "the folder",
-            "built": false
+            "built": true
         },
         "mail_folder_rename": {
             "action": "mail_folder_rename",
@@ -2382,7 +2394,7 @@
             "who": "`mail.use` · triage",
             "agent": true,
             "record_id": "the folder",
-            "built": false
+            "built": true
         },
         "mail_folder_delete": {
             "action": "mail_folder_delete",
@@ -2409,7 +2421,7 @@
             "who": "`mail.use` · triage",
             "agent": true,
             "record_id": "the folder",
-            "built": false
+            "built": true
         },
         "mail_label_create": {
             "action": "mail_label_create",
@@ -2442,7 +2454,7 @@
             "who": "`mail.use` · triage",
             "agent": true,
             "record_id": "the label",
-            "built": false
+            "built": true
         },
         "mail_label_update": {
             "action": "mail_label_update",
@@ -2481,7 +2493,7 @@
             "who": "`mail.use` · triage",
             "agent": true,
             "record_id": "the label",
-            "built": false
+            "built": true
         },
         "mail_label_delete": {
             "action": "mail_label_delete",
@@ -2508,7 +2520,7 @@
             "who": "`mail.use` · triage",
             "agent": true,
             "record_id": "the label",
-            "built": false
+            "built": true
         },
         "mail_template_save": {
             "action": "mail_template_save",
@@ -2553,7 +2565,7 @@
             "who": "`mail.use`",
             "agent": false,
             "record_id": "the template",
-            "built": false
+            "built": true
         },
         "mail_template_delete": {
             "action": "mail_template_delete",
@@ -2574,7 +2586,7 @@
             "who": "`mail.use` · own",
             "agent": false,
             "record_id": "the template",
-            "built": false
+            "built": true
         },
         "mail_permission_grant": {
             "action": "mail_permission_grant",

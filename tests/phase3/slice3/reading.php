@@ -88,8 +88,10 @@ ok(preg_match('/<iframe class="mail-body-frame" id="frame-' . $m1 . '" sandbox="
 ok(str_contains($r['body'], 'data-banner="outside"') && str_contains($r['body'], 'data-banner="dmarc-pass"') && str_contains($r['body'], 'data-banner="spam"'), 'the banners: from outside, DMARC passed, the spam score');
 ok(str_contains($r['body'], 'id="act-archive"') && str_contains($r['body'], 'id="act-trash"') && str_contains($r['body'], 'id="act-spam"') && str_contains($r['body'], 'id="act-star"') && str_contains($r['body'], 'id="act-sensitive"'),
    'the actions this slice built are there (archive, delete, spam, star, sensitive)…');
-ok(!str_contains($r['body'], 'id="act-reply"') && !str_contains($r['body'], 'id="act-label"') && !str_contains($r['body'], 'id="act-snooze"') && !str_contains($r['body'], 'id="act-take-over"'),
-   '…and no button for an action another slice has not built (reply, label, snooze, take over — decision 6)');
+ok(!str_contains($r['body'], 'id="act-reply"') && !str_contains($r['body'], 'id="act-take-over"'),
+   '…and no button for an action another slice has not built (reply, take over — decision 6)');
+// slice 6 built Label and Snooze: a triage holder's conversation offers them (the buttons follow the registry's built flag)
+ok(str_contains($r['body'], 'id="act-label"') && str_contains($r['body'], 'id="act-snooze"'), '…while Label and Snooze, built by slice 6, are offered');
 ok(str_contains($r['body'], 'id="mail-shortcuts"') && str_contains($r['body'], 'data-keys="on"') && str_contains($r['body'], '/assets/mail/keys.js'), 'the shortcuts section and the keyboard script, on by default');
 ok(str_contains($r['body'], 'id="msg-' . $m1 . '-original"'), 'Show original');
 ok((string) one('SELECT seen FROM mail_messages WHERE id = :id', ['id' => $m1]) === '1' || one('SELECT seen FROM mail_messages WHERE id = :id', ['id' => $m1]) === true, 'opening marked it read on the server (store_seen for the owner)');
@@ -361,8 +363,13 @@ ok(count(q("SELECT 1 FROM activity_log WHERE action = 'message.raw' AND mailbox_
 ok(page($jd, "/m/$E/msg/$me1/original")['code'] === 404 && page($jd, "/m/$E/msg/$me1/raw")['code'] === 404, 'Dana: 404 on both');
 $acc = as_member(26, "SELECT string_agg(DISTINCT action, ',' ORDER BY action) FROM mcp_mailbox_access_log WHERE mailbox_id = $E");
 ok(str_contains((string) $acc, 'message.open') && str_contains((string) $acc, 'message.raw'), 'the access log view shows the reading rows to the overseer', (string) $acc);
-$mcp = q("SELECT count(*) FROM activity_log WHERE action = 'mcp.read' AND mailbox_id = $E AND actor_member_id = 26");
-ok($mcp[0]['count'] >= 1, 'an agent-mailbox read through the records queries (door.py) wrote mcp.read');
+// door.py wrote it a step ago through another connection: wait for the row (bounded), never read the log once and judge
+$mcpN = 0;
+for ($i = 0; $i < 50 && $mcpN < 1; $i++) {
+    $mcpN = (int) one("SELECT count(*) FROM activity_log WHERE action = 'mcp.read' AND mailbox_id = $E AND actor_member_id = 26");
+    if ($mcpN < 1) { usleep(200000); }
+}
+ok($mcpN >= 1, 'an agent-mailbox read through the records queries (door.py) wrote mcp.read', "rows seen: $mcpN");
 ok(count(q("SELECT 1 FROM activity_log WHERE after::text ILIKE '%Ship the Q4%' OR after::text ILIKE '%floor plan is attached%'")) === 0, 'no body text in any activity row');
 
 finish();

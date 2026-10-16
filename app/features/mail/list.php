@@ -53,13 +53,14 @@ function mail_page_size(array $box): int
 }
 
 /** The ids of a view in order (ml_mail_list_ids — the list's own filter), at most $limit, newest first, after $before. */
-function mail_list_ids(PDO $db, int $mailbox, string $view, ?int $folder, bool $unread, ?array $before, int $limit): array
+function mail_list_ids(PDO $db, int $mailbox, string $view, ?int $folder, bool $unread, ?array $before, int $limit, ?int $label = null): array
 {
     $st = $db->prepare('SELECT row_kind, row_id, (floor(extract(epoch FROM row_at) * 1000))::bigint AS at_ms
-                          FROM ml_mail_list_ids(:mb, :view, :folder, NULL, :unread, :bat, :bid, :lim)');
+                          FROM ml_mail_list_ids(:mb, :view, :folder, :label, :unread, :bat, :bid, :lim)');
     $st->bindValue('mb', $mailbox, PDO::PARAM_INT);
-    $st->bindValue('view', $folder !== null ? null : $view);
+    $st->bindValue('view', $folder !== null || $label !== null ? null : $view);
     $st->bindValue('folder', $folder, $folder === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+    $st->bindValue('label', $label, $label === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
     $st->bindValue('unread', $unread, PDO::PARAM_BOOL);
     $st->bindValue('bat', $before[0] ?? null);
     $st->bindValue('bid', $before[1] ?? null, isset($before[1]) ? PDO::PARAM_INT : PDO::PARAM_NULL);
@@ -69,16 +70,17 @@ function mail_list_ids(PDO $db, int $mailbox, string $view, ?int $folder, bool $
 }
 
 /** The rows of one page from the gatherer, in the shape the templates and the JSON read use. */
-function mail_list_rows(PDO $db, int $mailbox, string $view, ?int $folder, bool $unread, ?array $before, int $limit): array
+function mail_list_rows(PDO $db, int $mailbox, string $view, ?int $folder, bool $unread, ?array $before, int $limit, ?int $label = null): array
 {
     $st = $db->prepare('SELECT thread_id, subject, array_to_json(participants) AS participants, names, last_message_at,
                                (floor(extract(epoch FROM last_message_at) * 1000))::bigint AS at_ms, message_count, unread, flagged,
                                has_attachments, snippet, labels, snoozed_until, sensitive, agent_badge, latest_message, outbound_id,
                                outbound_status, send_after, array_to_json(hold_reasons) AS hold_reasons
-                          FROM ml_mail_list(:mb, :view, :folder, NULL, :unread, :bat, :bid, :lim)');
+                          FROM ml_mail_list(:mb, :view, :folder, :label, :unread, :bat, :bid, :lim)');
     $st->bindValue('mb', $mailbox, PDO::PARAM_INT);
-    $st->bindValue('view', $folder !== null ? null : $view);
+    $st->bindValue('view', $folder !== null || $label !== null ? null : $view);
     $st->bindValue('folder', $folder, $folder === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+    $st->bindValue('label', $label, $label === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
     $st->bindValue('unread', $unread, PDO::PARAM_BOOL);
     $st->bindValue('bat', $before[0] ?? null);
     $st->bindValue('bid', $before[1] ?? null, isset($before[1]) ? PDO::PARAM_INT : PDO::PARAM_NULL);
@@ -95,6 +97,18 @@ function mail_list_rows(PDO $db, int $mailbox, string $view, ?int $folder, bool 
         $r['cursor'] = mail_row_cursor($r);
         $rows[] = $r;
     }
+    // the "back from snooze" chip (db/019): the conversations that woke and have not been opened since
+    $ids = array_values(array_filter(array_map(static fn (array $r): ?int => $r['thread_id'] === null ? null : (int) $r['thread_id'], $rows)));
+    $woke = [];
+    if ($ids !== []) {
+        $w = $db->prepare('SELECT ml_woke_threads(CAST(:ids AS bigint[]))');
+        $w->execute(['ids' => '{' . implode(',', $ids) . '}']);
+        $woke = array_flip(array_map('intval', $w->fetchAll(PDO::FETCH_COLUMN)));
+    }
+    foreach ($rows as &$r) {
+        $r['woke'] = $r['thread_id'] !== null && isset($woke[(int) $r['thread_id']]);
+    }
+    unset($r);
     return $rows;
 }
 
@@ -103,15 +117,15 @@ function mail_list_rows(PDO $db, int $mailbox, string $view, ?int $folder, bool 
  * row number of the page's first row, carried in the links (`n`) so "26–50 of N" needs no count of what came before — when a link did
  * not carry it, it is counted once.
  */
-function mail_list_page(PDO $db, int $mailbox, string $view, ?int $folder, ?string $before, bool $unread, int $limit, ?int $start = null): array
+function mail_list_page(PDO $db, int $mailbox, string $view, ?int $folder, ?string $before, bool $unread, int $limit, ?int $start = null, ?int $label = null): array
 {
     $limit = max(1, min(100, $limit));
     $cur = mail_cursor_parse($before);
-    $rows = mail_list_rows($db, $mailbox, $view, $folder, $unread, $cur, $limit);
+    $rows = mail_list_rows($db, $mailbox, $view, $folder, $unread, $cur, $limit, $label);
     $older = null;
     if (count($rows) === $limit) {
         $last = mail_cursor_parse($rows[$limit - 1]['cursor']);
-        if (mail_list_ids($db, $mailbox, $view, $folder, $unread, $last, 1) !== []) {
+        if (mail_list_ids($db, $mailbox, $view, $folder, $unread, $last, 1, $label) !== []) {
             $older = $rows[$limit - 1]['cursor'];
         }
     }
@@ -119,7 +133,7 @@ function mail_list_page(PDO $db, int $mailbox, string $view, ?int $folder, ?stri
         $start = 0;
     } elseif ($start === null || $start < 0) {
         $start = 0;
-        foreach (mail_list_ids($db, $mailbox, $view, $folder, $unread, null, 10001) as $i) {
+        foreach (mail_list_ids($db, $mailbox, $view, $folder, $unread, null, 10001, $label) as $i) {
             if ([(int) $i['at_ms'], (int) $i['row_id']] >= [(int) explode('.', (string) $before)[0], $cur[1]]) {
                 $start++;
             }
@@ -130,13 +144,13 @@ function mail_list_page(PDO $db, int $mailbox, string $view, ?int $folder, ?stri
         if ($start <= $limit) {
             $newer = '';                                               // the first page
         } else {
-            $ids = mail_list_ids($db, $mailbox, $view, $folder, $unread, null, $start - $limit);
+            $ids = mail_list_ids($db, $mailbox, $view, $folder, $unread, null, $start - $limit, $label);
             $lastId = end($ids);
             $newer = $lastId === false ? '' : $lastId['at_ms'] . '.' . $lastId['row_id'];
         }
     }
-    $total = (int) db_value($db, 'SELECT ml_mail_list_total(:mb, :view, :folder, NULL, :unread)', [
-        'mb' => $mailbox, 'view' => $folder !== null ? null : $view, 'folder' => $folder, 'unread' => $unread]);
+    $total = (int) db_value($db, 'SELECT ml_mail_list_total(:mb, :view, :folder, :label, :unread)', [
+        'mb' => $mailbox, 'view' => $folder !== null || $label !== null ? null : $view, 'folder' => $folder, 'label' => $label, 'unread' => $unread]);
     $seq = (int) db_value($db, 'SELECT ml_mailbox_seq(:mb)', ['mb' => $mailbox]);
     return ['rows' => $rows, 'older' => $older, 'newer' => $newer, 'total' => $total, 'seq' => $seq, 'start' => $start, 'limit' => $limit];
 }
@@ -188,7 +202,9 @@ function mail_rail(PDO $db, int $currentMailbox): array
     }
     $counts = null;
     $folders = [];
+    $labels = [];
     if ($current !== null) {
+        $labels = ml_labels_of($db, (int) $current['id']);
         $counts = json_decode((string) db_value($db, 'SELECT ml_mailbox_counts(:mb)', ['mb' => (int) $current['id']]), true) ?: null;
         $fs = $db->prepare("SELECT id, name, delimiter, messages_unseen FROM mcp_folders WHERE mailbox_id = :mb AND special_use IS NULL
                              AND upper(name) <> 'INBOX' ORDER BY name");
@@ -202,7 +218,7 @@ function mail_rail(PDO $db, int $currentMailbox): array
         }
     }
     return ['groups' => array_filter($groups, static fn (array $g): bool => $g[1] !== []), 'current' => $current, 'counts' => $counts,
-            'folders' => $folders];
+            'folders' => $folders, 'labels' => $labels];
 }
 
 /** A view's count for the rail, where it matters: Inbox unread, Drafts total, Scheduled total, Outbox failed + held. */
@@ -225,7 +241,7 @@ function mail_view_count(?array $counts, string $view): string
  * conversations newer than $top are counted for the "N new" bar (they never shift the page — decision 4).
  */
 function mail_changes(PDO $db, int $mailbox, int $since, string $view, ?int $folder, array $pageThreadIds, ?string $top = null,
-                      int $limit = 50, bool $unread = false): ?array
+                      int $limit = 50, bool $unread = false, ?int $label = null): ?array
 {
     $seq = db_value($db, 'SELECT ml_mailbox_seq(:mb)', ['mb' => $mailbox]);
     if ($seq === null || $seq === false) {
@@ -247,7 +263,7 @@ function mail_changes(PDO $db, int $mailbox, int $since, string $view, ?int $fol
     $gone = [];
     $new = 0;
     if ($topCur !== null) {
-        $window = mail_list_rows($db, $mailbox, $view, $folder, $unread, [$topCur[0], $topCur[1] + 1], max(1, min(100, $limit)));
+        $window = mail_list_rows($db, $mailbox, $view, $folder, $unread, [$topCur[0], $topCur[1] + 1], max(1, min(100, $limit)), $label);
         $inWindow = [];
         foreach ($window as $r) {
             $inWindow[(int) ($r['outbound_id'] ?? 0 ?: $r['thread_id'])] = $r;
@@ -260,7 +276,7 @@ function mail_changes(PDO $db, int $mailbox, int $since, string $view, ?int $fol
             }
         }
         $topMs = (int) explode('.', (string) $top)[0];
-        foreach (mail_list_ids($db, $mailbox, $view, $folder, $unread, null, 100) as $i) {
+        foreach (mail_list_ids($db, $mailbox, $view, $folder, $unread, null, 100, $label) as $i) {
             if ([(int) $i['at_ms'], (int) $i['row_id']] > [$topMs, $topCur[1]]) {
                 $new++;
             }
@@ -271,7 +287,7 @@ function mail_changes(PDO $db, int $mailbox, int $since, string $view, ?int $fol
                 $gone[] = $id;
             }
         }
-        $new = count(mail_list_ids($db, $mailbox, $view, $folder, $unread, null, 100));
+        $new = count(mail_list_ids($db, $mailbox, $view, $folder, $unread, null, 100, $label));
     }
     $unreadCount = db_value($db, 'SELECT ml_unread_count(:mb)', ['mb' => $mailbox]);
     return ['seq' => $seq, 'unread' => $unreadCount === null ? 0 : (int) $unreadCount, 'rows' => $rowsOut, 'gone' => $gone, 'new' => $new];
@@ -317,6 +333,26 @@ function mail_participants(array $row, string $ownAddress): string
     return $out;
 }
 
+/**
+ * The search query that finds exactly the conversations a list view holds — what "Select all N" sends as `matching` (the handlers act on
+ * every conversation it finds, up to ML_MATCHING_CAP). null when the view has no exact equivalent (starred, all mail, drafts, scheduled,
+ * outbox, a folder whose name search cannot quote): the bar then offers no "Select all N" rather than act on something different.
+ * ml_search tokenises `(-?)(?:(op):)?("…"|\S+)`, so a name with a space is quoted and one with a quote is refused.
+ */
+function mail_view_matching(string $view, ?array $folder, ?array $label, bool $unread): ?string
+{
+    if ($label !== null) {
+        $slug = (string) db_value(db(), 'SELECT slug FROM tags WHERE id = :i', ['i' => (int) $label['id']]);
+        $q = $slug !== '' && !preg_match('/\s/', $slug) ? 'label:' . $slug . ' in:anywhere' : null;     // a label view holds Trash and Spam too
+    } elseif ($folder !== null) {
+        $name = (string) $folder['name'];
+        $q = $name === '' || str_contains($name, '"') || preg_match('/[\x00-\x1f]/', $name) ? null : 'in:"' . $name . '"';
+    } else {
+        $q = ['inbox' => 'in:inbox', 'sent' => 'in:sent', 'spam' => 'in:spam', 'trash' => 'in:trash', 'snoozed' => 'is:snoozed'][$view] ?? null;
+    }
+    return $q === null ? null : $q . ($unread ? ' is:unread' : '');
+}
+
 /** The bulk bar's buttons: the actions whose handler is built (the registry's flag — decision 3). */
 function mail_bulk_actions(): array
 {
@@ -359,10 +395,11 @@ function mail_log_list_view(PDO $db, int $mailbox, string $view): void
  * The two screens' one body (html/m/view.php, html/m/folder.php): the page (or, for Older / Newer / the chip, #mail-list alone), the
  * JSON read, the access log. $box is ml_require_mailbox()'s row (404 already answered below view).
  */
-function mail_list_respond(PDO $pdo, array $box, string $view, ?array $folder): never
+function mail_list_respond(PDO $pdo, array $box, string $view, ?array $folder, ?array $label = null): never
 {
     $id = (int) $box['id'];
-    $screen = $folder !== null ? 'folder-view' : 'mailbox-view';
+    $screen = $label !== null ? 'label-view' : ($folder !== null ? 'folder-view' : 'mailbox-view');
+    $labelId = $label !== null ? (int) $label['id'] : null;
     $unread = request_string('unread') === '1';
     $before = request_string('before');
     if ($before !== '' && mail_cursor_parse($before) === null) {
@@ -370,13 +407,13 @@ function mail_list_respond(PDO $pdo, array $box, string $view, ?array $folder): 
     }
     $n = request_integer('n');
     $page = mail_list_page($pdo, $id, $view, $folder !== null ? (int) $folder['id'] : null, $before !== '' ? $before : null, $unread,
-                           mail_page_size($box), $n);
+                           mail_page_size($box), $n, $labelId);
     if (!is_htmx_request() || ($_SERVER['HTTP_HX_TARGET'] ?? '') !== 'mail-list') {
         log_screen_view($pdo, $screen, $id);
     }
-    mail_log_list_view($pdo, $id, $folder !== null ? 'folder' : $view);
+    mail_log_list_view($pdo, $id, $label !== null ? 'label' : ($folder !== null ? 'folder' : $view));
     if (wants_json()) {
-        respond_screen(['mailbox_id' => $id, 'view' => $folder !== null ? 'folder' : $view, 'folder_id' => $folder !== null ? (int) $folder['id'] : null,
+        respond_screen(['mailbox_id' => $id, 'view' => $label !== null ? 'label' : ($folder !== null ? 'folder' : $view), 'label_id' => $labelId, 'folder_id' => $folder !== null ? (int) $folder['id'] : null,
                         'rows' => array_map('mail_row_json', $page['rows']), 'older' => $page['older'], 'newer' => $page['newer'],
                         'total' => $page['total'], 'more_than' => $page['total'] > 10000 ? 10000 : null, 'start' => $page['start'],
                         'change_seq' => $page['seq']]);
@@ -391,14 +428,15 @@ function mail_list_respond(PDO $pdo, array $box, string $view, ?array $folder): 
     }
     $settings = is_string($box['settings'] ?? null) ? (json_decode($box['settings'], true) ?: []) : [];
     $poll = $pdo->query('SELECT poll_visible_seconds, poll_hidden_seconds FROM ml_settings WHERE id = 1')->fetch(PDO::FETCH_NUM) ?: [15, 60];
-    $title = $folder !== null ? (string) $folder['name'] : mail_view_label($view);
-    $data = ['box' => $box, 'view' => $view, 'folder' => $folder, 'page' => $page, 'unread' => $unread, 'title' => $title, 'status' => $status,
+    $title = $label !== null ? (string) $label['label'] : ($folder !== null ? (string) $folder['name'] : mail_view_label($view));
+    $data = ['box' => $box, 'view' => $label !== null ? 'label' : $view, 'folder' => $folder, 'label' => $label, 'page' => $page, 'unread' => $unread, 'title' => $title, 'status' => $status,
              'tz' => member_timezone(), 'poll' => [(int) $poll[0], (int) $poll[1]],
              'density' => ($settings['density'] ?? '') === 'compact' ? 'compact' : 'comfortable',
-             'base' => $folder !== null ? '/m/' . $id . '/f/' . (int) $folder['id'] : '/m/' . $id . '/v/' . $view,
+             'base' => $label !== null ? '/m/' . $id . '/label/' . $labelId : ($folder !== null ? '/m/' . $id . '/f/' . (int) $folder['id'] : '/m/' . $id . '/v/' . $view),
              // an action's landing (reading.md, slice 3): the notice and, after an archive / move / trash / spam, the Undo
              'notice' => function_exists('mail_action_notice') ? mail_action_notice($_GET['notice'] ?? null, (int) ($_GET['n'] ?? 0)) : null,
-             'undo' => isset($_GET['undo']) ? array_values(array_filter(array_map('intval', explode(',', (string) $_GET['undo'])))) : null];
+             'undo' => isset($_GET['undo']) ? array_values(array_filter(array_map('intval', explode(',', (string) $_GET['undo'])))) : null,
+             'unsnooze' => isset($_GET['unsnooze']) ? array_values(array_filter(array_map('intval', explode(',', (string) $_GET['unsnooze'])))) : null];
     $count = $view === 'inbox' && $folder === null ? (int) db_value($pdo, 'SELECT ml_unread_count(:mb)', ['mb' => $id]) : 0;
     $pageTitle = ($count > 0 ? '(' . $count . ') ' : '') . $title . ' — ' . $box['address'];
     if (is_htmx_request() && ($_SERVER['HTTP_HX_TARGET'] ?? '') === 'mail-list') {

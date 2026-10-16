@@ -3,7 +3,7 @@ TLS for the mail service's proofs, so nothing in a proof logs in to MaluMail's r
 trip its abuse protection for this whole machine (research 04). Synthetic mail only.
 
 It answers: CAPABILITY, ID, NOOP, LOGOUT, LOGIN, ENABLE (CONDSTORE, QRESYNC), LIST (SPECIAL-USE flags; `RETURN (SPECIAL-USE STATUS
-(…))`), STATUS, SELECT/EXAMINE (with `(QRESYNC (uidvalidity modseq))` → `VANISHED (EARLIER)` and the changed FETCHes), CREATE,
+(…))`), STATUS, SELECT/EXAMINE (with `(QRESYNC (uidvalidity modseq))` → `VANISHED (EARLIER)` and the changed FETCHes), CREATE, RENAME, DELETE,
 GETQUOTAROOT, [UID] SEARCH (ALL, UNSEEN, SEEN, UID set), [UID] FETCH (UID FLAGS INTERNALDATE RFC822.SIZE BODYSTRUCTURE MODSEQ PREVIEW
 BODY[.PEEK][section] BINARY[.PEEK][part]<o.l> BINARY.SIZE[part] RFC822 RFC822.HEADER; the `(CHANGEDSINCE m [VANISHED])` modifier),
 [UID] STORE, [UID] EXPUNGE, IDLE, NOTIFY SET/NONE. It advertises only what it answers. A BODY[…] or BINARY[…] fetch WITHOUT .PEEK sets
@@ -248,7 +248,7 @@ class Server:
         self.users, self.stats_path, self.passwords = users, stats_path, passwords
         self.stats = {a: {"attempts": 0, "ok": 0} for a in users}
         self.stats["_"] = {"seen_by_fetch": 0, "stores": [], "notify_sets": 0, "notify_refused": 0, "idles": 0, "selects": 0,
-                           "commands": 0, "connections": 0, "moves": [], "expunges": [], "creates": []}
+                           "commands": 0, "connections": 0, "moves": [], "expunges": [], "creates": [], "renames": [], "deletes": []}
         self.refuse_notify = no_notify
         self.boxes = {}
         self.sessions: set = set()
@@ -845,6 +845,32 @@ class Session:
             server.stats["_"]["creates"].append({"user": self.user, "folder": name})
             server.mark()
             send(f"{tag} OK CREATE completed")
+        elif cmd == "RENAME":                            # slice 6: a folder and the folders under it change name; the messages go with them
+            old, new = (args[0], args[1]) if len(args) > 1 else ("", "")
+            if old not in box or old.upper() == "INBOX" or box[old].special:
+                send(f"{tag} NO [CANNOT] A system folder keeps its name")
+                return
+            if not new or new in box:
+                send(f"{tag} NO [ALREADYEXISTS] Mailbox exists")
+                return
+            for n in [n for n in box if n == old or n.startswith(old + ".")]:
+                f = box.pop(n)
+                f.name = new + n[len(old):]
+                box[f.name] = f
+            server.stats["_"]["renames"].append({"user": self.user, "from": old, "to": new})
+            server.mark()
+            send(f"{tag} OK RENAME completed")
+        elif cmd == "DELETE":                            # slice 6: a folder goes with its messages, as Dovecot does (the mail service asks first)
+            name = args[0] if args else ""
+            if name not in box or name.upper() == "INBOX" or box[name].special:
+                send(f"{tag} NO [CANNOT] No such folder, or a system one")
+                return
+            if self.selected is box[name]:
+                self.selected = None
+            del box[name]
+            server.stats["_"]["deletes"].append({"user": self.user, "folder": name})
+            server.mark()
+            send(f"{tag} OK DELETE completed")
         elif cmd in ("SELECT", "EXAMINE"):
             f = box.get(args[0]) if args else None
             if f is None:

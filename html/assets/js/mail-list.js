@@ -51,8 +51,21 @@
         else if (t.id === 'mail-select-all-matching') {
             selectAll(true);
             var all = list.querySelector('#mail-all-matching');
-            if (all) all.value = list.getAttribute('data-view') || '1';
+            if (all) all.value = list.getAttribute('data-matching') || '';
             refreshBar();
+        }
+    });
+
+    // ---- the Label filter and Snooze panels (slice 6; the list's bar and the conversation's More menu): typing a date clears the quick
+    // choices; the filter hides the labels that do not match
+    document.addEventListener('input', function (e) {
+        var box = e.target.closest ? e.target.closest('.mail-bar-form') : null;
+        if (!box) return;
+        if (e.target.classList.contains('mail-label-filter')) {
+            var q = e.target.value.toLowerCase();
+            box.querySelectorAll('.mail-label-choice').forEach(function (r) { r.style.display = r.getAttribute('data-name').indexOf(q) === -1 ? 'none' : ''; });
+        } else if (e.target.classList.contains('mail-snooze-local')) {
+            box.querySelectorAll('.mail-snooze-choice').forEach(function (r) { r.checked = false; });
         }
     });
 
@@ -101,7 +114,7 @@
         if (!list || !document.body.contains(list)) { list = null; return; }
         var p = new URLSearchParams({
             since: list.getAttribute('data-change-seq') || '0', view: list.getAttribute('data-view') || 'inbox',
-            folder: list.getAttribute('data-folder') || '', top: list.getAttribute('data-top') || '',
+            folder: list.getAttribute('data-folder') || '', label: list.getAttribute('data-label') || '', top: list.getAttribute('data-top') || '',
             limit: list.getAttribute('data-limit') || '50', unread: list.getAttribute('data-unread') || '', ids: pageIds()
         });
         var url = '/m/' + list.getAttribute('data-mailbox') + '/changes?' + p.toString();

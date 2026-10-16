@@ -57,6 +57,7 @@ $chips = static function (string $name, array $list): string {
                 <input type="hidden" name="body_format" value="text" id="compose-body-format"><?php /* text without a script; the editor sets html when it starts */ ?>
                 <input type="hidden" name="send_at" value="" id="compose-send-at">
                 <input type="hidden" name="quote" value="no">
+                <?php if (!empty($templateId)): ?><input type="hidden" name="template" value="<?= (int) $templateId ?>"><?php endif; ?>
                 <?php if ($initial['reply_to'] !== null): ?><input type="hidden" name="message" value="<?= (int) $initial['reply_to'] ?>"><input type="hidden" name="reply_to" value="<?= (int) $initial['reply_to'] ?>"><?php endif; ?>
                 <?php if ($mode === 'reply_all'): ?><input type="hidden" name="reply_all" value="yes"><?php endif; ?>
                 <?php if ($initial['forward_of'] !== null): ?><input type="hidden" name="message" value="<?= (int) $initial['forward_of'] ?>"><?php endif; ?>

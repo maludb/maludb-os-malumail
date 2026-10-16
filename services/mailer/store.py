@@ -376,12 +376,22 @@ class Store:
     async def folder_uids(self, folder_id: int) -> list:
         return await self.pool.fetch("SELECT id, uidvalidity, uid FROM mail_messages WHERE folder_id = $1 ORDER BY uid", folder_id)
 
-    async def ensure_folder_row(self, mailbox_id: int, name: str, special_use: str) -> int:
+    async def ensure_folder_row(self, mailbox_id: int, name: str, special_use: str | None, delimiter: str = ".") -> int:
         row = await self.pool.fetchrow(
-            """INSERT INTO mail_folders (mailbox_id, name, delimiter, special_use) VALUES ($1, $2, '.', $3)
+            """INSERT INTO mail_folders (mailbox_id, name, delimiter, special_use) VALUES ($1, $2, $4, $3)
                ON CONFLICT (mailbox_id, name) DO UPDATE SET special_use = COALESCE(mail_folders.special_use, EXCLUDED.special_use)
-               RETURNING id""", mailbox_id, name, special_use)
+               RETURNING id""", mailbox_id, name, special_use, delimiter)
         return int(row["id"])
+
+    async def folder_removed(self, mailbox_id: int, folder_id: int) -> None:
+        """The folder the server no longer has (it was empty): its row goes."""
+        await self.pool.execute("DELETE FROM mail_folders WHERE id = $1 AND mailbox_id = $2", folder_id, mailbox_id)
+
+    async def folder_renamed(self, mailbox_id: int, folder_id: int, old: str, new: str, delimiter: str) -> None:
+        """A renamed folder and the folders under it: their rows follow the server's names (ids, messages and uidvalidity kept)."""
+        async with self.pool.acquire() as c, c.transaction():
+            await c.execute("UPDATE mail_folders SET name = $3 || substr(name, length($2) + 1) WHERE mailbox_id = $1 AND (name = $2 OR name LIKE $4)",
+                            mailbox_id, old, new, old.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + delimiter + "%")
 
     async def set_folder_uidvalidity(self, folder_id: int, uidvalidity: int) -> None:
         await self.pool.execute("UPDATE mail_folders SET uidvalidity = $2 WHERE id = $1 AND uidvalidity IS NULL", folder_id, uidvalidity)
