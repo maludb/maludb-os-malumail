@@ -2,11 +2,13 @@
    recipient chips with address validation (an outside address outlined), autosave by the settings' seconds and on leaving (sendBeacon),
    attachments by the paper-clip, drop and paste (one request each through the draft's files door), Send through fetch → the bar with Undo
    for the undo window, then "Sent — View message"; Schedule… as an inline panel; Discard. Without this file the plain form still sends.
-   The identity form reuses the editor for the signature. Test hooks: window.mlCompose = {draft, version, lastSave}. */
+   The identity form reuses the editor for the signature, and the review page's edit (slice 5) for the held message's body. Test hooks:
+   window.mlCompose = {draft, version, lastSave}. */
 (function () {
     'use strict';
-    var root = document.getElementById('mail-compose') || document.getElementById('identity-form-page');
+    var root = document.getElementById('mail-compose') || document.getElementById('identity-form-page') || document.getElementById('review-edit-page');
     if (!root) return;
+    if (root.id === 'review-edit-page') { reviewEdit(root); return; }
     var isIdentity = root.id === 'identity-form-page';
     var form = document.getElementById(isIdentity ? 'identity-form' : 'compose-form');
     if (!form) return;
@@ -333,4 +335,33 @@
         sent = true; dirty = false;
         fetch(discard.getAttribute('data-url'), { method: 'POST', body: fd, credentials: 'same-origin', headers: { 'Accept': 'application/json' } }).then(function () { window.location.href = '/m/' + root.getAttribute('data-mailbox') + '/v/inbox'; });
     });
+
+    // ---- the review page's edit (oversight.md review-edit): the held message's body in the same editor; HTML posted with body_format html ----
+    function reviewEdit(page) {
+        var form = document.getElementById('review-edit-form'), el = document.getElementById('review-edit-editor'), ta = document.getElementById('review-edit-body');
+        var fmt = document.getElementById('review-edit-format'), bar = page.querySelector('#compose-toolbar'), ed = null;
+        if (!form || !el || !ta || !window.Squire) return;
+        el.classList.remove('d-none'); ta.classList.add('d-none'); if (bar) bar.classList.remove('d-none');
+        ed = new window.Squire(el, { blockTag: 'div' });
+        var html = el.getAttribute('data-initial-html') || '';
+        if (html === '') { var d = document.createElement('div'); d.textContent = ta.value; html = '<div style="white-space:pre-wrap">' + d.innerHTML + '</div>'; }
+        ed.setHTML(html);
+        fmt.value = 'html';
+        window.mlReviewEdit = ed;
+        if (bar) bar.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-cmd]'); if (!b) return; e.preventDefault();
+            var c = b.getAttribute('data-cmd');
+            if (c === 'bold') ed.hasFormat('B') ? ed.removeBold() : ed.bold();
+            else if (c === 'italic') ed.hasFormat('I') ? ed.removeItalic() : ed.italic();
+            else if (c === 'underline') ed.hasFormat('U') ? ed.removeUnderline() : ed.underline();
+            else if (c === 'ul') ed.hasFormat('UL') ? ed.removeList() : ed.makeUnorderedList();
+            else if (c === 'ol') ed.hasFormat('OL') ? ed.removeList() : ed.makeOrderedList();
+            else if (c === 'quote') ed.hasFormat('BLOCKQUOTE') ? ed.decreaseQuoteLevel() : ed.increaseQuoteLevel();
+            else if (c === 'clear') ed.removeAllFormatting();
+            else if (c === 'link') { var url = window.prompt('Link to (http://…)'); if (url && /^https?:\/\//i.test(url)) ed.makeLink(url); }
+            ed.focus();
+        });
+        form.addEventListener('submit', function () { ta.value = ed.getHTML(); fmt.value = 'html'; });
+        document.body.addEventListener('htmx:configRequest', function (e) { if (e.detail.elt === form) { e.detail.parameters.body = ed.getHTML(); e.detail.parameters.body_format = 'html'; } });
+    }
 })();

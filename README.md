@@ -57,7 +57,13 @@ Undo. `tests/phase3/slice3/run.sh` proves it under php -S and Apache.
 **Slice 4, writing, is built** (2026-10-16), the third exemplar: compose, reply, reply all and forward in Fastmail's Squire editor with
 recipient chips, attachments, autosave to the Drafts folder, Undo send and scheduled sending; identities and signatures; and the mail
 service's outbox, which submits over SMTP, files the Sent copy, marks the original answered and holds an agent's message when its policy
-says so. `tests/phase3/slice4/run.sh` proves it under php -S and Apache against IMAP and SMTP fixtures. Next: slice 5, agents' mail and oversight.
+says so. `tests/phase3/slice4/run.sh` proves it under php -S and Apache against IMAP and SMTP fixtures.
+
+**Slice 5, agents' mail and oversight, is built** (2026-10-16), the fourth exemplar: the people who oversee an agent's mailbox see its week
+on a card, review its held mail exactly as it would go out — every link with its real host, every reason in a sentence — and approve,
+edit, reject, ask the agent, or take the conversation over; they answer the mail that did not wake it, set its sending policy and pause it.
+Agents never decide (refused by the page and again by the database); the agent hears each decision in a chat turn that carries ids and a
+person's words, never mail text. `tests/phase3/slice5/run.sh` proves it under php -S and Apache. Next: slice 6.
 
 ## Documents
 

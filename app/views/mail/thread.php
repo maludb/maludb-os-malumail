@@ -50,14 +50,22 @@ if ($canTriage) {
     }
 }
 $more[] = $act('mark-read', $anyUnread ? 'act-read' : 'act-unread', $anyUnread ? 'Mark read' : 'Mark unread', $anyUnread ? 'feather-eye' : 'feather-eye-off', ['read' => $anyUnread ? 'yes' : 'no']);
-foreach (['mail_label' => ['act-label', 'Label', 'feather-tag'], 'mail_snooze' => ['act-snooze', 'Snooze', 'feather-clock'], 'mail_mute' => ['act-mute', 'Mute', 'feather-bell-off']] as $a => [$id, $label, $icon]) {
+foreach (['mail_label' => ['act-label', 'Label', 'feather-tag'], 'mail_snooze' => ['act-snooze', 'Snooze', 'feather-clock']] as $a => [$id, $label, $icon]) {
     if ($canTriage && ml_action_built($a)) { $more[] = '<a class="btn btn-sm btn-light btn-touch" id="' . $id . '" href="/m/' . $mb . '/' . substr($a, 5) . '?thread=' . $tid . '"><i class="' . $icon . ' me-1"></i>' . $label . '</a>'; }
+}
+$isMuted = $t['muted'] === true || $t['muted'] === 't';
+if ($canTriage && ml_action_built('mail_mute')) {
+    $more[] = $act('mute', 'act-mute', $isMuted ? 'Unmute' : 'Mute', 'feather-bell-off', ['muted' => $isMuted ? 'no' : 'yes', 'return_to' => '/m/' . $mb . '/t/' . $tid]);
 }
 if ($isHuman && $canTriage) {
     $more[] = $act('sensitive', 'act-sensitive', $t['sensitive'] ? 'Not sensitive' : 'Mark sensitive', 'feather-lock', ['sensitive' => $t['sensitive'] ? 'no' : 'yes']);
 }
-if ($box['kind'] === 'agent' && $isHuman && ml_action_built('mail_take_over')) {
-    $more[] = $act('take-over', 'act-take-over', 'Take over', 'feather-user-check', [], '', 'btn btn-sm btn-warning btn-touch');
+if ($box['kind'] === 'agent' && $isHuman && $level === 'full' && ml_action_built('mail_thread_take_over')) {
+    $taken = $t['taken_over_by'] !== null;
+    $more[] = '<form method="post" action="/oversight/take-over" class="d-inline mail-act-form" id="act-take-over" hx-post="/oversight/take-over" hx-target="#page-content"'
+            . ($taken ? '' : ' hx-confirm="Take this conversation over? The agent is not woken by it again, and its held replies here are cancelled."') . '>' . csrf_field()
+            . '<input type="hidden" name="mailbox" value="' . $mb . '"><input type="hidden" name="thread" value="' . $tid . '"><input type="hidden" name="taken_over" value="' . ($taken ? 'no' : 'yes') . '">'
+            . '<input type="hidden" name="return_to" value="/m/' . $mb . '/t/' . $tid . '"><button type="submit" class="btn btn-sm btn-warning btn-touch"><i class="feather-user-check me-1"></i>' . ($taken ? 'Give back to the agent' : 'Take over') . '</button></form>';
 }
 $more[] = '<button type="button" class="btn btn-sm btn-light btn-touch" id="act-print" onclick="window.print()"><i class="feather-printer me-1"></i>Print</button>';
 ?>

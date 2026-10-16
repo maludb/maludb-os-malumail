@@ -66,6 +66,13 @@ function ml_oversees_any(): bool
     return $v ??= db_bool(db(), "SELECT EXISTS (SELECT 1 FROM mailboxes b WHERE b.kind = 'agent' AND ml_is_decider(b.id, app_current_member_id()))");
 }
 
+/** Does held mail wait for the caller's decision — an agent's mail from the person's own mailbox (D12) shows them Oversight too. */
+function ml_reviews_waiting(): bool
+{
+    static $v = null;
+    return $v ??= db_bool(db(), "SELECT EXISTS (SELECT 1 FROM outbound_email o WHERE o.status = 'held' AND ml_outbound_reviewer(o.id, app_current_member_id()))");
+}
+
 /** The Mail admins' names, for the no-mailbox card. */
 function ml_mail_admin_names(): array
 {

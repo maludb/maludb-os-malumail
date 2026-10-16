@@ -221,7 +221,7 @@ Actions:
 | `mail_review_edit` | `/oversight/edit.php` | **outbound**, subject, **body**, body_format (text or html) | — |  |  | `review.edit` | `mail.oversee` · decider | people | the outbound message |
 | `mail_review_reject` | `/oversight/reject.php` | **outbound**, **note** (reaches the agent in its next turn) | — |  |  | `review.reject` | `mail.oversee` · decider | people | the outbound message |
 | `mail_review_reply` | `/oversight/reply.php` | **outbound**, **note** (a question to the agent — the draft is kept) | — |  |  | `review.reply` | `mail.oversee` · decider | people | the outbound message |
-| `mail_thread_take_over` | `/oversight/take-over.php` | **mailbox**, **thread** | restore prior |  |  | `thread.take_over` | `mail.oversee` · full | people | the conversation |
+| `mail_thread_take_over` | `/oversight/take-over.php` | **mailbox**, thread, outbound (a held reply: its conversation), taken_over (yes or no — no gives it back) | restore prior |  |  | `thread.take_over` | `mail.oversee` · full | people | the conversation |
 | `mail_mute` | `/mail/mute.php` | **mailbox**, **thread[]**, muted (yes or no) | restore prior |  |  | `thread.mute` | `mail.use` · triage | yes | the first conversation |
 | `mail_unscreened_release` | `/oversight/release.php` | **mailbox**, **message** (a message key id) | — |  |  | `unscreened.release` | `mail.oversee` · full | people | the dispatch |
 | `mail_unscreened_dismiss` | `/oversight/dismiss.php` | **mailbox**, **message**, as_spam (yes to move it to Spam) | — |  |  | `unscreened.dismiss` | `mail.oversee` · full | people | the dispatch |

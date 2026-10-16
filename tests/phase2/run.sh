@@ -34,6 +34,10 @@ SELECT id, 'member', 30, 'view', 1 FROM mailboxes WHERE address = 'sales@busines
 INSERT INTO mailbox_permissions (mailbox_id, principal_kind, principal_id, level, granted_by)
 SELECT id, 'member', 26, 'full', 1 FROM mailboxes WHERE address = 'expert@business.example';
 UPDATE mailboxes SET primary_overseer_id = 26 WHERE address = 'expert@business.example';
+-- an agent's mailbox has its policy (ml_mailbox_create makes it; slice 5's policy page reads it)
+INSERT INTO agent_mail_policies (mailbox_id, send_mode, first_contact_review, attachments_review, max_external_per_day, max_per_hour, max_per_thread_per_day, wake_on_mail, wake_from, disclosure, updated_by)
+SELECT b.id, s.default_send_mode, s.default_first_contact_review, s.default_attachments_review, s.default_max_external_per_day, s.default_max_per_hour,
+       s.default_max_per_thread_per_day, s.default_wake_on_mail, s.default_wake_from, s.default_disclosure, 1 FROM mailboxes b, ml_settings s WHERE b.kind = 'agent';
 INSERT INTO ml_notice_acknowledgements (member_id, notice_version) SELECT m.id, 1 FROM members m WHERE m.member_kind = 'human' AND m.id <> 30;
 SQL
 sudo -n -u postgres psql -X -At -d "$ML_DEV_DB" -c "SELECT json_object_agg(split_part(address, '@', 1), id) FROM mailboxes" > "$ML_P2_SEED"

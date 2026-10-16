@@ -584,7 +584,7 @@ async def outbox_list(pool: asyncpg.Pool, caller: Caller, mailbox, status: str |
         shown = r["shown"]
         if status is not None and shown != status and not (status == "queued" and shown == "scheduled"):
             continue
-        item = {"outbound": r["id"], "status": shown, "to": list(r["to_addresses"] or []), "cc": list(r["cc_addresses"] or []), "subject": fence_untrusted(r["subject"] or ""),
+        item = {"outbound": r["id"], "status": shown, "to": list(r["to_addresses"] or []), "cc": list(r["cc_addresses"] or []), "subject": r["subject"] or "",
                 "send_after": r["send_after"], "sent_at": r["sent_at"], "attempts": r["attempts"], "retry_at": r["retry_at"], "smtp_reply": r["smtp_reply"],
                 "error": r["error"], "hold_reasons": list(r["hold_reasons"] or []), "refusal": r["refusal"], "external": r["external"],
                 "has_attachments": r["has_attachments"], "sender_is_agent": r["sender_is_agent"], "purpose": r["purpose"], "created_at": r["created_at"]}
@@ -599,3 +599,200 @@ async def outbox_list(pool: asyncpg.Pool, caller: Caller, mailbox, status: str |
 TOOLS.update({"find_threads": find_threads, "thread_read": thread_read, "message_read": message_read, "message_headers": message_headers,
               "find_attachments": find_attachments, "attachment_read": attachment_read,
               "find_identities": find_identities, "outbox_list": outbox_list})
+
+
+# ---- slice 5: agents' mail and oversight (docs/build-specs/oversight.md "MCP tools this slice makes real") ------------------------------
+# The same views and the same gatherer as the screens: mcp_review_queue (a Mail admin never sees a person's mailbox's held mail; the Clerk
+# sees its agent mailboxes' queue and decides nothing), ml_agent_mail_summary() (decision 1 — the cards and these tools never disagree),
+# mcp_dispatches, mcp_agent_mail_policies. Held mail is an agent's words and a subject came in mail: Phase 4's tools wrap them in
+# fence_untrusted() (server_common.py) as they do every string from a message — these queries answer the plain text.
+
+REASONS = ("mode", "first_contact", "attachment", "over_hour", "over_day", "over_thread", "over_business_budget", "paused",
+           "hold_all_agents", "hold_all_external", "on_behalf")
+UNSCREENED_WHY = {"unknown_sender": "An outside sender this mailbox does not know", "internal_unproven": "Looks internal, but this application did not send it",
+                  "unauthenticated": "No DMARC pass", "no_overseer": "No primary overseer to act"}
+
+
+async def review_queue(pool: asyncpg.Pool, caller: Caller, mailbox=None, reason: str | None = None, limit: int = 25) -> dict:
+    """Held mail the caller reviews (or, for the Clerk, holds triage on), oldest first: it expires."""
+    limit = max(1, min(100, int(limit or 25)))
+    if reason is not None and reason not in REASONS:
+        return bad("reason is one of " + ", ".join(REASONS))
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        mid = None
+        if mailbox is not None:
+            mid = await _mailbox_id(con, mailbox)
+            if mid is None:
+                return not_found()
+        rows = await con.fetch(
+            """SELECT q.id, q.mailbox_id, q.mailbox_address, q.sender_member_id, s.display_name AS sender, q.to_addresses, q.cc_addresses, q.subject,
+                      q.hold_reasons, q.held_at, q.expires_at, q.can_decide
+                 FROM mcp_review_queue q LEFT JOIN mcp_members s ON s.member_id = q.sender_member_id
+                WHERE ($1::bigint IS NULL OR q.mailbox_id = $1) AND ($2::text IS NULL OR $2 = ANY (q.hold_reasons))
+                ORDER BY q.held_at, q.id LIMIT $3""", mid, reason, limit)
+        for b in sorted({r["mailbox_id"] for r in rows}):
+            await _log_read(con, caller, b, "review_queue")
+    return {"ok": True, "held": [{"outbound": r["id"], "mailbox": r["mailbox_id"], "mailbox_address": r["mailbox_address"], "sender": r["sender"],
+                                  "to": list(r["to_addresses"] or []) + list(r["cc_addresses"] or []), "subject": r["subject"] or "",
+                                  "hold_reasons": list(r["hold_reasons"] or []), "held_at": r["held_at"], "expires_at": r["expires_at"],
+                                  "can_decide": r["can_decide"]} for r in rows]}
+
+
+def _links_with_hosts(html: str | None, text: str) -> list[dict]:
+    """The links of a held message with their real hosts (oversight.md decision 3) — the same rule as app/features/oversight/links.php."""
+    import html as _html
+    from urllib.parse import urlsplit
+    out, seen = [], set()
+    for m in re.finditer(r"""<a\b[^>]*\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>(.*?)</a>""", html or "", re.I | re.S):
+        href = _html.unescape((m.group(1) or m.group(2) or m.group(3) or "").strip())
+        if not href:
+            continue
+        words = re.sub(r"\s+", " ", _html.unescape(re.sub(r"<[^>]+>", "", m.group(4) or ""))).strip()
+        out.append((words, href))
+        seen.add(href)
+    for u in re.findall(r"""\bhttps?://[^\s<>"']+""", text or "", re.I):
+        u = u.rstrip(".,);:!?")
+        if u not in seen:
+            out.append(("", u))
+            seen.add(u)
+    res = []
+    for words, href in out[:200]:
+        if href.lower().startswith("mailto:"):
+            host = "mail to " + href[7:].split("?", 1)[0].lower()
+        else:
+            host = (urlsplit(href).hostname or "(no host)").lower()
+        res.append({"text": words, "href": href[:300], "host": host})
+    return res
+
+
+async def review_get(pool: asyncpg.Pool, caller: Caller, outbound) -> dict:
+    """The held message as it will go out, the conversation it answers, the purpose, the run, every hold reason, the decisions so far."""
+    try:
+        oid = int(outbound)
+    except (TypeError, ValueError):
+        return bad("outbound is the held message's id")
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        q = await con.fetchrow(
+            """SELECT q.*, i.address::text AS from_address, s.display_name AS sender
+                 FROM mcp_review_queue q LEFT JOIN mcp_members s ON s.member_id = q.sender_member_id
+                 LEFT JOIN mcp_outbound o ON o.id = q.id LEFT JOIN mcp_identities i ON i.id = o.identity_id
+                WHERE q.id = $1""", oid)
+        if q is None:
+            return not_found("held message")
+        reviews = await con.fetch("SELECT r.decision, m.display_name AS by, r.note, r.created_at FROM mcp_mail_reviews r LEFT JOIN mcp_members m ON m.member_id = r.reviewer_member_id "
+                                  "WHERE r.outbound_id = $1 ORDER BY r.created_at, r.id", oid)
+        atts = await con.fetch("SELECT filename, mime_type, byte_size, sha256 FROM mcp_outbound_attachments WHERE outbound_id = $1 ORDER BY id", oid)
+        thread = None
+        if q["reply_to_key_id"] is not None:
+            thread = await con.fetchval("SELECT thread_id FROM mcp_messages WHERE mailbox_id = $1 AND message_key_id = $2 ORDER BY id LIMIT 1",
+                                        q["mailbox_id"], q["reply_to_key_id"])
+        await _log_read(con, caller, q["mailbox_id"], "review_get")
+    return {"ok": True, "outbound": oid, "mailbox": q["mailbox_id"], "mailbox_address": q["mailbox_address"], "from": q["from_address"] or q["mailbox_address"],
+            "sender": q["sender"], "to": list(q["to_addresses"] or []), "cc": list(q["cc_addresses"] or []), "bcc": list(q["bcc_addresses"] or []),
+            "outside_recipients": list(q["outside_recipients"] or []), "new_recipients": list(q["new_recipients"] or []),
+            "subject": q["subject"] or "", "text": q["body_text"] or "", "links": _links_with_hosts(q["body_html"], q["body_text"] or ""),
+            "attachments": [{"name": a["filename"], "type": a["mime_type"], "size": a["byte_size"], "sha256": a["sha256"]} for a in atts],
+            "disclosure": q["disclosure"], "thread_id": thread, "purpose": q["purpose"], "run_id": q["agent_run_id"], "hold_reasons": list(q["hold_reasons"] or []),
+            "held_at": q["held_at"], "expires_at": q["expires_at"], "can_decide": q["can_decide"],
+            "reviews": [{"decision": r["decision"], "by": r["by"], "note": r["note"], "at": r["created_at"]} for r in reviews]}
+
+
+def _summary(doc) -> dict:
+    s = json.loads(doc) if isinstance(doc, str) else dict(doc or {})
+    return s
+
+
+async def agent_mail_summary(pool: asyncpg.Pool, caller: Caller, mailbox, days: int = 7) -> dict:
+    """An agent mailbox's days: received, woken, unscreened, sent, held, its record, refusals, external today against the cap (ml_agent_mail_summary)."""
+    days = max(1, min(90, int(days or 7)))
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        mid = await _mailbox_id(con, mailbox)
+        if mid is None or await con.fetchval("SELECT kind FROM mcp_mailboxes WHERE id = $1", mid) != "agent":
+            return not_found()
+        if await con.fetchval("SELECT ml_level_rank(ml_level($1))", mid) < 2:
+            return not_found()
+        doc = await con.fetchval("SELECT ml_agent_mail_summary($1, $2)", mid, days)
+        await _log_read(con, caller, mid, "agent_mail_summary")
+    return {"ok": True, "summary": _summary(doc)}
+
+
+async def oversight_summary(pool: asyncpg.Pool, caller: Caller, days: int = 7) -> dict:
+    """One card per agent mailbox the caller oversees (a person with full) — or, for the Clerk, holds triage on: the summary, paused, the oldest held."""
+    days = max(1, min(90, int(days or 7)))
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        rows = await con.fetch(
+            """SELECT b.id, b.display_name, ml_agent_mail_summary(b.id, $1) AS s
+                 FROM mcp_mailboxes b
+                WHERE b.kind = 'agent' AND (ml_is_decider(b.id, $2)
+                       OR ($2 = (SELECT clerk_member_id FROM mcp_settings) AND ml_level_rank(b.my_level) >= 2))
+                ORDER BY b.display_name""", days, caller.member_id)
+    cards = [dict(_summary(r["s"]), name=r["display_name"]) for r in rows]
+    cards.sort(key=lambda c: (-int(c.get("held_now") or 0), str(c.get("name") or "").lower()))
+    return {"ok": True, "cards": cards}
+
+
+async def unscreened_mail(pool: asyncpg.Pool, caller: Caller, mailbox=None, limit: int = 25) -> dict:
+    """The arriving mail that did not wake its agent, and why — newest first."""
+    limit = max(1, min(100, int(limit or 25)))
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        mid = None
+        if mailbox is not None:
+            mid = await _mailbox_id(con, mailbox)
+            if mid is None:
+                return not_found()
+        rows = await con.fetch(
+            """SELECT d.message_key_id, d.mailbox_id, b.address::text AS mailbox_address, d.from_address, d.subject, d.received_at, d.decision, d.dmarc_pass
+                 FROM mcp_dispatches d JOIN mcp_mailboxes b ON b.id = d.mailbox_id
+                WHERE d.status = 'unscreened' AND d.kind = 'mail' AND ($1::bigint IS NULL OR d.mailbox_id = $1)
+                ORDER BY COALESCE(d.received_at, d.created_at) DESC, d.id DESC LIMIT $2""", mid, limit)
+        for b in sorted({r["mailbox_id"] for r in rows}):
+            await _log_read(con, caller, b, "unscreened_mail")
+    return {"ok": True, "unscreened": [{"message": r["message_key_id"], "mailbox": r["mailbox_id"], "mailbox_address": r["mailbox_address"],
+                                        "from": r["from_address"], "dmarc_pass": r["dmarc_pass"], "subject": r["subject"] or "",
+                                        "received_at": r["received_at"], "reason": r["decision"], "why": UNSCREENED_WHY.get(r["decision"], r["decision"])}
+                                       for r in rows]}
+
+
+POLICY_MEANINGS = {
+    "send_mode": "What the agent may send without a person: hold everything, send inside the business, send to an allow-list, or send on its own.",
+    "allow_domains": "The outside domains an allow-list agent writes to without review.",
+    "allow_addresses": "The outside addresses an allow-list agent writes to without review.",
+    "first_contact_review": "Hold a message to anyone this mailbox has never written to.",
+    "attachments_review": "Hold every message that carries a file.",
+    "max_external_per_day": "At most this many messages leaving the business a day.",
+    "max_per_hour": "At most this many messages an hour.",
+    "max_per_thread_per_day": "At most this many messages a day in one conversation.",
+    "wake_on_mail": "Arriving mail wakes the agent for one turn.",
+    "wake_from": "Whose mail wakes it; the rest waits in Unscreened for a person.",
+    "disclosure": "Its mail carries a line saying an AI agent wrote it.",
+    "disclosure_text": "The line, with {agent} for its name.",
+}
+
+
+async def agent_mail_policy_get(pool: asyncpg.Pool, caller: Caller, mailbox) -> dict:
+    """An agent mailbox's policy with each setting's meaning, the business-wide budget and switches that also apply, who set it last and when."""
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        mid = await _mailbox_id(con, mailbox)
+        if mid is None:
+            return not_found()
+        p = await con.fetchrow("SELECT p.*, u.display_name AS updated_by_name, pb.display_name AS paused_by_name FROM mcp_agent_mail_policies p "
+                               "LEFT JOIN mcp_members u ON u.member_id = p.updated_by LEFT JOIN mcp_members pb ON pb.member_id = p.paused_by WHERE p.mailbox_id = $1", mid)
+        if p is None:
+            return not_found("agent mailbox")
+        s = await con.fetchrow("SELECT agent_external_budget_today, hold_all_agents, hold_all_external, held_expiry_hours FROM mcp_settings")
+        await _log_read(con, caller, mid, "agent_mail_policy_get")
+    pol = {k: (list(p[k]) if k in ("allow_domains", "allow_addresses") else p[k]) for k in POLICY_MEANINGS}
+    return {"ok": True, "mailbox": mid, "policy": pol, "meanings": POLICY_MEANINGS, "paused": p["paused"], "paused_by": p["paused_by_name"],
+            "pause_reason": p["pause_reason"], "updated_by": p["updated_by_name"], "updated_at": p["updated_at"],
+            "business": {"budget_today": s["agent_external_budget_today"] if s else None, "hold_all_agents": s["hold_all_agents"] if s else None,
+                         "hold_all_external": s["hold_all_external"] if s else None, "held_expiry_hours": s["held_expiry_hours"] if s else None}}
+
+
+TOOLS.update({"review_queue": review_queue, "review_get": review_get, "agent_mail_summary": agent_mail_summary, "oversight_summary": oversight_summary,
+              "unscreened_mail": unscreened_mail, "agent_mail_policy_get": agent_mail_policy_get})

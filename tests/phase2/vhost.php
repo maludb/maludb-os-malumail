@@ -24,8 +24,10 @@ $r = page($j, "/m/$priya/identities/new");
 ok($r['code'] === 200 && str_contains($r['body'], 'id="identity-form"'), "/m/{mailbox}/identities/new reaches its screen (slice 4 built it)");
 $r = page($j, "/m/$priya/identities/999999/edit");
 ok($r['code'] === 404 && str_contains($r['body'], 'No such identity'), "/m/{mailbox}/identities/{identity}/edit reaches its screen (slice 4 built it: its own 404)");
+// slice 5 built review-view and review-edit: their routes answer their own screens (a message no one holds: 404)
+ok(page($j, '/oversight/review/999999')['code'] === 404 && page($j, '/oversight/review/999999/edit')['code'] === 404, '/oversight/review/{outbound} and /edit reach their screens (slice 5 built them: its own 404)');
 foreach (["/m/$priya/label/2", "/m/$priya/people/jon%40acme.example",
-          "/m/$priya/access/new", "/m/$priya/search", "/m/$priya/access-log", "/oversight/review/5", "/oversight/review/5/edit",
+          "/m/$priya/access/new", "/m/$priya/search", "/m/$priya/access-log",
           '/templates/new', '/templates/7/edit', '/search', '/notifications', '/settings/notifications'] as $p) {
     $r = page($j, $p);
     ok($r['code'] === 200 && str_contains($r['body'], 'builds this screen'), "$p reaches its screen's placeholder");

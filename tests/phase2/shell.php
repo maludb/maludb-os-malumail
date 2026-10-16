@@ -132,8 +132,8 @@ ok(page($jo, "/m/$priya/v/inbox")['code'] === 404, 'the Mail admin: a person\'s 
 $r = page($jd, "/m/$sales/settings");
 ok($r['code'] === 403 && str_contains($r['body'], 'read this mailbox (view)'), 'Dana at view on sales@: its settings refused in words (403)');
 ok(page($jd, "/m/$sales/v/inbox")['code'] === 200 && page($jd, "/m/$sales/compose")['code'] === 403, '…its Inbox opens; compose needs triage');
-ok(page($jp, "/m/$expert/policy")['code'] === 200, 'Priya, the Expert\'s overseer, reaches its policy\'s placeholder');
-ok(page($jd, '/oversight')['code'] === 200, 'Oversight\'s placeholder opens to a Mail user (the rail hides it from one who oversees nothing)');
+ok(str_contains(page($jp, "/m/$expert/policy")['body'], 'data-screen="agent-policy"'), 'Priya, the Expert\'s overseer, reaches its policy (slice 5 built it)');
+ok(str_contains(page($jd, '/oversight')['body'], 'id="oversight-empty"'), 'Oversight opens to a Mail user who oversees nothing, saying so (the rail hides it; slice 5 built it)');
 $r = page($jp, '/admin/mailboxes');
 ok($r['code'] === 403 && str_contains($r['body'], 'super-admin'), 'a Mail user is refused the admin in the schema\'s sentence');
 ok(page($jm, '/admin/mailboxes')['code'] === 403, 'Marco (the admin role, no super-admin) is refused too');

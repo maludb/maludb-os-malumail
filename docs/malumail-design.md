@@ -1508,4 +1508,44 @@ questions in one sitting and changed none:
     Phase 2 79/44/28 and 79/48/28 (it now follows slice 4's screens), slices 1–3 green both ways, the mail service 80, the kit 101, the
     schema 554, the specs 98, the registry check green.
 
-  **NEXT:** slice 5, agents' mail and oversight (THE FOURTH EXEMPLAR). **People's existing mailboxes wait on MM1.**
+- **2026-10-16, SLICE 5 BUILT — agents' mail and oversight, THE FOURTH EXEMPLAR** (`docs/build-specs/oversight.md`, the slice 5 parts of
+  `sending-and-oversight.md`; the owner: "Push and continue to slice 5"). 6 screens, 12 actions (the registry: 25 of 45 screens, 46 of 67
+  actions built).
+  - **The screens** (`html/oversight/`, `html/m/policy.php`, `app/features/oversight/`, `app/views/oversight/`): `oversight` — a card per
+    agent mailbox the person decides (`ml_agent_mail_summary()`, the ONE gatherer the two summary tools share), Paused in red with who and
+    why, Pause asking its reason inline, Resume; `review-queue` — oldest first, every reason a chip, outside recipients amber and new ones
+    marked, filters by mailbox and reason, the rows polled every 30 s while visible, "For its overseers" and no buttons for a non-decider;
+    `review-view` — the message exactly as it goes out, its body on its own sandboxed response (`/oversight/review/{outbound}/body`, the
+    message body's CSP), every link with its REAL host (`links.php`, server-side; an international name kept in its `xn--` form), the
+    attachments with their digests, the conversation it answers with its DMARC and spam score, the purpose, the run, each reason in a
+    sentence about THIS message, the decisions so far; a decided message shows an edit's line diff; `review-edit` — slice 4's Squire editor
+    (`compose.js` gains the review mode), the recipients read-only; `unscreened` — why in words, Release, Mark sender known, Spam, Dismiss,
+    Open; `agent-policy` — each setting with its meaning, what the business also applies, the pause switch, the history from the activity
+    log; `policy.js` sets `hx-confirm` naming what WIDENS (never for a narrowing).
+  - **The handlers:** the eleven people actions start with `ov_handler_begin()` (POST, CSRF, `require_human()`, `mail.oversee`) and the
+    schema refuses an agent and a non-decider again; a decision lands on the NEXT held message (decision 4); `mail_mute` (`/mail/mute.php`)
+    is the one an agent may. The conversation page's Mute and Take over / Give back are real forms now (it asked `ml_action_built()` about
+    a `mail_take_over` that does not exist).
+  - **The worker:** `dispatches` — one chat turn per queued dispatch (a woken mail, a release, a reject, a reply, a take-over, an expiry),
+    at most five per agent a pass, none for a paused mailbox, the turn carrying ids and a person's words, never mail text (no body, no
+    subject), backed off 1, 5, 30 minutes then `failed` with a `dispatch_failed` notice; `held_expiry` — `ml_held_expire()` and one
+    `review.expire` row each.
+  - **The tools:** `review_queue`, `review_get`, `agent_mail_summary`, `oversight_summary`, `unscreened_mail`, `agent_mail_policy_get` in
+    `mcp/records_server.py` and `review_trail`, `agent_activity` in `mcp/activity_queries.py` — over the `mcp_*` views only (the records role
+    reads no base table). **Found:** slice 4's `outbox_list` called `fence_untrusted()` without importing it (a NameError on its first call —
+    no proof had called it); the queries answer plain text and Phase 4's tools fence, as the file's header says.
+  - **`db/018_oversight_slice5.sql`:** `notifications.kind` admits `dispatch_failed` (§9.3's notice had no kind); `mcp_outbound_attachments`
+    (a held message's files behind `mcp_outbound`'s wall, never a storage path — `review_get` had no view to read them). Proven by
+    `db/proof/slice5_oversight.sql` (7).
+  - **The manifest:** `mail_thread_take_over` → `**mailbox**, thread, outbound, taken_over` — the review page names the held reply, the
+    conversation page gives a conversation back.
+  - **As built, recorded:** resume removes `paused` from a message held for other reasons too, and lets a person-approved one go; one held
+    for the pause ALONE and never reviewed waits for a person still saying `paused` (`ml_mailbox_pause()`; `oversight.md` Proof 8's "waits
+    without paused" is true of the first kind). An internal-looking sender is a real mailbox's address: an unknown address on the business's
+    domain is not internal (`ml_is_internal_address()`), so it is Unscreened as `unauthenticated`.
+  - **The proof:** `tests/phase3/slice5/run.sh` — checks 168, tools 31, browser 27 (375 and 1280 px, a held body that tries to run script
+    runs nothing) under php -S and under Apache; the live step skipped (no handoff file named — one submission when it runs: an agent's first
+    contact held, approved, arriving at spike02 with `X-OS-Agent` and without `Auto-Submitted`). Phase 2 follows slice 5's screens; slices
+    1–4 green both ways, the mail service 80, the kit 101, the schema 561, the specs 98, the registry check green.
+
+  **NEXT:** slice 6 (Sonnet 5.5 workers from here, D16). **People's existing mailboxes wait on MM1.**

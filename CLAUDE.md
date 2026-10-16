@@ -206,6 +206,22 @@ customer key nor the sealing secret** — the proof checks it.
   `html/assets/vendor/README.md`. The sticky bar is placed by the script above the tab bar and the command bar; never assume a phone
   keyboard sends a key event for a comma.
 
+## Slice 5 (2026-10-16, agents' mail and oversight BUILT — THE FOURTH EXEMPLAR) — `docs/build-specs/oversight.md`, `sending-and-oversight.md` §7–§9
+- `bash tests/phase3/slice5/run.sh` (php -S) and `ML_APP=apache …`: scratch `ml_dev5`; `checks.php` (every hold reason from a REAL agent send
+  under a run token, the refusals, the five decisions, agents never decide, a person's mailbox, expiry, Unscreened, pause/resume, the
+  policy), `tools.py` (the records and activity queries as the records role), `browser.mjs` (375 and 1280, the sandboxed held body),
+  `live.py` (only with `ML_LIVE_CREDENTIALS`; ONE submission); checks 168, tools 31, browser 27 under both. `ML_S5_HOLD=1` leaves the
+  servers up. The fake kernel's chat endpoint appends every turn (agent, acting member, utterance, context, conversation) to `<state>.chat`.
+- **Every people-only decision copies `html/oversight/approve.php` + `app/features/oversight/`**: `ov_handler_begin()` (POST, CSRF,
+  `require_human()`, the right) — the SQL function refuses an agent (`ml_require_person`) and a non-decider (`ml_require_decider`) AGAIN;
+  log ids, digests and counts, never a body; an outside address by its domain.
+- **A mail turn carries ids and a person's words, never mail text** (`bin/worker.php` `worker_dispatch_turn()`): no body, no subject; the
+  conversation id `mail:<mailbox>:<anchor>`; a paused mailbox gets no turn.
+- **The records queries read the `mcp_*` views only** (the records role has no base table, not even `members` — use `mcp_members`), answer
+  plain text, and leave fencing to Phase 4's tools. `mcp_outbound_attachments` (db/018) is a held message's files.
+- **pdo_pgsql with native prepares refuses a named placeholder used twice** — name each use (`:mb`, `:mb2`).
+- **PHP here has no `intl`**: no `idn_to_utf8()`; a link's host is shown as parsed (an `xn--` name stays so — a look-alike shows as one).
+
 ## Numbers
 Ports `APP_INTERNAL_PORT=8199`, `MCP_RECORDS_PORT=8852`, `MCP_ACTIVITY_PORT=8853`, `ML_MAILER_PORT=8854`, `ML_IMAGES_PORT=8855`;
 scratch 9201 (the app), 9202 (the fake kernel), 9203 (the fake MaluDB + MaluMail REST), 9204–9205 (the MCP servers), 9206 (the

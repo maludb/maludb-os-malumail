@@ -16,7 +16,7 @@ const ML_VIEWS = ['inbox' => ['Inbox', 'feather-inbox'], 'starred' => ['Starred'
 function nav_top_items(): array
 {
     return [
-        ['oversight', '/oversight', 'feather-eye', 'Oversight', has_right('mail.oversee') && ml_oversees_any()],
+        ['oversight', '/oversight', 'feather-eye', 'Oversight', has_right('mail.oversee') && (ml_oversees_any() || ml_reviews_waiting())],
         ['templates', '/templates', 'feather-copy', 'Templates', has_right('mail.use')],
         ['admin', '/admin', 'feather-settings', 'Admin', has_right('mailboxes.manage')],
         ['notifications', '/notifications', 'feather-bell', 'Notifications', true],

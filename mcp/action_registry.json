@@ -1,6 +1,6 @@
 {
     "generated_from": "docs/malumail-action-manifest.md",
-    "generated_at": "2026-10-16T12:25:07+00:00",
+    "generated_at": "2026-10-16T15:19:28+00:00",
     "screens": {
         "home": {
             "screen": "home",
@@ -218,7 +218,7 @@
             "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
             "when": "a card per agent mailbox I oversee: received, sent, held, rejected (7 days), last activity, Pause/Resume",
             "params": [],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "review-queue": {
@@ -230,7 +230,7 @@
                 "mailbox",
                 "reason"
             ],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "review-view": {
@@ -239,7 +239,7 @@
             "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
             "when": "one held message as it will go out, beside the conversation it answers, the agent's purpose, its run and every hold reason; Approve, Edit, Reject with a note, Reply to the agent, Take over",
             "params": [],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "review-edit": {
@@ -248,7 +248,7 @@
             "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
             "when": "edit a held message before sending it — the edit kept as a diff",
             "params": [],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "unscreened": {
@@ -259,7 +259,7 @@
             "params": [
                 "mailbox"
             ],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "agent-policy": {
@@ -268,7 +268,7 @@
             "section": "Agents' mail and oversight (slice 5 — the fourth exemplar)",
             "when": "an agent mailbox's sending policy with each setting's meaning, its pause switch and its history",
             "params": [],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "search": {
@@ -1818,7 +1818,7 @@
             "who": "`mail.oversee` · decider",
             "agent": false,
             "record_id": "the outbound message",
-            "built": false
+            "built": true
         },
         "mail_review_edit": {
             "action": "mail_review_edit",
@@ -1857,7 +1857,7 @@
             "who": "`mail.oversee` · decider",
             "agent": false,
             "record_id": "the outbound message",
-            "built": false
+            "built": true
         },
         "mail_review_reject": {
             "action": "mail_review_reject",
@@ -1884,7 +1884,7 @@
             "who": "`mail.oversee` · decider",
             "agent": false,
             "record_id": "the outbound message",
-            "built": false
+            "built": true
         },
         "mail_review_reply": {
             "action": "mail_review_reply",
@@ -1911,7 +1911,7 @@
             "who": "`mail.oversee` · decider",
             "agent": false,
             "record_id": "the outbound message",
-            "built": false
+            "built": true
         },
         "mail_thread_take_over": {
             "action": "mail_thread_take_over",
@@ -1926,9 +1926,21 @@
                 },
                 {
                     "name": "thread",
-                    "required": true,
+                    "required": false,
                     "repeated": false,
                     "hint": ""
+                },
+                {
+                    "name": "outbound",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "a held reply: its conversation"
+                },
+                {
+                    "name": "taken_over",
+                    "required": false,
+                    "repeated": false,
+                    "hint": "yes or no — no gives it back"
                 }
             ],
             "undo": "restore prior",
@@ -1938,7 +1950,7 @@
             "who": "`mail.oversee` · full",
             "agent": false,
             "record_id": "the conversation",
-            "built": false
+            "built": true
         },
         "mail_mute": {
             "action": "mail_mute",
@@ -1971,7 +1983,7 @@
             "who": "`mail.use` · triage",
             "agent": true,
             "record_id": "the first conversation",
-            "built": false
+            "built": true
         },
         "mail_unscreened_release": {
             "action": "mail_unscreened_release",
@@ -1998,7 +2010,7 @@
             "who": "`mail.oversee` · full",
             "agent": false,
             "record_id": "the dispatch",
-            "built": false
+            "built": true
         },
         "mail_unscreened_dismiss": {
             "action": "mail_unscreened_dismiss",
@@ -2031,7 +2043,7 @@
             "who": "`mail.oversee` · full",
             "agent": false,
             "record_id": "the dispatch",
-            "built": false
+            "built": true
         },
         "mail_sender_mark_known": {
             "action": "mail_sender_mark_known",
@@ -2058,7 +2070,7 @@
             "who": "`mail.oversee` · full",
             "agent": false,
             "record_id": "the correspondent",
-            "built": false
+            "built": true
         },
         "mail_policy_set": {
             "action": "mail_policy_set",
@@ -2151,7 +2163,7 @@
             "who": "`mail.oversee` · full",
             "agent": false,
             "record_id": "the policy",
-            "built": false
+            "built": true
         },
         "mail_mailbox_pause": {
             "action": "mail_mailbox_pause",
@@ -2178,7 +2190,7 @@
             "who": "`mail.oversee` · full",
             "agent": false,
             "record_id": "the mailbox",
-            "built": false
+            "built": true
         },
         "mail_mailbox_resume": {
             "action": "mail_mailbox_resume",
@@ -2199,7 +2211,7 @@
             "who": "`mail.oversee` · full",
             "agent": false,
             "record_id": "the mailbox",
-            "built": false
+            "built": true
         },
         "mail_label": {
             "action": "mail_label",
