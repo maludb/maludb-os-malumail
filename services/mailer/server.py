@@ -19,6 +19,12 @@ secret key and MaluMail's customer key. It listens on loopback, 127.0.0.1:ML_MAI
   POST /v1/mailboxes/{id}/mutate        slice 3: one op on a set of messages — seen, unseen, flag, unflag, move, archive, trash, spam,
                                         not_spam, delete_forever, trash_empty — ml_mutation_refusal() per folder, one IMAP command per
                                         folder, the index updated in the same request (mail-service.md §5)
+  POST /v1/mailboxes/{id}/append_draft  slice 4: APPEND a draft's new version to Drafts now (the composer closing), or its delete half
+                                        (discard: true) — ml_mutation_refusal(…, 'draft'); answers the new ref
+  POST /v1/sanitise                     slice 4: HTML a person wrote, cleaned with the compose or signature profile → {html, text} — mail.use
+  POST /v1/mailboxes/{id}/identity_check slice 4: does an alias deliver to this mailbox (list_aliases under the customer key; the list
+                                        itself never returned) — full
+  The OUTBOX loop (outbox.py) and the DRAFTS loop (drafts.py) run beside the passes, woken by pg_notify ml_outbox / ml_drafts.
 
 Every POST body is JSON: {"actor": <member id>, "on_behalf": <member id or null>, "args": {...}} — on_behalf is the person behind an
 agent's run (slice 2); the service computes levels itself, ml_level_as(mailbox, actor, on_behalf), never from a caller's word. Answers: {"ok": true, "result": …} or {"ok": false, "error":
@@ -56,14 +62,16 @@ from starlette.requests import Request  # noqa: E402
 from starlette.responses import JSONResponse, StreamingResponse  # noqa: E402
 from starlette.routing import Route  # noqa: E402
 
-from services.mailer import door, imap, mailbox_mcp, mime_read, seal  # noqa: E402
+from services.mailer import door, imap, mailbox_mcp, mime, mime_read, sanitise, seal  # noqa: E402
+from services.mailer.drafts import Drafts  # noqa: E402
+from services.mailer.outbox import Outbox  # noqa: E402
 from services.mailer.admin_flows import Flows  # noqa: E402
 from services.mailer.config import Config, ConfigError  # noqa: E402
 from services.mailer.store import Store  # noqa: E402
 from services.mailer.textpass import TextPass  # noqa: E402
 from services.mailer.watch import Busy, Stopped, Sync  # noqa: E402
 
-VERSION = "0.3.0-slice3"
+VERSION = "0.4.0-slice4"
 log = logging.getLogger("malumail.mailer")
 BACKOFF_FIRST, BACKOFF_MAX = 30, 1800
 
@@ -668,6 +676,89 @@ def build_app(cfg: Config) -> Starlette:
                                                     "moved": [{"message": m, "ref": f"{f}.{v}.{u}"} for m, f, v, u in moved_out],
                                                     "deleted": deleted, "refused": _merge(refused)}})
 
+    # ---- SLICE 4: drafts, sanitising for the composer, identities (mail-service.md §1, §6) ---------------------------------------------
+    async def append_draft_call(request: Request):
+        got = await mailbox_call(request, "view", strict=True)
+        if isinstance(got, JSONResponse):
+            return got
+        actor, on_behalf, args, mailbox_id, _level = got
+        store: Store = state["store"]
+        try:
+            draft_id = int(args.get("draft"))
+        except (TypeError, ValueError):
+            return refuse(422, "bad_request", "draft is a draft's id.")
+        why = await store.mutation_refusal(mailbox_id, actor, on_behalf, None, "draft")
+        if why is not None:
+            return refuse(404 if why == "No such mailbox." else 403, "forbidden", why)
+        d = await store.draft(draft_id)
+        if d is None or int(d["mailbox_id"]) != mailbox_id:
+            return refuse(404, "not_found", "No such draft.")
+        if bool(args.get("discard")):
+            ok_ = await state["drafts"].discard(draft_id)
+            return JSONResponse({"ok": True, "result": {"discarded": ok_}})
+        got_ref = await state["drafts"].file(draft_id)
+        if got_ref is None:
+            return refuse(502, "not_filed", "The draft is saved here; it will reach the Drafts folder when the mail service can reach the mailbox.")
+        return JSONResponse({"ok": True, "result": {"ref": f"{got_ref['folder_id']}.{got_ref['uidvalidity']}.{got_ref['uid']}", **got_ref}})
+
+    async def sanitise_call(request: Request):
+        got = await signed(request)
+        if isinstance(got, JSONResponse):
+            return got
+        actor, args = got
+        store: Store = state["store"]
+        if not await store.member_may(actor, "mail.use"):
+            return refuse(403, "forbidden", "Cleaning HTML is for a Mail user.")
+        html = str(args.get("html") or "")
+        if len(html) > 2 * 1024 * 1024:
+            return refuse(422, "too_large", "The HTML is larger than 2 MB.")
+        profile = "signature" if str(args.get("profile") or "compose") == "signature" else "compose"
+        s = sanitise.sanitise(html, cid_url=lambda c: None, remote_image_url=lambda u: None)
+        out = s.html
+        if profile == "signature":
+            # no heading or table larger than a signature needs: headings become paragraphs, tables beyond 20 rows are cut
+            out = re.sub(r"</?h[1-6][^>]*>", lambda m: "</p>" if m.group(0).startswith("</") else "<p>", out)
+            if out.count("<tr") > 20:
+                out = nh3_text(out)
+        text = mime.text_from_html(out)
+        return JSONResponse({"ok": True, "result": {"html": out, "text": text, "hidden_removed": s.hidden_removed, "unstable": s.unstable}})
+
+    def nh3_text(html: str) -> str:
+        import nh3
+        return nh3.clean(html, tags=set())
+
+    async def identity_check_call(request: Request):
+        got = await mailbox_call(request, "view", strict=True)
+        if isinstance(got, JSONResponse):
+            return got
+        actor, on_behalf, args, mailbox_id, level = got
+        store: Store = state["store"]
+        if level != "full":
+            return refuse(403, "forbidden", "Checking an identity needs full on the mailbox.")
+        address = str(args.get("address") or "").strip().lower()
+        if "@" not in address:
+            return refuse(422, "bad_request", "address is an email address.")
+        row = await store.credential_row(mailbox_id)
+        mailbox_address = str(row["address"]).lower() if row else ""
+        if address == mailbox_address:
+            return JSONResponse({"ok": True, "result": {"delivers": True, "kind": "own"}})
+        domain = address.split("@", 1)[1]
+        try:
+            result = await mailbox_mcp.admin_call(state["http"], cfg.mcp_url, cfg.customer_key, public_key, "list_aliases", {"domain": domain},
+                                                  may=lambda right: _always(), served=store.domain_served)
+        except mailbox_mcp.McpError as e:
+            status = {"forbidden": 403, "policy": 422, "refused": 422, "unconfigured": 503}.get(e.kind, 502)
+            return refuse(status, e.kind, str(e))
+        aliases = (result or {}).get("aliases") or []
+        delivers = await store.alias_delivers(address, mailbox_address, aliases)
+        if delivers:
+            dest = next((a.get("forwards_to") or a.get("destinations") or [] for a in aliases if str(a.get("address", "")).lower() == address), [])
+            await store.set_identity_checked(mailbox_id, address, [str(x) for x in dest])
+        return JSONResponse({"ok": True, "result": {"delivers": delivers, "kind": "alias"}})
+
+    async def _always():
+        return True
+
     def _merge(refused: list[dict]) -> list[dict]:
         out: dict[str, int] = {}
         for r in refused:
@@ -682,10 +773,30 @@ def build_app(cfg: Config) -> Starlette:
                 live = await state["sync"].reconcile()
                 stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
                 passes["sync"].update(last_run_at=stamp, mailboxes=live)
-                passes["outbox"].update(last_run_at=stamp, due=counts["outbox_due"])
+                passes["outbox"].update(last_run_at=stamp, due=counts["outbox_due"], sent=state["outbox"].sent if state.get("outbox") else 0)
             except Exception as e:  # noqa: BLE001 — a pass never takes the service down
                 log.warning("pass failed: %s", type(e).__name__)
             await asyncio.sleep(cfg.pass_seconds)
+
+    async def listen_wakeups():
+        """pg_notify ml_outbox / ml_drafts on a connection of their own (db/015's triggers): Send leaves within a second of its window."""
+        import asyncpg
+        while True:
+            try:
+                con = await asyncpg.connect(**cfg.db_dsn)              # a connection of its own: a listener never goes back to the pool
+                try:
+                    await con.add_listener("ml_outbox", lambda *_a: state["outbox"].kick())
+                    await con.add_listener("ml_drafts", lambda *_a: state["drafts"].kick())
+                    while True:
+                        await asyncio.sleep(60)
+                        await con.execute("SELECT 1")                 # a dead connection shows here, and the listen starts again
+                finally:
+                    await con.close()
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:  # noqa: BLE001 — the database went away: listen again
+                log.info("wake-up listener: %s", type(e).__name__)
+                await asyncio.sleep(5)
 
     async def run_text(tasks: set):
         while True:
@@ -702,9 +813,14 @@ def build_app(cfg: Config) -> Starlette:
         state["flows"] = Flows(cfg, state["store"], state["http"], public_key)
         state["sync"] = Sync(cfg, state["store"], backoff, asyncio.get_running_loop())
         state["text"] = TextPass(state["sync"], cfg.text_per_minute)
+        state["drafts"] = Drafts(cfg, state["store"], state["sync"])
+        state["outbox"] = Outbox(cfg, state["store"], state["sync"], backoff, state["drafts"])
         tasks: set = set()
         tasks.add(asyncio.create_task(run_passes()))           # held, or the loop may collect it (Boards' finding)
         tasks.add(asyncio.create_task(run_text(tasks)))
+        tasks.add(asyncio.create_task(state["outbox"].loop()))
+        tasks.add(asyncio.create_task(state["drafts"].loop()))
+        tasks.add(asyncio.create_task(listen_wakeups()))
         try:
             yield
         finally:
@@ -727,6 +843,9 @@ def build_app(cfg: Config) -> Starlette:
         Route("/v1/mailboxes/{mailbox:int}/part", part_call, methods=["POST"]),
         Route("/v1/mailboxes/{mailbox:int}/raw", raw_call, methods=["POST"]),
         Route("/v1/mailboxes/{mailbox:int}/mutate", mutate_call, methods=["POST"]),
+        Route("/v1/mailboxes/{mailbox:int}/append_draft", append_draft_call, methods=["POST"]),
+        Route("/v1/sanitise", sanitise_call, methods=["POST"]),
+        Route("/v1/mailboxes/{mailbox:int}/identity_check", identity_check_call, methods=["POST"]),
     ], lifespan=lifespan)
 
 

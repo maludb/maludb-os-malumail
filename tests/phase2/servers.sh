@@ -13,12 +13,30 @@ PY=${ML_PY:-$ROOT/mcp/venv/bin/python}
 mkdir -p "$STATE"
 stop() {
   for f in "$STATE"/*.pid; do [ -e "$f" ] && kill "$(cat "$f")" 2>/dev/null || true; rm -f "$f"; done
-  for port in "$P_APP" "$P_KERNEL" "$P_FAKE"; do pkill -f "php -S 127.0.0.1:${port} " 2>/dev/null || true; done   # only this block's ports
+  for port in "$P_APP" "$P_KERNEL" "$P_FAKE"; do pkill -f "php .*-S 127.0.0.1:${port} " 2>/dev/null || true; done   # only this block's ports
   [ -f "$STATE/apache/main.conf" ] && apache2 -f "$STATE/apache/main.conf" -k stop 2>/dev/null || true
   sleep 0.3
 }
+# the mail service against whatever fixtures are up (their ports from the state directory); slice 4's proofs restart it alone
+# (`restart-mailer`) to prove the crash rule
+start_mailer() {
+  local MENV="${ENVF%.env}-mailer.env" MAILERENV=()
+  [ -s "$STATE/imap.port" ] && MAILERENV+=(ML_IMAP_HOST=127.0.0.1 "ML_IMAP_PORT=$(cat "$STATE/imap.port")" "ML_TLS_CA_FILE=$STATE/tls/ca.pem")
+  [ -s "$STATE/smtp.port" ] && MAILERENV+=(ML_SMTP_HOST=127.0.0.1 "ML_SMTP_PORT=$(cat "$STATE/smtp.port")")
+  env "${MAILERENV[@]}" ML_MAILER_PORT=$P_MAILER MALUMAIL_MCP_URL="http://127.0.0.1:$(cat "$STATE/mcp.port")/mcp" ML_DEV_ENV="$ENVF" \
+    "$PY" -I "$ROOT/services/mailer/server.py" >>"$STATE/mailer.log" 2>&1 & echo $! > "$STATE/mailer.pid"
+}
 case "${1:-}" in
   stop) stop ;;
+  restart-mailer)
+    set -a; . "$ENVF"; set +a
+    export APP_URL="http://127.0.0.1:$P_APP" OS_INTERNAL_URL="http://127.0.0.1:$P_KERNEL" MALUDB_API_URL="http://127.0.0.1:$P_FAKE" MALUMAIL_API_URL="http://127.0.0.1:$P_FAKE"
+    export FAKE_KERNEL_STATE="$STATE/kernel.json" FAKE_MALUDB_LOG="$STATE/maludb.log" FAKE_MALUMAIL_LOG="$STATE/malumail.log" ML_MAILER_PORT=$P_MAILER
+    [ -s "$STATE/mailer.pid" ] && { kill -9 "$(cat "$STATE/mailer.pid")" 2>/dev/null || true; }
+    for i in $(seq 1 50); do (exec 3<>/dev/tcp/127.0.0.1/$P_MAILER) 2>/dev/null || break; sleep 0.1; done
+    start_mailer
+    for i in $(seq 1 100); do curl -s -m 1 "http://127.0.0.1:$P_MAILER/health" >/dev/null 2>&1 && break; sleep 0.1; done
+    ;;
   start)
     stop
     set -a; . "$ENVF"; set +a
@@ -55,9 +73,17 @@ case "${1:-}" in
         --control "$STATE/imap-control" --inbox "${ML_IMAP_INBOX:-12}" ${ML_IMAP_FLAGS:-} >"$STATE/imap.out" 2>&1 & echo $! > "$STATE/imap.pid"
       for i in $(seq 1 300); do [ -s "$STATE/imap.port" ] && break; sleep 0.1; done
       IMAPENV=(ML_IMAP_HOST=127.0.0.1 "ML_IMAP_PORT=$(cat "$STATE/imap.port")" "ML_TLS_CA_FILE=$STATE/tls/ca.pem")
+      # slice 4: the SMTP submission fixture under the same certificate, the same users file (its smtp_mode per user), a spool the
+      # proofs read; the mail service submits to it (ML_SMTP_HOST/PORT) — never to MaluMail
+      if [ "${ML_WITH_SMTP:-0}" = "1" ]; then
+        rm -f "$STATE/smtp.port"; rm -rf "$STATE/spool"; mkdir -p "$STATE/spool"
+        "$PY" -I "$ROOT/tests/fixtures/smtp_server.py" --users "$STATE/imap-users.json" --cert "$STATE/tls/imap.pem" --key "$STATE/tls/imap.key" \
+          --port-file "$STATE/smtp.port" --stats "$STATE/smtp-stats.json" --spool "$STATE/spool" >"$STATE/smtp.out" 2>&1 & echo $! > "$STATE/smtp.pid"
+        for i in $(seq 1 100); do [ -s "$STATE/smtp.port" ] && break; sleep 0.1; done
+        IMAPENV+=(ML_SMTP_HOST=127.0.0.1 "ML_SMTP_PORT=$(cat "$STATE/smtp.port")")
+      fi
     fi
-    env "${IMAPENV[@]}" ML_MAILER_PORT=$P_MAILER MALUMAIL_MCP_URL="http://127.0.0.1:$(cat "$STATE/mcp.port")/mcp" ML_DEV_ENV="$ENVF" \
-      "$PY" -I "$ROOT/services/mailer/server.py" >"$STATE/mailer.log" 2>&1 & echo $! > "$STATE/mailer.pid"
+    start_mailer
     # slice 3: the image door on 9207 (its socket stand-in: --port), admitting the proof's loopback image fixture alone
     # (ML_IMAGES_TEST_ALLOW, refused in production); P_IMAGE_FIXTURE names the fixture's port when a proof started one
     if [ "${ML_WITH_IMAGES:-0}" = "1" ]; then
@@ -84,7 +110,7 @@ open(out + '/main.conf', 'w').write('ServerRoot "/etc/apache2"\nDefaultRuntimeDi
 PY
       apache2 -f "$STATE/apache/main.conf" -k start
     else
-      ( cd "$ROOT" && PHP_CLI_SERVER_WORKERS=4 php -S 127.0.0.1:$P_APP -t html tests/dev_router.php >"$STATE/app.log" 2>&1 & echo $! > "$STATE/app.pid" )
+      ( cd "$ROOT" && PHP_CLI_SERVER_WORKERS=4 php -d upload_max_filesize=8M -d post_max_size=9M -S 127.0.0.1:$P_APP -t html tests/dev_router.php >"$STATE/app.log" 2>&1 & echo $! > "$STATE/app.pid" )
     fi
     for i in $(seq 1 50); do curl -s -o /dev/null http://127.0.0.1:$P_APP/api/v1/health && curl -s -o /dev/null http://127.0.0.1:$P_MAILER/health && break; sleep 0.2; done
     echo "servers up (app :$P_APP ${ML_APP:-php}, fake kernel :$P_KERNEL, fake MaluDB :$P_FAKE, mail service :$P_MAILER)" ;;

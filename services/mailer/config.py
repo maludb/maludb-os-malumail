@@ -58,6 +58,9 @@ class Config:
     pass_seconds: int
     max_connections: int = 400         # ML_MAILER_MAX_CONNECTIONS: every IMAP connection of the service, watchers and pools (§2)
     part_key: bytes = b""              # ML_PART_KEY: signs the one-hour part and image links the service mints as it sanitises (slice 3)
+    smtp_host: str = "mbox01.malumail.com"   # ML_SMTP_HOST / ML_SMTP_PORT: submission (587, STARTTLS) — slice 4
+    smtp_port: int = 587
+    storage_dir: str = "storage"       # ML_STORAGE_DIR: the attachment store PHP writes (files/), read here to build the MIME
     text_per_minute: int = 4           # ML_MAILER_TEXT_PER_MINUTE: the text pass's commands a minute per mailbox (§3.4); the proofs raise it
 
     @staticmethod
@@ -96,4 +99,7 @@ class Config:
             max_connections=max(4, int(e.get("ML_MAILER_MAX_CONNECTIONS") or 400)),
             text_per_minute=max(1, int(e.get("ML_MAILER_TEXT_PER_MINUTE") or 4)),
             part_key=(e.get("ML_PART_KEY") or "").encode(),
+            smtp_host=e.get("ML_SMTP_HOST", "mbox01.malumail.com"),
+            smtp_port=int(e.get("ML_SMTP_PORT") or 587),
+            storage_dir=e.get("ML_STORAGE_DIR", "storage"),
         )

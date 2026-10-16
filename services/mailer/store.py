@@ -391,3 +391,117 @@ class Store:
             """SELECT lower(address::text) AS a FROM mailboxes WHERE id = $1
                UNION SELECT lower(address::text) FROM mail_identities WHERE mailbox_id = $1""", mailbox_id)
         return {r["a"] for r in rows}
+
+    # ============================================================================================================================
+    # SLICE 4 — the outbox loop and the drafts (docs/build-specs/sending-and-oversight.md §5, mail-service.md §6).
+
+    async def claim(self, limit: int = 10) -> list[int]:
+        rows = await self.pool.fetch("SELECT ml_outbound_claim($1) AS id", limit)
+        return [int(r["id"]) for r in rows]
+
+    async def outbound(self, outbound_id: int):
+        return await self.pool.fetchrow(
+            """SELECT o.*, b.address::text AS mailbox_address, b.display_name AS mailbox_display, b.kind AS mailbox_kind, b.owner_member_id,
+                      i.address::text AS identity_address, i.display_name AS identity_display, i.reply_to::text AS identity_reply_to,
+                      i.signature_html, i.signature_text,
+                      sm.display_name AS sender_name, sm.member_kind AS sender_kind, sm.email::text AS sender_email,
+                      (SELECT s.business_name FROM ml_settings s WHERE s.id = 1) AS business_name,
+                      (SELECT COALESCE(b2.address::text, NULL) FROM mailboxes b2 WHERE b2.kind = 'person' AND b2.owner_member_id = o.on_behalf_member_id LIMIT 1) AS delegate_mailbox
+                 FROM outbound_email o JOIN mailboxes b ON b.id = o.mailbox_id
+                 LEFT JOIN mail_identities i ON i.id = o.identity_id
+                 LEFT JOIN members sm ON sm.id = o.sender_member_id
+                WHERE o.id = $1""", outbound_id)
+
+    async def attachments_of(self, record_type: str, record_id: int) -> list:
+        return [dict(r) for r in await self.pool.fetch(
+            "SELECT id, filename, mime_type, byte_size, sha256, storage_path FROM attachments WHERE record_type = $1 AND record_id = $2 ORDER BY id",
+            record_type, record_id)]
+
+    async def outbound_sent(self, outbound_id: int, queue_id: str | None, reply: str | None) -> None:
+        await self.pool.execute("SELECT ml_outbound_sent($1, $2, $3)", outbound_id, queue_id, reply)
+
+    async def outbound_deferred(self, outbound_id: int, reply: str | None) -> None:
+        await self.pool.execute("SELECT ml_outbound_deferred($1, $2)", outbound_id, reply)
+
+    async def outbound_failed(self, outbound_id: int, error: str) -> None:
+        await self.pool.execute("SELECT ml_outbound_failed($1, $2)", outbound_id, error)
+
+    async def outbound_lost(self, outbound_id: int) -> None:
+        await self.pool.execute("SELECT ml_outbound_lost($1)", outbound_id)
+
+    async def outbound_filed(self, outbound_id: int) -> None:
+        await self.pool.execute("UPDATE outbound_email SET filed_at = now() WHERE id = $1", outbound_id)
+
+    async def outbound_note(self, outbound_id: int, text: str) -> None:
+        await self.pool.execute("UPDATE outbound_email SET error = $2 WHERE id = $1", outbound_id, text[:1000])
+
+    async def stalled(self, minutes: int = 10) -> list[int]:
+        return [int(r["id"]) for r in await self.pool.fetch("SELECT ml_outbound_stalled($1) AS id", minutes)]
+
+    async def unfiled(self, limit: int = 20) -> list[int]:
+        return [int(r["id"]) for r in await self.pool.fetch(
+            "SELECT id FROM outbound_email WHERE status = 'sent' AND filed_at IS NULL AND sent_at > now() - interval '1 day' AND COALESCE(error, '') <> 'not filed in Sent' ORDER BY sent_at LIMIT $1", limit)]
+
+    async def due_count(self) -> int:
+        return int(await self.pool.fetchval("SELECT count(*) FROM outbound_email WHERE status IN ('queued', 'deferred') AND send_after <= now() AND (retry_at IS NULL OR retry_at <= now())") or 0)
+
+    async def next_due(self):
+        return await self.pool.fetchval("SELECT min(GREATEST(send_after, COALESCE(retry_at, send_after))) FROM outbound_email WHERE status IN ('queued', 'deferred')")
+
+    async def message_row_for_key(self, key_id: int):
+        return await self.pool.fetchrow(
+            """SELECT m.id, m.uidvalidity, m.uid, f.name AS folder FROM mail_messages m JOIN mail_folders f ON f.id = m.folder_id
+                WHERE m.message_key_id = $1 ORDER BY (f.special_use = 'inbox') DESC, m.id LIMIT 1""", key_id)
+
+    async def notify_send_failed(self, outbound_id: int, who: int | None, title: str, body: str, mailbox_id: int) -> None:
+        if who is None:
+            return
+        await self.pool.execute("SELECT ml_notify($1, 'send_failed', $2, $3, $4, 'outbound', $5)", who, title, body, mailbox_id, outbound_id)
+
+    async def primary_overseer(self, mailbox_id: int) -> int | None:
+        return await self.pool.fetchval("SELECT ml_mailbox_acting_person($1)", mailbox_id)
+
+    # drafts
+    async def draft(self, draft_id: int):
+        return await self.pool.fetchrow(
+            """SELECT d.*, b.address::text AS mailbox_address, b.display_name AS mailbox_display,
+                      i.address::text AS identity_address, i.display_name AS identity_display, i.reply_to::text AS identity_reply_to
+                 FROM mail_drafts d JOIN mailboxes b ON b.id = d.mailbox_id LEFT JOIN mail_identities i ON i.id = d.identity_id
+                WHERE d.id = $1""", draft_id)
+
+    async def draft_filed(self, draft_id: int, folder_id: int, uidvalidity: int, uid: int) -> None:
+        await self.pool.execute("UPDATE mail_drafts SET folder_id = $2, uidvalidity = $3, uid = $4, filed_at = now() WHERE id = $1",
+                                draft_id, folder_id, uidvalidity, uid)
+
+    async def draft_unfiled(self, draft_id: int, discarded: bool) -> None:
+        await self.pool.execute("UPDATE mail_drafts SET folder_id = NULL, uidvalidity = NULL, uid = NULL" + (", discarded_at = COALESCE(discarded_at, now())" if discarded else "") + " WHERE id = $1", draft_id)
+
+    async def drafts_to_file(self, limit: int = 20) -> list[int]:
+        """Drafts saved after they were last filed (or never), not discarded, not sent."""
+        return [int(r["id"]) for r in await self.pool.fetch(
+            """SELECT id FROM mail_drafts WHERE discarded_at IS NULL AND outbound_id IS NULL AND (filed_at IS NULL OR filed_at < saved_at)
+                  AND saved_at < now() - interval '2 seconds' ORDER BY saved_at LIMIT $1""", limit)]
+
+    async def drafts_to_discard(self, limit: int = 20) -> list[int]:
+        return [int(r["id"]) for r in await self.pool.fetch(
+            "SELECT id FROM mail_drafts WHERE discarded_at IS NOT NULL AND uid IS NOT NULL ORDER BY discarded_at LIMIT $1", limit)]
+
+    async def folder_named(self, mailbox_id: int, special: str):
+        return await self.pool.fetchrow("SELECT id, name, uidvalidity FROM mail_folders WHERE mailbox_id = $1 AND special_use = $2", mailbox_id, special)
+
+    async def alias_delivers(self, address: str, mailbox_address: str, aliases: list[dict]) -> bool:
+        for a in aliases:
+            if str(a.get("address", "")).lower() == address.lower():
+                return mailbox_address.lower() in [str(x).lower() for x in (a.get("forwards_to") or a.get("destinations") or [])]
+        return False
+
+    async def set_identity_checked(self, mailbox_id: int, address: str, destinations: list[str] | None = None) -> None:
+        """An alias list_aliases showed delivering here: the identity's checked_at, and the alias cache row (ml_aliases — MaluMail is the
+        record, the cache is what the screens and the identities' trigger read) refreshed from the same answer."""
+        if destinations:
+            await self.pool.execute(
+                """INSERT INTO ml_aliases (domain_id, address, destinations, synced_at)
+                   SELECT d.id, $1::text, $2::citext[], now() FROM ml_domains d WHERE d.domain = split_part($1::text, '@', 2) AND d.served
+                   ON CONFLICT (address) DO UPDATE SET destinations = EXCLUDED.destinations, synced_at = now(), active = true""",
+                address.lower(), [str(x).lower() for x in destinations])
+        await self.pool.execute("UPDATE mail_identities SET checked_at = now() WHERE mailbox_id = $1 AND address = $2", mailbox_id, address)

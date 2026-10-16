@@ -481,3 +481,26 @@ def expunge_uids(client, uids) -> None:
     typ, data, _u = raw(client, "UID", "EXPUNGE", uid_set(uids))
     if typ != "OK":
         raise IMAPClientError(f"UID EXPUNGE failed: {_text(data[0] if data else b'')}")
+
+
+# ================================================================================================================================
+# SLICE 4 — drafts and the Sent copy (mail-service.md §6–§7): APPEND with APPENDUID, SEARCH HEADER, the answered flag.
+
+_APPENDUID = re.compile(r"APPENDUID\s+(\d+)\s+(\d+)", re.I)
+
+
+def append(client, folder: str, raw: bytes, flags: list[str], when=None) -> tuple[int, int] | None:
+    """APPEND folder (flags) [date] {raw} → (uidvalidity, uid) from APPENDUID, or None when the server gave none."""
+    resp = client.append(folder, raw, flags=[f.encode() if isinstance(f, str) else f for f in flags], msg_time=when)
+    text = _text(resp if not isinstance(resp, (list, tuple)) else b" ".join(_flatten(x) for x in resp))
+    m = _APPENDUID.search(text)
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def search_header(client, name: str, value: str) -> list[int]:
+    """UID SEARCH HEADER name value on the selected folder."""
+    return [int(u) for u in client.search(["HEADER", name, value])]
+
+
+def answered(client, uids) -> None:
+    store_flags(client, uids, "\\Answered", True)

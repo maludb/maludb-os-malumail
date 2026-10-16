@@ -15,8 +15,17 @@ ok($r['code'] === 404 && str_contains($r['body'], 'No such folder'), "/m/{mailbo
 $r = page($j, "/m/$priya/t/9");
 ok($r['code'] === 404 && str_contains($r['body'], 'moved or was deleted'), "/m/{mailbox}/t/{thread} reaches its screen (slice 3 built it: no such conversation, its own 404)");
 ok(page($j, "/m/$priya/msg/3.1.7/original")['code'] === 404, "/m/{mailbox}/msg/{message}/original reaches its screen (slice 3 built it)");
-foreach (["/m/$priya/label/2", "/m/$priya/drafts/4", "/m/$priya/people/jon%40acme.example",
-          "/m/$priya/identities/new", "/m/$priya/identities/2/edit", "/m/$priya/access/new", "/m/$priya/search", "/m/$priya/access-log", "/oversight/review/5", "/oversight/review/5/edit",
+// slice 4 built compose, draft-edit and the identity form: their routes answer their own screens (a missing draft or identity: the screen's 404)
+$r = page($j, "/m/$priya/compose");
+ok($r['code'] === 200 && str_contains($r['body'], 'id="compose-form"'), "/m/{mailbox}/compose reaches its screen (slice 4 built it)");
+$r = page($j, "/m/$priya/drafts/999999");
+ok($r['code'] === 404 && str_contains($r['body'], 'No such draft'), "/m/{mailbox}/drafts/{draft} reaches its screen (slice 4 built it: no such draft, its own 404)");
+$r = page($j, "/m/$priya/identities/new");
+ok($r['code'] === 200 && str_contains($r['body'], 'id="identity-form"'), "/m/{mailbox}/identities/new reaches its screen (slice 4 built it)");
+$r = page($j, "/m/$priya/identities/999999/edit");
+ok($r['code'] === 404 && str_contains($r['body'], 'No such identity'), "/m/{mailbox}/identities/{identity}/edit reaches its screen (slice 4 built it: its own 404)");
+foreach (["/m/$priya/label/2", "/m/$priya/people/jon%40acme.example",
+          "/m/$priya/access/new", "/m/$priya/search", "/m/$priya/access-log", "/oversight/review/5", "/oversight/review/5/edit",
           '/templates/new', '/templates/7/edit', '/search', '/notifications', '/settings/notifications'] as $p) {
     $r = page($j, $p);
     ok($r['code'] === 200 && str_contains($r['body'], 'builds this screen'), "$p reaches its screen's placeholder");

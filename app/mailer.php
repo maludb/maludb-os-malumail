@@ -181,3 +181,44 @@ function mailer_stream(string $path, int $actorMemberId, array $args, callable $
         $headers['__short'] = true;                          // the stream ended early: the caller's output is already partly sent
     }
 }
+
+// ---- slice 4 (writing.md "Mail-service calls"): the door calls the composer makes, by name -----------------------------------------
+/** APPEND a draft's current version to Drafts now (the composer closing; otherwise the service files it on its own within seconds). Null when it could not. */
+function mailer_draft_append(int $mailbox, int $draft, bool $discard = false): ?array
+{
+    try {
+        return mailer_call('/v1/mailboxes/' . $mailbox . '/append_draft', (int) current_member_id(), ['draft' => $draft, 'discard' => $discard], ml_on_behalf(), 30);
+    } catch (MailerRefused | MailerDown) {
+        return null;
+    }
+}
+
+/** The original's sanitised body for a quote (the compose profile: no images, links kept). */
+function mailer_fetch_for_quote(int $mailbox, int $messageId): ?array
+{
+    return ml_message_fetch($mailbox, $messageId, 'html', false, ['profile' => 'compose']);
+}
+
+/** HTML a person wrote, cleaned by the mail service: ['html' => …, 'text' => …]; null when the service cannot answer. $profile: compose · signature. */
+function mailer_sanitise(string $html, string $profile = 'compose'): ?array
+{
+    try {
+        $r = mailer_call('/v1/sanitise', (int) current_member_id(), ['html' => $html, 'profile' => $profile], ml_on_behalf(), 30);
+        return ['html' => (string) ($r['html'] ?? ''), 'text' => (string) ($r['text'] ?? '')];
+    } catch (MailerRefused | MailerDown) {
+        return null;
+    }
+}
+
+/** Does an address deliver to this mailbox (MaluMail's list_aliases under the customer key, the list never returned)? ['delivers' => bool, 'kind' => own|alias], or a refusal's words. */
+function mailer_identity_check(int $mailbox, string $address): array
+{
+    try {
+        $r = mailer_call('/v1/mailboxes/' . $mailbox . '/identity_check', (int) current_member_id(), ['address' => $address], ml_on_behalf(), 30);
+        return ['delivers' => !empty($r['delivers']), 'kind' => (string) ($r['kind'] ?? 'alias'), 'error' => null];
+    } catch (MailerRefused $e) {
+        return ['delivers' => false, 'kind' => 'alias', 'error' => $e->getMessage()];
+    } catch (MailerDown $e) {
+        return ['delivers' => false, 'kind' => 'alias', 'error' => $e->getMessage()];
+    }
+}

@@ -189,6 +189,23 @@ customer key nor the sealing secret** — the proof checks it.
   named twice (reading's `pg_text_array` beside admin's) is a redeclaration fatal on the admin pages alone — prefix a global helper (`ml_…`)
   and run every earlier suite before committing (the regressions found it: Phase 2 and slice 1).
 
+## Slice 4 (2026-10-16, writing BUILT — THE THIRD EXEMPLAR) — `docs/build-specs/writing.md`, `sending-and-oversight.md`, `mail-service.md` §6
+- `bash tests/phase3/slice4/run.sh` (php -S) and `ML_APP=apache …`: scratch `ml_dev4`, `ML_WITH_SMTP=1` starts `tests/fixtures/smtp_server.py`
+  beside the IMAP fixture (per-user `smtp_mode` in the users file; the spool the proofs read); `service.py` (the outbox, drafts, the crash
+  rule through `servers.sh restart-mailer`, the breaker, an agent's hold), `checks.php` (the pages and the nine actions), `browser.mjs`
+  (375 and 1280, axe, JavaScript off), `live.py` (only with `ML_LIVE_CREDENTIALS`; at most two submissions; never print the file or a
+  password); service 71, checks 113, browser 48 under both. `ML_S4_HOLD=1` leaves the servers up — stop them by their ports, never with a
+  `pkill -f` pattern that matches your own shell.
+- **Every page that writes mail copies `html/m/compose.php` + `app/features/compose/`**: the database row is the save (the mail service files it
+  in Drafts within seconds, one copy); Send = `outbound_send()` → `ml_outbound_submit()` under `ml_guard()` (the policy, the hold, the undo
+  window and the schedule are the schema's), the draft's attachments moved to the message — and back on Undo; recipients read by
+  `compose_posted()` (the chips and the typed box: a form without a script still sends).
+- **The outbox** (`services/mailer/outbox.py`): ONE SMTP authentication attempt (PLAIN, else LOGIN) — smtplib's `login()` would try every
+  mechanism and double the failed logins MaluMail counts against this machine; `ml_outbound_sent` before filing in Sent.
+- **The composer's front end**: Squire 2.4.9 needs DOMPurify (3.4.16) loaded first; both vendored with their `LICENSE` and hashes in
+  `html/assets/vendor/README.md`. The sticky bar is placed by the script above the tab bar and the command bar; never assume a phone
+  keyboard sends a key event for a comma.
+
 ## Numbers
 Ports `APP_INTERNAL_PORT=8199`, `MCP_RECORDS_PORT=8852`, `MCP_ACTIVITY_PORT=8853`, `ML_MAILER_PORT=8854`, `ML_IMAGES_PORT=8855`;
 scratch 9201 (the app), 9202 (the fake kernel), 9203 (the fake MaluDB + MaluMail REST), 9204–9205 (the MCP servers), 9206 (the

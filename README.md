@@ -47,7 +47,17 @@ with MaluMail's server (the first sync, NOTIFY — else IDLE and a STATUS round 
 keep everything keyed on a message, a gentle text pass for search; it never marks anything read), and every mailbox opens as Gmail's
 conversation list: ten views and its folders, stars, snippets, agent badges, keyset paging, unread counts per person in the rail, and a
 cheap poll that shows "N new" without moving the page. `tests/phase3/slice2/run.sh` proves it under php -S and Apache against an IMAP
-fixture, and once against MaluMail's own test mailboxes. Next: slice 3, reading.
+fixture, and once against MaluMail's own test mailboxes.
+
+**Slice 3, reading, is built** (2026-10-15), the second exemplar: a conversation opens with each message's body cleaned by the mail
+service and shown in a sandboxed frame under a strict content policy, attachments and remote images through two signed doors, banners for
+outside senders, DMARC, deceptive links and hidden content, and the eleven actions (archive, move, delete, spam, star, read/unread…) with
+Undo. `tests/phase3/slice3/run.sh` proves it under php -S and Apache.
+
+**Slice 4, writing, is built** (2026-10-16), the third exemplar: compose, reply, reply all and forward in Fastmail's Squire editor with
+recipient chips, attachments, autosave to the Drafts folder, Undo send and scheduled sending; identities and signatures; and the mail
+service's outbox, which submits over SMTP, files the Sent copy, marks the original answered and holds an agent's message when its policy
+says so. `tests/phase3/slice4/run.sh` proves it under php -S and Apache against IMAP and SMTP fixtures. Next: slice 5, agents' mail and oversight.
 
 ## Documents
 

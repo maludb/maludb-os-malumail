@@ -43,7 +43,7 @@ from pathlib import Path
 
 CAPS_PRE = "IMAP4rev1 LITERAL+ ID ENABLE AUTH=PLAIN"
 CAPS = ("IMAP4rev1 LITERAL+ ID ENABLE IDLE CONDSTORE QRESYNC SPECIAL-USE LIST-EXTENDED LIST-STATUS NOTIFY BINARY PREVIEW QUOTA "
-        "UIDPLUS MOVE")
+        "UIDPLUS MOVE")   # + APPEND with APPENDUID and SEARCH HEADER (slice 4)
 FOLDERS = [("INBOX", ""), ("Drafts", "\\Drafts"), ("Sent", "\\Sent"), ("Junk", "\\Junk"), ("Trash", "\\Trash")]
 QUOTA_KB = 1048576
 CRLF = b"\r\n"
@@ -520,6 +520,7 @@ class Session:
         self.user, self.selected, self.readonly = None, None, False
         self.notify = self.qresync = self.condstore = self.idling = False
         self.pending: list[bytes] = []
+        self.literals: list = []
 
     def send(self, s) -> None:
         self.writer.write((s.encode() if isinstance(s, str) else s) + (b"" if isinstance(s, bytes) and s.endswith(CRLF) else CRLF))
@@ -681,6 +682,16 @@ class Session:
                 k += 1
                 ids = seqset(words[k], maxuid)
                 result = [(s, m) for s, m in result if m["uid"] in ids]
+            elif w == "HEADER":                                       # slice 4: SEARCH HEADER Message-ID <id>
+                name, value = words[k + 1].lower().encode(), words[k + 2].encode()
+                k += 2
+                def has(m, name=name, value=value):
+                    head = m["raw"].split(b"\r\n\r\n", 1)[0]
+                    for ln in re.split(rb"\r\n(?![ \t])", head):
+                        if ln.lower().startswith(name + b":") and value in ln:
+                            return True
+                    return False
+                result = [(s, m) for s, m in result if has(m)]
             elif re.match(r"^[\d*:,]+$", w):
                 ids = seqset(w, len(f.messages))
                 result = [(s, m) for s, m in result if s in ids]
@@ -734,6 +745,7 @@ class Session:
                 if got is None:
                     break
                 words = tokens(*got)
+                self.literals = got[1]                       # the raw literals of this command (APPEND reads the last one as bytes)
                 if len(words) < 2:
                     send("* BAD Missing command")
                     continue
@@ -930,6 +942,34 @@ class Session:
                 send(f"{tag} OK [COPYUID {to.uidvalidity} {','.join(map(str, src))} {','.join(map(str, dst))}] Move completed")
             else:
                 send(f"{tag} OK Move completed (nothing matched)")
+        elif cmd == "APPEND":                                     # slice 4: APPEND folder [(flags)] ["date"] {literal} → [APPENDUID v uid]
+            name = args[0] if args else ""
+            f = box.get(name)
+            if f is None:
+                send(f"{tag} NO [TRYCREATE] No such mailbox")
+                return
+            flags = set()
+            when = None
+            for a in args[1:]:
+                if isinstance(a, list):
+                    flags = set(str(x) for x in a)
+                elif isinstance(a, str) and re.match(r"^\d{1,2}-[A-Za-z]{3}-\d{4} ", a):
+                    try:
+                        when = time.mktime(time.strptime(a[:20].strip(), "%d-%b-%Y %H:%M:%S")) - time.timezone
+                    except ValueError:
+                        when = None
+            raw = self.literals[-1] if self.literals else b""
+            m = f.add(crlf(raw), flags, when)
+            server.stats["_"].setdefault("appends", []).append({"user": self.user, "folder": f.name, "uid": m["uid"], "flags": sorted(flags), "size": len(raw)})
+            server.mark()
+            for other in list(server.sessions):
+                if other is not self and other.user == self.user:
+                    if other.selected is f:
+                        other.push(f"* {len(f.messages)} EXISTS")
+                    elif other.notify:
+                        st = f.status()
+                        other.push(f"* STATUS {q(f.name)} (MESSAGES {st['MESSAGES']} UIDNEXT {st['UIDNEXT']} UNSEEN {st['UNSEEN']} HIGHESTMODSEQ {st['HIGHESTMODSEQ']})")
+            send(f"{tag} OK [APPENDUID {f.uidvalidity} {m['uid']}] Append completed")
         elif cmd == "NOTIFY":
             if args and str(args[0]).upper() == "NONE":
                 self.notify = False

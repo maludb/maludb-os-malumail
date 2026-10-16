@@ -535,5 +535,67 @@ async def attachment_read(pool: asyncpg.Pool, caller: Caller, mailbox, message, 
             "text": text[:ATTACHMENT_TEXT_LIMIT], "truncated": len(text) > ATTACHMENT_TEXT_LIMIT, "fence": "the text is mail: fence it"}
 
 
+
+# ---- slice 4 writing (writing.md): find_identities (a resolver), outbox_list ------------------------------------------------------------
+
+async def find_identities(pool: asyncpg.Pool, caller: Caller, mailbox, q: str = "", limit: int = 25) -> dict:
+    """The addresses a mailbox sends as (own + aliases MaluMail delivers to it), for anyone who may view it: a resolver for `identity`."""
+    limit = max(1, min(100, int(limit or 25)))
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        mid = await _mailbox_id(con, mailbox)
+        if mid is None:
+            return not_found()
+        rows = await con.fetch(
+            """SELECT id, address, display_name, kind, reply_to, is_default, signature_text IS NOT NULL AS has_signature
+                 FROM mcp_identities WHERE mailbox_id = $1 AND ($2 = '' OR address ILIKE '%' || $2 || '%' OR coalesce(display_name, '') ILIKE '%' || $2 || '%')
+                ORDER BY is_default DESC, address LIMIT $3""", mid, (q or "").strip(), limit)
+    return {"ok": True, "mailbox_id": mid, "identities": [{"identity_id": r["id"], "address": r["address"], "display_name": r["display_name"], "kind": r["kind"],
+                                                            "reply_to": r["reply_to"], "is_default": r["is_default"], "has_signature": r["has_signature"]} for r in rows]}
+
+
+async def outbox_list(pool: asyncpg.Pool, caller: Caller, mailbox, status: str | None = None, since=None, limit: int = 25) -> dict:
+    """What is in the outbox — scheduled (queued with a send_after ahead), sending, deferred, failed, held, refused, sent. Sent mail to any
+    reader of the mailbox; the rest to its writer and those who triage the mailbox (mcp_outbound). The writer of a held message sees the
+    latest review decision and note on it."""
+    limit = max(1, min(100, int(limit or 25)))
+    statuses = ("scheduled", "queued", "sending", "deferred", "failed", "held", "refused", "sent", "cancelled")
+    if status is not None and status not in statuses:
+        return bad("status is one of " + ", ".join(statuses))
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        mid = await _mailbox_id(con, mailbox)
+        if mid is None:
+            return not_found()
+        rows = await con.fetch(
+            """SELECT o.id, o.status, o.to_addresses, o.cc_addresses, o.subject, o.send_after, o.sent_at, o.attempts, o.retry_at, o.smtp_reply, o.error,
+                      o.hold_reasons, o.refusal, o.external, o.has_attachments, o.sender_member_id, o.sender_is_agent, o.purpose, o.created_at,
+                      CASE WHEN o.status = 'queued' AND o.send_after > now() + interval '2 minutes' THEN 'scheduled' ELSE o.status END AS shown,
+                      (SELECT r.decision FROM mcp_mail_reviews r WHERE r.outbound_id = o.id ORDER BY r.created_at DESC LIMIT 1) AS decision,
+                      (SELECT r.note FROM mcp_mail_reviews r WHERE r.outbound_id = o.id ORDER BY r.created_at DESC LIMIT 1) AS note
+                 FROM mcp_outbound o
+                WHERE o.mailbox_id = $1 AND ($2::timestamptz IS NULL OR o.created_at >= $2)
+                ORDER BY o.created_at DESC LIMIT $3""", mid, dt.datetime.fromisoformat(since) if since else None, limit * 3)
+        owner = await con.fetchval("SELECT owner_member_id FROM mcp_mailboxes WHERE id = $1", mid)
+        if owner != caller.member_id:
+            await _log_read(con, caller, mid, "outbox_list")
+    out = []
+    for r in rows:
+        shown = r["shown"]
+        if status is not None and shown != status and not (status == "queued" and shown == "scheduled"):
+            continue
+        item = {"outbound": r["id"], "status": shown, "to": list(r["to_addresses"] or []), "cc": list(r["cc_addresses"] or []), "subject": fence_untrusted(r["subject"] or ""),
+                "send_after": r["send_after"], "sent_at": r["sent_at"], "attempts": r["attempts"], "retry_at": r["retry_at"], "smtp_reply": r["smtp_reply"],
+                "error": r["error"], "hold_reasons": list(r["hold_reasons"] or []), "refusal": r["refusal"], "external": r["external"],
+                "has_attachments": r["has_attachments"], "sender_is_agent": r["sender_is_agent"], "purpose": r["purpose"], "created_at": r["created_at"]}
+        if r["sender_member_id"] == caller.member_id:
+            item["decision"], item["note"] = r["decision"], r["note"]
+        out.append(item)
+        if len(out) >= limit:
+            break
+    return {"ok": True, "mailbox_id": mid, "outbox": out}
+
+
 TOOLS.update({"find_threads": find_threads, "thread_read": thread_read, "message_read": message_read, "message_headers": message_headers,
-              "find_attachments": find_attachments, "attachment_read": attachment_read})
+              "find_attachments": find_attachments, "attachment_read": attachment_read,
+              "find_identities": find_identities, "outbox_list": outbox_list})

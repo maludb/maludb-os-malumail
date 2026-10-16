@@ -1471,4 +1471,41 @@ questions in one sitting and changed none:
     fixture's `/loop<n>` route swallowed `/loopback` (a fixture defect); the servers' start kills every pid in the state directory (the
     fixture starts after them); an Inbox re-read after a UIDVALIDITY reset gives rows new ids (a proof resolves by subject after it).
 
-  **NEXT:** slice 4, writing (THE THIRD EXEMPLAR). **People's existing mailboxes wait on MM1.**
+- **2026-10-16, SLICE 4 BUILT — writing, THE THIRD EXEMPLAR** (`docs/build-specs/writing.md`, the slice 4 parts of
+  `sending-and-oversight.md` and `mail-service.md`; the owner: "Continue"). 4 screens, 9 actions (the registry: 19 of 45 screens, 34 of 67
+  actions built).
+  - **The composer** (`html/m/compose.php`, `app/features/compose/`, `app/views/compose/`, `html/assets/js/compose.js`): compose and
+    draft-edit in one column (760 px at 1280) with a sticky bar — Send with Schedule…, the paper-clip, the plain/rich toggle (remembered per
+    person), Discard; Squire 2.4.9 vendored with DOMPurify 3.4.16 (Squire 2 needs it as a global; both with their `LICENSE`, the hashes in
+    `html/assets/vendor/README.md`); recipient chips (an outside address outlined, a bad one refused); reply, reply all and forward
+    prefilled from a message key with the quote from the SANITISED body; a delegate's From/Sender; autosave by the settings' seconds and on
+    leaving; attachments by picker, drop and paste through `html/m/draft-files.php` (≤ 7 MB each, the message < ~9.8 MiB encoded); Send →
+    the bar with Undo for the window, then "Sent — View message"; the schedule panel inline. Without a script the plain form sends.
+  - **The identities** (`html/m/identity-form.php`): own address or an alias MaluMail delivers to the mailbox (checked through the mail
+    service's `identity_check`, the alias list never returned), the signature in the same editor and sanitised, one default.
+  - **The mail service:** `mime.py` (the MIME from the row — the Message-ID minted and stored before submission, In-Reply-To/References,
+    an agent's signature and disclosure added here, Bcc only in the Sent copy), `outbox.py` (rows claimed `FOR UPDATE SKIP LOCKED`, 587 with
+    STARTTLS and a verified certificate, `ml_outbound_sent` the moment of the 250, then APPEND to Sent, `\Answered` on the original — never
+    `\Seen` —, the draft's copy expunged; 4xx → deferred with backoff; some recipients refused → sent with a `send_failed` notice; 535 →
+    the breaker; the crash rule at start), `drafts.py` (the row is the save; the APPEND to Drafts within seconds replaces the previous
+    copy; a draft written on a phone opens by its key). An agent's message passes `ml_outbound_hold_reasons` and lands `held` when it says
+    so (the review is slice 5). The records MCP gains `find_identities` and `outbox_list`.
+  - **Fixtures:** the IMAP fixture gained APPEND, STORE, UID EXPUNGE and SEARCH HEADER; `tests/fixtures/smtp_server.py` (standard-library
+    asyncio, STARTTLS under the scratch CA, per-user modes `defer_once` · `defer` · `drop_once` · `refuse_rcpt`, a size limit, every
+    submission spooled); `tests/phase2/servers.sh restart-mailer` restarts the service alone for the crash rule.
+  - **Found and fixed while proving:** smtplib's `login()` tries EVERY mechanism the server offers, so one wrong password was two failed
+    logins against MaluMail's abuse protection — the outbox now makes ONE attempt (PLAIN, else LOGIN); `set_identity_checked()` used one
+    parameter as both `citext` and `text` and every alias identity answered 503; a phone keyboard sends no key for a comma — chips are also
+    made on `input`; the sticky bar sat under the command bar on a phone — the script now places it above whatever is fixed at the bottom
+    and it sticks only then (without a script it stays at the form's end), and the schedule panel follows the bar; without a script the
+    typed recipient (`to_typed`) was dropped and the textarea hidden — `compose_posted()` reads both, the textarea is shown until the editor
+    starts; Undo left the attachments on the cancelled message — they return to the draft with it; the identity form's editor fired the
+    composer's autosave (a page error); hint text below AA contrast. No migration: `db/015` held the schema slice 4 needed.
+  - **File-name divergence:** the identity form is `html/m/identity-form.php` (the manifest's rewrite), not writing.md's
+    `html/m/identities/form.php`.
+  - **The proof:** `tests/phase3/slice4/run.sh` — service 71, checks 113, browser 48 (375 and 1280 px, axe, JavaScript off) under php -S and
+    under Apache; the live step skipped (no handoff file named — at most two submissions between the two test mailboxes when it runs).
+    Phase 2 79/44/28 and 79/48/28 (it now follows slice 4's screens), slices 1–3 green both ways, the mail service 80, the kit 101, the
+    schema 554, the specs 98, the registry check green.
+
+  **NEXT:** slice 5, agents' mail and oversight (THE FOURTH EXEMPLAR). **People's existing mailboxes wait on MM1.**

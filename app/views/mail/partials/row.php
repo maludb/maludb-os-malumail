@@ -8,6 +8,9 @@ $isOut = $r['outbound_id'] !== null;
 $rid = $isOut ? 'o-' . (int) $r['outbound_id'] : 't-' . (int) $r['thread_id'];
 $mb = (int) $box['id'];
 $href = $r['thread_id'] !== null ? '/m/' . $mb . '/t/' . (int) $r['thread_id'] : null;
+if ($view === 'drafts' && $r['latest_message'] !== null && !$isOut) {                 // slice 4: a draft opens in the composer (its row by the index's key)
+    $href = '/m/' . $mb . '/compose?key=' . (int) $r['latest_message'];
+}
 $when = match (true) {
     $view === 'snoozed' && $r['snoozed_until'] !== null => '<i class="feather-clock me-1"></i>' . e(mail_list_date($r['snoozed_until'], $tz)),
     $view === 'scheduled' && $r['send_after'] !== null => '<i class="feather-send me-1"></i>' . e(format_ts($r['send_after'], $tz, 'M j, g:i A')),
@@ -42,6 +45,12 @@ $outState = ['deferred' => ['Trying again', 'warning'], 'failed' => ['Failed', '
         <?php endif; ?>
         <?php if ($r['agent_badge'] !== null && !($isOut && $r['outbound_status'] === 'held')): ?>
             <span class="badge bg-soft-info text-info fw-normal mail-agent-badge"><i class="feather-cpu me-1"></i><?= e($r['agent_badge']) ?></span>
+        <?php endif; ?>
+        <?php if ($isOut && in_array($r['outbound_status'], ['queued', 'failed'], true)): // slice 4: Cancel a scheduled send, Retry a failed one ?>
+            <form method="post" action="<?= $r['outbound_status'] === 'queued' ? '/mail/send-cancel' : '/mail/outbox-retry' ?>" class="d-inline" hx-post="<?= $r['outbound_status'] === 'queued' ? '/mail/send-cancel' : '/mail/outbox-retry' ?>" hx-target="#page-content">
+                <?= csrf_field() ?><input type="hidden" name="mailbox" value="<?= $mb ?>"><input type="hidden" name="outbound" value="<?= (int) $r['outbound_id'] ?>"><input type="hidden" name="return_to" value="/m/<?= $mb ?>/v/<?= e($view) ?>">
+                <button type="submit" class="btn btn-sm btn-link p-0 fs-12 mail-out-action"><?= $r['outbound_status'] === 'queued' ? 'Cancel' : 'Retry' ?></button>
+            </form>
         <?php endif; ?>
     </div>
 </div>

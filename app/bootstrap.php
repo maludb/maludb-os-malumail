@@ -94,6 +94,10 @@ require_once __DIR__ . '/features/mail/wall.php';        // the wall as the page
 require_once __DIR__ . '/features/shell/nav.php';        // the rail, the tabs, the bell, the notice gate, the placeholders (Phase 2)
 require_once __DIR__ . '/features/mail/list.php';        // the list: ml_mail_list() behind the screens, the rail's groups, the poll (slice 2)
 require_once __DIR__ . '/features/mail/reading.php';     // reading: the conversation, the fetch, the targets, the act, the eleven handlers' runner (slice 3)
+require_once __DIR__ . '/features/compose/queries.php';  // writing: drafts, attachments, Send, identities (slice 4)
+require_once __DIR__ . '/features/compose/compose.php';  // writing: the prefill, the quote, the subject and recipient rules
+require_once __DIR__ . '/features/compose/present.php';
+require_once __DIR__ . '/features/compose/handlers.php'; // writing: the send handlers' shared body
 require_once __DIR__ . '/picker.php';                    // the record picker (plugin 0.8.0)
 
 // A JSON caller (the kernel's actions server, an approval replay) never receives PHP's own
@@ -146,11 +150,12 @@ if (PHP_SAPI !== 'cli') {
                 // An agent's grant is not in the change feed: the first time a known, active agent
                 // arrives with a run token, the kernel's run-facts call vouches for it (valid, an
                 // agent, endpoints of THIS application) and the mirror records its admission.
-                if ($m !== null && $m['member_kind'] === 'agent' && $m['status'] === 'active' && $m['capability'] === null
-                    && action_token_run_id($actionToken) !== null) {
+                // Every agent run's facts are read (K38: who asked — the Expert in a person's chat run reaches that person's
+                // mailboxes at triage when they switched on ai_read; slice 4): once per token, cached by run_facts().
+                if ($m !== null && $m['member_kind'] === 'agent' && $m['status'] === 'active' && action_token_run_id($actionToken) !== null) {
                     $facts = run_facts($actionToken);
                     $GLOBALS['__run_facts'] = $facts;                 // an evaluation run writes nothing (is_eval)
-                    if ($facts !== null && !empty($facts['valid']) && !empty($facts['is_agent'])
+                    if ($m['capability'] === null && $facts !== null && !empty($facts['valid']) && !empty($facts['is_agent'])
                         && (int) ($facts['member_id'] ?? 0) === $mid && !empty($facts['endpoints'])) {
                         db()->prepare("UPDATE members SET capability = 'write', synced_at = now() WHERE id = :id")->execute(['id' => $mid]);
                         $m['capability'] = 'write';
@@ -162,6 +167,9 @@ if (PHP_SAPI !== 'cli') {
                     $GLOBALS['__action_authed'] = true;
                     $GLOBALS['__agent_run_id'] = action_token_run_id($actionToken);
                     $GLOBALS['__action_token'] = $actionToken;
+                    if ($m['member_kind'] === 'agent' && ml_on_behalf() !== null) {   // the SQL wall's app.on_behalf_of (db/012 ml_level, db/017 ml_my_levels)
+                        db()->prepare('SELECT set_config(?, ?, false)')->execute(['app.on_behalf_of', (string) ml_on_behalf()]);
+                    }
                     header_remove('Set-Cookie');
                     register_shutdown_function(static function (): void {
                         if (session_status() === PHP_SESSION_ACTIVE) {

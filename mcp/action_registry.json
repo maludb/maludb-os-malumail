@@ -1,6 +1,6 @@
 {
     "generated_from": "docs/malumail-action-manifest.md",
-    "generated_at": "2026-10-15T13:23:28+00:00",
+    "generated_at": "2026-10-16T12:25:07+00:00",
     "screens": {
         "home": {
             "screen": "home",
@@ -180,7 +180,7 @@
                 "body",
                 "template"
             ],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "draft-edit": {
@@ -189,7 +189,7 @@
             "section": "Writing (slice 4 — the third exemplar)",
             "when": "go on with a draft — one written here or on a phone",
             "params": [],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "identity-new": {
@@ -200,7 +200,7 @@
             "params": [
                 "address"
             ],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "identity-edit": {
@@ -209,7 +209,7 @@
             "section": "Writing (slice 4 — the third exemplar)",
             "when": "change an identity's display name, reply-to, signature or default",
             "params": [],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "oversight": {
@@ -1383,7 +1383,7 @@
             "who": "`mail.use` · triage",
             "agent": true,
             "record_id": "the draft",
-            "built": false
+            "built": true
         },
         "mail_draft_discard": {
             "action": "mail_draft_discard",
@@ -1410,7 +1410,7 @@
             "who": "`mail.use` · triage",
             "agent": true,
             "record_id": "the draft",
-            "built": false
+            "built": true
         },
         "mail_send": {
             "action": "mail_send",
@@ -1491,7 +1491,7 @@
             "who": "`mail.use` · send",
             "agent": true,
             "record_id": "the outbound message",
-            "built": false
+            "built": true
         },
         "mail_reply": {
             "action": "mail_reply",
@@ -1572,7 +1572,7 @@
             "who": "`mail.use` · send",
             "agent": true,
             "record_id": "the outbound message",
-            "built": false
+            "built": true
         },
         "mail_forward": {
             "action": "mail_forward",
@@ -1659,7 +1659,7 @@
             "who": "`mail.use` · send",
             "agent": true,
             "record_id": "the outbound message",
-            "built": false
+            "built": true
         },
         "mail_send_cancel": {
             "action": "mail_send_cancel",
@@ -1686,7 +1686,7 @@
             "who": "`mail.use` · send",
             "agent": true,
             "record_id": "the draft reopened",
-            "built": false
+            "built": true
         },
         "mail_outbox_retry": {
             "action": "mail_outbox_retry",
@@ -1713,7 +1713,7 @@
             "who": "`mail.use` · send",
             "agent": true,
             "record_id": "the outbound message",
-            "built": false
+            "built": true
         },
         "mail_identity_save": {
             "action": "mail_identity_save",
@@ -1770,7 +1770,7 @@
             "who": "`mail.use` · full",
             "agent": false,
             "record_id": "the identity",
-            "built": false
+            "built": true
         },
         "mail_identity_delete": {
             "action": "mail_identity_delete",
@@ -1797,7 +1797,7 @@
             "who": "`mail.use` · full",
             "agent": false,
             "record_id": "the identity",
-            "built": false
+            "built": true
         },
         "mail_review_approve": {
             "action": "mail_review_approve",
