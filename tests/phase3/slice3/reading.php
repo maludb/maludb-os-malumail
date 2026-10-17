@@ -13,7 +13,8 @@ function ctl(array $cmd): array
 {
     global $CTL;
     $n = bin2hex(random_bytes(8));
-    file_put_contents("$CTL/$n.json", json_encode($cmd));
+    file_put_contents("$CTL/$n.part", json_encode($cmd));
+    rename("$CTL/$n.part", "$CTL/$n.json");                      // whole or not at all: the fixture polls *.json
     for ($i = 0; $i < 200; $i++) {
         if (is_file("$CTL/$n.done")) { $o = json_decode((string) file_get_contents("$CTL/$n.done"), true); unlink("$CTL/$n.done"); return $o; }
         usleep(50000);
@@ -256,8 +257,9 @@ $a = jact(26, 'move', ['mailbox' => $P, 'thread' => $tOffer, 'to_folder' => $fol
 ok($a['code'] === 200 && where_is($mre) === 'archive' && where_is($ms) === 'sent', 'move leaves the Sent copy where it is (decision 3)');
 $a = jact(26, 'trash', ['mailbox' => $P, 'thread' => $tOffer]);
 $tj = json_decode($a['body'], true);
-ok($a['code'] === 200 && where_is($mre) === 'trash' && where_is($ms) === 'trash' && $tj['count'] === 2, 'trash takes every message but drafts');
-$a = jact(26, 'move', ['mailbox' => $P, 'restore' => implode(',', $tj['undo']['restore'])]);
+ok($a['code'] === 200 && where_is($mre) === 'trash' && where_is($ms) === 'trash' && ($tj['count'] ?? null) === 2, 'trash takes every message but drafts',
+   $a['code'] . ' ' . where_is($mre) . '/' . where_is($ms) . ' ' . substr($a['body'], 0, 300));
+$a = jact(26, 'move', ['mailbox' => $P, 'restore' => implode(',', $tj['undo']['restore'] ?? [])]);
 ok($a['code'] === 200 && where_is($mre) === 'inbox' && where_is($ms) === 'sent', 'undo of a trash: received → Inbox, sent → Sent (decision 2)');
 $a = jact(26, 'spam', ['mailbox' => $P, 'thread' => $tOffer]);
 ok($a['code'] === 200 && where_is($mre) === 'junk' && where_is($ms) === 'sent', 'spam takes the received message only');

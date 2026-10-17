@@ -53,7 +53,8 @@ def sql(q: str) -> str:
 
 def ctl(**cmd) -> dict:
     name = uuid.uuid4().hex
-    (CONTROL / f"{name}.json").write_text(json.dumps(cmd))
+    (CONTROL / f"{name}.part").write_text(json.dumps(cmd))
+    (CONTROL / f"{name}.part").rename(CONTROL / f"{name}.json")      # whole or not at all: the fixture polls *.json
     done = CONTROL / f"{name}.done"
     for _ in range(200):
         if done.exists():

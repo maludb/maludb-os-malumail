@@ -55,7 +55,8 @@ def sql(q: str) -> str:
 
 def ctl(**cmd) -> dict:
     name = uuid.uuid4().hex
-    (CONTROL / f"{name}.json").write_text(json.dumps(cmd))
+    (CONTROL / f"{name}.part").write_text(json.dumps(cmd))
+    (CONTROL / f"{name}.part").rename(CONTROL / f"{name}.json")      # whole or not at all: the fixture polls *.json
     done = CONTROL / f"{name}.done"
     for _ in range(200):
         if done.exists():
@@ -114,7 +115,9 @@ def deliver(user: str, subject: str, html: str | None = None, text: str | None =
     c = {"op": "deliver", "user": user, "raw": bytes(m).decode("utf-8", "surrogateescape")}
     if folder:
         c["folder"] = folder
-    ctl(**c)
+    r = ctl(**c)
+    if not r.get("ok"):
+        raise RuntimeError(f"the fixture refused the delivery of {subject}: {r}")
     mb = SEED[user.split("@")[0]]
     mid_header = m["Message-ID"]
     took = wait(lambda: sql(f"SELECT id FROM mail_messages WHERE mailbox_id = {mb} AND message_id_header = '{mid_header}'") != "", 60)

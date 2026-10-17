@@ -10,7 +10,8 @@ function ctl(array $cmd): array
 {
     global $CTL;
     $n = bin2hex(random_bytes(8));
-    file_put_contents("$CTL/$n.json", json_encode($cmd));
+    file_put_contents("$CTL/$n.part", json_encode($cmd));
+    rename("$CTL/$n.part", "$CTL/$n.json");                      // whole or not at all: the fixture polls *.json
     for ($i = 0; $i < 200; $i++) {
         if (is_file("$CTL/$n.done")) { $o = json_decode((string) file_get_contents("$CTL/$n.done"), true); unlink("$CTL/$n.done"); return $o; }
         usleep(50000);

@@ -407,7 +407,14 @@ class Server:
         while True:
             for p in sorted(d.glob("*.json")):
                 try:
-                    c = json.loads(p.read_text())
+                    try:
+                        c = json.loads(p.read_text())
+                    except ValueError:
+                        # a writer that does not write-then-rename may still be writing (a large delivery): try again next round,
+                        # and answer with the error only once the file has stood still for two seconds
+                        if time.time() - p.stat().st_mtime < 2:
+                            continue
+                        raise
                     out = self.control(c)
                 except Exception as e:  # noqa: BLE001
                     out = {"ok": False, "error": f"{type(e).__name__}: {e}"}
