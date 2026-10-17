@@ -161,7 +161,10 @@ class Outbox:
             await self.store.outbound_sent(oid, queue_id, reply[:500])
             if refused:
                 who = int(o["sender_member_id"]) if o["sender_kind"] == "human" else await self.store.primary_overseer(mb)
-                await self.store.notify_send_failed(oid, who, "Some recipients were refused", "The server refused " + ", ".join(refused) + ".", mb)
+                # the domain, never a correspondent's address (notifications.md: a notice carries no mail content)
+                domains = sorted({str(a).rsplit("@", 1)[-1].lower() for a in refused})
+                await self.store.notify_send_failed(oid, who, "Some recipients were refused",
+                                                    f"The server refused {len(refused)} recipient{'' if len(refused) == 1 else 's'} at " + ", ".join(domains) + ".", mb)
             await self.file(oid, msg=msg, o=o)
             return
         if kind == "auth_failed":

@@ -304,7 +304,7 @@ r = row(o9, "smtp_reply")
 check("refused" in r[0] and "nobody@nowhere.example" in r[0] and "550" in r[0], "…the refusal named in the reply", r[0])
 check(spooled(message_id(o9))[0]["rcpt"] == ["good@customer.example"], "…the spool shows the one accepted recipient")
 check(wait(lambda: int(sql("SELECT count(*) FROM notifications WHERE kind = 'send_failed'")) == notices_before + 1, 10) is not None
-      and sql(f"SELECT member_id || '|' || body FROM notifications WHERE kind = 'send_failed' ORDER BY id DESC LIMIT 1") == f"26|The server refused nobody@nowhere.example.", "…a send_failed notice to the writer naming the refused address")
+      and sql(f"SELECT member_id || '|' || body FROM notifications WHERE kind = 'send_failed' ORDER BY id DESC LIMIT 1") == f"26|The server refused 1 recipient at nowhere.example.", "…a send_failed notice to the writer naming the refused domain, never the address")
 dropped_before = smtp_stats()["dropped"]
 set_mode("marco@business.example", "drop_once")
 o10 = submit(MARCO, 27, ["outside@customer.example"], f"Dropped {RUN}")
