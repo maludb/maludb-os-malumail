@@ -82,11 +82,15 @@ $railData  = $noticeOk ? mail_rail($pdo, (int) ($current['id'] ?? 0)) : null;
             </div>
             <div class="header-right ms-auto">
                 <div class="d-flex align-items-center">
-                    <div class="nxl-h-item">
-                        <a href="/notifications" class="nxl-head-link me-0 position-relative" id="bell" aria-label="Notifications" hx-get="/notifications" hx-target="#page-content" hx-push-url="/notifications">
+                    <div class="dropdown nxl-h-item" id="bell-dropdown">
+                        <a href="javascript:void(0);" class="nxl-head-link me-0 position-relative" id="bell" aria-label="Notifications" role="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
                             <i class="feather-bell"></i>
                             <?= view('shared/bell.php', ['unread' => $unread]) ?>
                         </a>
+                        <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown p-0" id="bell-menu" style="width:340px;max-width:calc(100vw - 24px)"
+                             hx-get="/notifications?menu=1" hx-trigger="mouseenter from:#bell-dropdown throttle:15s, click from:#bell throttle:15s, show.bs.dropdown from:#bell throttle:15s, notificationChanged from:body" hx-swap="innerHTML">
+                            <div class="px-3 py-3 text-muted fs-12">Loading…</div>
+                        </div>
                     </div>
                     <?= view('shared/app-switcher.php') ?>
                     <div class="nxl-h-item dark-light-theme">

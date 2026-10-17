@@ -41,9 +41,9 @@ $r = page($j, "/m/$priya/people/jon%40acme.example");
 ok($r['code'] === 404 && str_contains($r['body'], 'has not exchanged mail'), '/m/{mailbox}/people/{correspondent} reaches its screen (slice 8 built it: no such correspondent, its own 404)');
 $r = page($j, "/m/$priya/people");
 ok($r['code'] === 200 && str_contains($r['body'], 'id="correspondents-content"'), '/m/{mailbox}/people reaches its screen (slice 8 built it)');
-foreach (['/notifications', '/settings/notifications'] as $p) {
+foreach (['/notifications' => 'notifications-content', '/settings/notifications' => 'notification-settings-content'] as $p => $marker) {
     $r = page($j, $p);
-    ok($r['code'] === 200 && str_contains($r['body'], 'builds this screen'), "$p reaches its screen's placeholder");
+    ok($r['code'] === 200 && str_contains($r['body'], 'id="' . $marker . '"'), "$p reaches its screen (slice 9 built it)");
 }
 $r = page($j, "/m/$priya/access/new");
 ok($r['code'] === 200 && str_contains($r['body'], 'id="access-grant-new-content"'), "/m/{mailbox}/access/new reaches its screen (slice 7 built it)");

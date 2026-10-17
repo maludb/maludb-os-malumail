@@ -17,14 +17,16 @@ declare(strict_types=1);
  *
  * PHASE 0: every pass but `key_usage_prune` is a STUB that changes nothing and answers 0 — the slice whose data it touches fills it in
  * (design §10): `dispatches`, `held_expiry` slice 5's; `snoozes` slice 6's; `break_glass_expiry` slice
- * 7's; `notify_outbox`, `clerk_inputs` slice 9's. Each stub names its slice. REAL from the kit: `key_usage_prune`
+ * 7's; (slice 9, built: `new_mail`, `quota`, `clerk_note`, `notify_outbox`). Each stub names its slice. REAL from the kit: `key_usage_prune`
  * (ml_prune_key_usage, db/005); real since slice 2: `index_catch_up`; since slice 5: `dispatches`, `held_expiry`; since slice 6: `snoozes`; since slice 7: `break_glass_expiry` (permission rows past their date).
  */
 if (PHP_SAPI !== 'cli') { fwrite(STDERR, "CLI only.\n"); exit(1); }
 require_once dirname(__DIR__) . '/app/bootstrap.php';
+require_once dirname(__DIR__) . '/app/features/notifications/queries.php';
+require_once dirname(__DIR__) . '/app/features/notifications/passes.php';
 
 /** The passes, in the order they run. A new pass is a name here and a function worker_pass_<name>(PDO, int $limit, DateTimeImmutable $now): array. */
-const WORKER_PASSES = ['index_catch_up', 'dispatches', 'held_expiry', 'snoozes', 'break_glass_expiry', 'notify_outbox', 'clerk_inputs', 'key_usage_prune'];
+const WORKER_PASSES = ['index_catch_up', 'dispatches', 'held_expiry', 'snoozes', 'break_glass_expiry', 'new_mail', 'quota', 'clerk_note', 'notify_outbox', 'key_usage_prune'];
 
 $only = [];
 $limit = 200;
@@ -333,10 +335,37 @@ function worker_pass_break_glass_expiry(PDO $pdo, int $limit, DateTimeImmutable 
 {
     return ['revoked' => (int) $pdo->query('SELECT ml_permissions_expire()')->fetchColumn()];
 }
-/** SLICE 9 — notification_outbox: queued email (MaluMail's REST send) and text (K6) rows sent, failed ones retried with backoff. */
-function worker_pass_notify_outbox(PDO $pdo, int $limit, DateTimeImmutable $now): array { return ['sent' => 0, 'stub' => 'slice 9']; }
-/** SLICE 9 — the Mail Clerk's inputs at clerk_note_at on weekdays: held mail older than a day, unscreened mail, mailboxes near quota, sync failures — counts for its note, never mail text. */
-function worker_pass_clerk_inputs(PDO $pdo, int $limit, DateTimeImmutable $now): array { return ['cut' => 0, 'stub' => 'slice 9']; }
+/**
+ * SLICE 9 — new mail in the mailboxes people chose (notifications.md): the INBOX arrivals since the last pass, one coalesced notice per person and
+ * mailbox. The first pass ever only sets the watermark (mail that arrived before it is no news). The report keeps `through`, the database's clock
+ * at the end of the window, for the next pass to start from.
+ */
+function worker_pass_new_mail(PDO $pdo, int $limit, DateTimeImmutable $now): array
+{
+    $until = nt_db_now($pdo);
+    $through = nt_last_report($pdo, 'new_mail', 'through');
+    $told = $through === null ? 0 : pass_new_mail($pdo, new DateTimeImmutable((string) $through), $until);
+    return ['told' => $told, 'through' => $until->format('Y-m-d H:i:s.uP')];
+}
+/** SLICE 9 — mailboxes at 90 % and 100 % of their space, once per crossing (the report's `levels_json` is what was told). */
+function worker_pass_quota(PDO $pdo, int $limit, DateTimeImmutable $now): array
+{
+    $levels = [];
+    $made = pass_quota($pdo, $levels);
+    return ['notices' => $made, 'levels_json' => json_encode((object) $levels)];
+}
+/** SLICE 9 — the Mail Clerk's morning note for overseers, weekdays at or after clerk_note_at in the business's zone (once a day each; counts only). */
+function worker_pass_clerk_note(PDO $pdo, int $limit, DateTimeImmutable $now): array
+{
+    return ['notes' => pass_clerk_note($pdo, $now)];
+}
+/** SLICE 9 — notification_outbox: queued email (MaluMail's /v1/send) and text (the kernel's K6) rows sent, a failed attempt retried after 1 and 5 minutes, the third is `failed`. */
+function worker_pass_notify_outbox(PDO $pdo, int $limit, DateTimeImmutable $now): array
+{
+    $detail = [];
+    pass_notify_outbox($pdo, $limit, $detail);
+    return $detail;
+}
 /** ml_prune_key_usage() (db/005): minute buckets older than a day, day buckets older than 35 days. Real from the kit. */
 function worker_pass_key_usage_prune(PDO $pdo, int $limit, DateTimeImmutable $now): array
 {

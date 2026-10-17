@@ -1,6 +1,6 @@
 {
     "generated_from": "docs/malumail-action-manifest.md",
-    "generated_at": "2026-10-17T08:25:02+00:00",
+    "generated_at": "2026-10-17T11:27:31+00:00",
     "screens": {
         "home": {
             "screen": "home",
@@ -430,7 +430,7 @@
             "params": [
                 "unread"
             ],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "notification-settings": {
@@ -439,7 +439,7 @@
             "section": "Notifications (slice 9)",
             "when": "which notices reach me in-app, by mail and by text (K6), and for which mailboxes new mail notifies me",
             "params": [],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "admin": {
@@ -2766,7 +2766,7 @@
             "who": "own",
             "agent": false,
             "record_id": "the notification",
-            "built": false
+            "built": true
         },
         "mail_notification_prefs_save": {
             "action": "mail_notification_prefs_save",
@@ -2811,7 +2811,7 @@
             "who": "own",
             "agent": false,
             "record_id": "the member",
-            "built": false
+            "built": true
         },
         "mail_settings_save": {
             "action": "mail_settings_save",

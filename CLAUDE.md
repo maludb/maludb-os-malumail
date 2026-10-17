@@ -267,6 +267,14 @@ customer key nor the sealing secret** — the proof checks it.
 - People and the correspondent page read `mcp_correspondents` / `mcp_threads`; autocomplete is `ml_complete()` at `send` (a viewer: 404) and writes no log.
 - The composer's listbox lives in `compose.js` (capture-phase keydown so Enter on a suggestion never reaches the chip handler).
 
+## Slice 9 (2026-10-17, notifications BUILT) — `docs/build-specs/notifications.md`
+- `bash tests/phase3/slice9/run.sh` (php -S) and `ML_APP=apache …`: scratch `ml_dev9`, NO IMAP/SMTP: arrivals are rows in an INBOX, mail goes to the fake `/v1/send` (logged in `<state>/malumail.log`), texts to the fake kernel (`state.sms.mode`), the Clerk's note at a date given to the worker (`ML_WORKER_NOW`); `checks.php` 92, `browser.mjs` 27. `ML_S9_HOLD=1` leaves the servers up (never pipe it into `tail`).
+- **No notice carries mail**: titles say how many and where (a mailbox address, a percentage), never a subject, sender, body or folder; the proof scans every notice, outbox row, log row, mail and text of the run for the fixtures' words.
+- **A pass keeps its place in its own last report** (`worker_passes.steps`: `new_mail.through`, `quota.levels_json`); `worker_pass_*` in `bin/worker.php` call `pass_*` in `app/features/notifications/passes.php`. Writers of notices are the schema's (`ml_notify()`, `ml_notify_coalesce()`, db/015's trigger) — a new kind is added to `NT_KINDS` AND the check constraint.
+- **The Mail admin oversees every agent mailbox** (`ml_is_decider`), so held mail, expiry and the digest reach them for agents' mailboxes. Opening a notice is `hx-post` to `read.php` with `return_to`; the response's HX-Location follows the link.
+- **The theme opens header dropdowns on hover** (jQuery, no native event): load a dropdown's content on `mouseenter` and `click` as well as `show.bs.dropdown`.
+- Texts: the kernel offers no "has a verified phone" query; the page uses the directory's phone and the send's refusal ends a row `skipped`.
+
 ## Numbers
 Ports `APP_INTERNAL_PORT=8199`, `MCP_RECORDS_PORT=8852`, `MCP_ACTIVITY_PORT=8853`, `ML_MAILER_PORT=8854`, `ML_IMAGES_PORT=8855`;
 scratch 9201 (the app), 9202 (the fake kernel), 9203 (the fake MaluDB + MaluMail REST), 9204–9205 (the MCP servers), 9206 (the

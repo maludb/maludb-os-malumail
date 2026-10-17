@@ -1218,7 +1218,7 @@ questions in one sitting and changed none:
     4. **The mail service connects as `malumail_rw`** (D1's three roles; it writes the index).
     5. `ml_settings` carries §6.5 with the D4–D10 defaults; a new notice text bumps its version by trigger.
     6. The worker's eight passes are stubs naming their slice (`index_catch_up` 2, `dispatches`/`held_expiry` 5, `snoozes` 6,
-       `break_glass_expiry` 7, `notify_outbox`/`clerk_inputs` 9); `key_usage_prune` is real.
+       `break_glass_expiry` 7, `notify_outbox`/`clerk_note` 9, all built); `key_usage_prune` is real.
     7. Health reports the mail service and the image door (`ok` / `down` / `unconfigured`) without failing on them.
     8. The brand: an envelope on teal (`bin/make_brand_images.php`).
 
@@ -1563,3 +1563,4 @@ questions in one sitting and changed none:
   **NEXT:** slice 7 (Sonnet 5.5 workers, D16). **People's existing mailboxes wait on MM1.**
 - **2026-10-17, SLICE 7 BUILT — delegation and access** (`docs/build-specs/delegation-access.md`): Access, the grant and break-glass forms, the access log and the mailbox settings; db/020 (page_size and typed settings; the access log names its K7 consumer) — the wall itself unchanged; `tests/phase3/slice7/run.sh` 138 + 26 + 29 under php -S and Apache.
 - **2026-10-17, SLICE 8 BUILT — correspondents, autocomplete and the K7 share** (`docs/build-specs/correspondents.md`): People and the correspondent page (company tab, public providers excluded), the composer's recipient suggestions, `mcp/share_correspondence.py` (the kernel's consumer named, one `k7.read` per mailbox) and three records tools; db/021 (received once per message key; `ml_log_k7_read` validates its consumer and agent) — the wall itself unchanged; `tests/phase3/slice8/run.sh` 72 + 32 + 57 + 42 under php -S and Apache. Open for the owner: an empty share answer writes no log row.
+- **2026-10-17, SLICE 9 BUILT — notifications** (`docs/build-specs/notifications.md`): the bell and its menu, `/notifications`, `/settings/notifications`, the two actions, and the worker's `new_mail`, `quota`, `clerk_note` (replacing the `clerk_inputs` stub) and `notify_outbox` passes; no migration; a pass keeps its place in its own last `worker_passes` report. No notice carries mail (scanned in the proof). The Mail admin oversees every agent's mailbox, so is told of its held mail. The kernel cannot be asked whether a phone is verified, so the By-text column follows the directory's phone and the send's refusal ends a row skipped. Proof: `tests/phase3/slice9/run.sh` — checks 92, browser 27 under php -S and Apache; registry 41/45 screens, 62/67 actions built.

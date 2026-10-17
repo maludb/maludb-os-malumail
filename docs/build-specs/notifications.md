@@ -154,3 +154,44 @@ None for the owner.
 - **Done in `db/015_sending_oversight.sql`**: `ml_notify()`'s text row (deduplicated by `t<notification id>`), `ml_notify_coalesce()` with
   `notifications.item_count`, the held-mail trigger and the expiry notice (proven by `db/proof/phase1_sending.sql`).
 - **The tool surface**: none (`my_notifications` stands; `notice_status` is the shell's).
+
+## Built and proven (2026-10-17)
+
+Built by a Sonnet 5.5 worker; to be verified by the planning model.
+
+**Built**: both screens (`html/notifications/index.php`, `html/settings/notifications/index.php`) and both actions (`read.php`, `save.php`), the bell's menu
+(`GET /notifications?menu=1`, `app/views/notifications/_bell.php`, loaded by the shell's bell), `app/features/notifications/{queries,present,passes}.php`, the views
+`list`, `_row`, `_bell`, `settings`, and the worker's passes `new_mail`, `quota`, `clerk_note`, `notify_outbox` (`bin/worker.php`; the `clerk_inputs` stub is
+replaced by `clerk_note`). No migration. Registry: 41 of 45 screens, 62 of 67 actions built.
+
+**Proven** (`tests/phase3/slice9/run.sh`, php -S and `ML_APP=apache`): checks.php 92 and browser.mjs 27 under both; `bin/build_action_registry.php --check` green.
+No mail server of any kind is started: arrivals are rows in an INBOX, mail goes to the fake `/v1/send`, texts to the fake kernel, the Clerk's note at a date
+the worker is told.
+
+**Found and fixed**
+1. The theme opens a header dropdown on HOVER at desktop widths through jQuery (a native `show.bs.dropdown` is never dispatched) and a click then closes it, so
+   the bell's menu loads on `mouseenter`, `click` and `show.bs.dropdown` (throttled 15 s) and on `notificationChanged`. The bell's anchor is `javascript:void(0)`
+   like the user menu's; the rail's Notifications item is the no-script way in.
+2. Phase 2's proofs used `/notifications` as "a placeholder to POST to": they now use `/admin/settings` (unbuilt, slice 10), and the vhost proof follows built.
+3. The fake MaluMail send (`tests/fake_maludb.php`) returns no `message_id`, so mail rows have no `provider_ref`; the pass stores it when MaluMail gives one.
+
+**Decisions taken here (within the spec)**
+1. **State of a pass is the last pass's report** (`worker_passes.steps`): `new_mail` keeps `through` (the database's clock at the end of its window; its first pass
+   ever only sets it — mail before the first pass is no news), `quota` keeps `levels_json`. No migration; deleting the history resets them.
+2. **New mail**: INBOX rows created in the window, unread, not a draft, not from the mailbox's addresses or identities or the person's own mailboxes or address, not in a
+   muted conversation, and RECEIVED within the last day (a re-read of old mail after a UIDVALIDITY change is no arrival).
+3. **The Mail admin is a reviewer of an agent's mailbox** (the wall gives the role `full` there; db/015's trigger tells every `ml_is_decider`): held mail, expiry
+   and the Clerk's digest reach the admin for agents' mailboxes, never for a person's. The spec's "not a Mail admin for a person's mailbox" holds.
+4. **Texts: "a verified phone" cannot be asked of the kernel** (K6 has only the send), so the By-text column shows when the directory holds a phone for the person;
+   the kernel's refusal at send time (no verified phone, no sender, opted out, the day's cap) ends the row `skipped` with its code.
+5. **The digest** lists, per overseer (a person with `full` on an agent's mailbox), `address: N held over a day, N unscreened, N % full, not syncing` for their
+   mailboxes only; once a weekday at or after `clerk_note_at` in the business's zone, deduplicated by the local date (`record_id` YYYYMMDD); links are the notice's one link
+   (/oversight). Held mail is aged by `held_at`.
+6. **Quota** goes to the owner (a person's mailbox) or the overseers (an agent's), and always the Mail admins; the title is "<address> is <N> % full".
+7. **Delivery**: a 400 or a rejection from MaluMail is `skipped` (suppressed), no key configured is `skipped`, 5xx / 429 / transport are retried at +1 and +5 minutes, the third
+   failure is `failed`; the mail's link and the footer use `APP_URL`. A row's mail is plain text only.
+8. The kinds' preferences are saved sorted; a form posts an empty `kind[]` / `text_kind[]` / `new_mail_mailbox[]` marker so "all off" is not "left out".
+
+**Not done / for the owner**: `sync_failed`, `send_deferred`, `agent_replied` have no writer yet (the mail service's sync, the outbox loop's deferral and the dispatch pass are
+other slices'); the settings page offers them. `services/mailer/outbox.py` worded a `send_failed` notice with the REFUSED ADDRESSES, against this spec's "the domain, never the
+address of a person's correspondent" — FIXED by the planning model at review: "The server refused N recipient(s) at <domains>." (slice 4's service proof follows).

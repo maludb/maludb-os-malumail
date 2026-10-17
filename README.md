@@ -75,6 +75,8 @@ zone, brought back unread by the worker with a chip (an agent's mailbox wakes th
 
 **Slice 8, correspondents, autocomplete and the K7 share, is built** (2026-10-17): a mailbox's People (filters, Known and Outside chips), the correspondent page with the company tab, recipient suggestions in the composer, and the handler of the `correspondence_index` share (the owner's switch, never a sensitive conversation, every answer in the access log). `tests/phase3/slice8/run.sh` proves it under php -S and Apache. Next: slice 9.
 
+**Slice 9, notifications, is built** (2026-10-17): the bell (unread count, a menu of the latest eight) and the Notifications page, each person's settings (what reaches them in the bell, by mail and by text, and the mailboxes whose new mail notifies them), and the worker's passes that make and deliver notices — new mail coalesced per mailbox, quota crossings, the Mail Clerk's weekday morning note for overseers, mail through MaluMail's send and texts through the kernel. No notice ever contains a word of any message. (`tests/phase3/slice9/run.sh`.)
+
 ## Documents
 
 - [docs/malumail-design.md](docs/malumail-design.md) — the Phase 0 design fitted to the Business OS: why the webmail talks
