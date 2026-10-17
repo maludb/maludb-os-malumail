@@ -167,6 +167,53 @@
     if (showCc) showCc.addEventListener('click', function (e) { e.preventDefault(); document.getElementById('compose-row-cc').classList.remove('d-none'); document.getElementById('compose-cc').focus(); });
     if (showBcc) showBcc.addEventListener('click', function (e) { e.preventDefault(); document.getElementById('compose-row-bcc').classList.remove('d-none'); document.getElementById('compose-bcc').focus(); });
 
+    // ---- recipient suggestions (slice 8: GET /m/{mailbox}/complete) ----------------------------------------------------------------------
+    // After two characters, 150 ms after the last key; at most eight rows; arrows move, Enter takes, Escape closes. The door logs nothing.
+    ['to', 'cc', 'bcc'].forEach(function (f) {
+        var wrap = document.getElementById('compose-chips-' + f); if (!wrap) return;
+        var input = wrap.querySelector('.mail-chip-input');
+        var list = document.createElement('ul');
+        list.className = 'list-group position-absolute shadow-sm d-none mail-suggest'; list.id = 'compose-suggest-' + f; list.setAttribute('role', 'listbox');
+        list.style.zIndex = '1050'; list.style.maxWidth = '100%'; list.style.minWidth = '14rem'; list.style.top = '100%'; list.style.left = '0';
+        wrap.style.position = 'relative'; wrap.appendChild(list);
+        input.setAttribute('role', 'combobox'); input.setAttribute('aria-autocomplete', 'list'); input.setAttribute('aria-controls', list.id); input.setAttribute('aria-expanded', 'false');
+        var timer = null, active = -1, seq = 0;
+        function items() { return list.querySelectorAll('li[data-address]'); }
+        function hide() { list.classList.add('d-none'); list.innerHTML = ''; active = -1; input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); }
+        function mark(i) {
+            var li = items(); active = li.length ? (i + li.length) % li.length : -1;
+            li.forEach(function (x, k) { x.classList.toggle('active', k === active); x.setAttribute('aria-selected', k === active ? 'true' : 'false'); });
+            if (active >= 0) input.setAttribute('aria-activedescendant', li[active].id); else input.removeAttribute('aria-activedescendant');
+        }
+        function pick(li) { addChip(f, li.getAttribute('data-address')); input.value = ''; hide(); input.focus(); }
+        input.addEventListener('input', function () {
+            clearTimeout(timer);
+            var q = input.value.trim();
+            if (q.length < 2 || /[,;]/.test(q)) { hide(); return; }
+            timer = setTimeout(function () {
+                var mine = ++seq;
+                fetch('/m/' + root.getAttribute('data-mailbox') + '/complete?q=' + encodeURIComponent(q), { credentials: 'same-origin', headers: { 'Accept': 'text/html' } })
+                    .then(function (r) { return r.ok ? r.text() : ''; })
+                    .then(function (html) {
+                        if (mine !== seq || input.value.trim() !== q) return;
+                        list.innerHTML = html;
+                        if (items().length) { list.classList.remove('d-none'); input.setAttribute("aria-expanded", "true"); active = -1; } else { hide(); }
+                    }).catch(function () { hide(); });
+            }, 150);
+        });
+        // in the capture phase, so an Enter that takes a suggestion never reaches the chip handler that would take the typed text
+        input.addEventListener('keydown', function (e) {
+            var open = !list.classList.contains('d-none');
+            if (open && e.key === 'ArrowDown') { e.preventDefault(); mark(active + 1); }
+            else if (open && e.key === 'ArrowUp') { e.preventDefault(); mark(active < 0 ? -1 : active - 1); }
+            else if (open && e.key === 'Enter' && active >= 0) { e.preventDefault(); e.stopImmediatePropagation(); pick(items()[active]); }
+            else if (open && e.key === 'Escape') { e.preventDefault(); hide(); }
+        }, true);
+        list.addEventListener('mousedown', function (e) { e.preventDefault(); });
+        list.addEventListener('click', function (e) { var li = e.target.closest('li[data-address]'); if (li) pick(li); });
+        input.addEventListener('blur', function () { setTimeout(hide, 100); });
+    });
+
     // ---- autosave ---------------------------------------------------------------------------------------------------------------------
     var status = document.getElementById('compose-status');
     var saveSecs = parseInt(root.getAttribute('data-save-seconds') || '10', 10);

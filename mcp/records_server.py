@@ -1029,3 +1029,87 @@ async def mailbox_access_log(pool: asyncpg.Pool, caller: Caller, mailbox, since=
                                                           "through": "another application" if r["action"] == "k7.read" else ("a tool" if r["action"] == "mcp.read" or r["source"] in ("mcp", "agent", "assistant") else "the webmail"),
                                                           "consumer": r["consumer"]} for r in rows]}
 
+
+
+# ================================================================================================================================
+# SLICE 8 — correspondents (docs/build-specs/correspondents.md "MCP tools this slice makes real"): correspondence, find_correspondents,
+# find_members. The share correspondence_index is mcp/share_correspondence.py (the kernel's token alone). Through the views: the wall
+# decides every row; an agent never sees a sensitive conversation. Phase 4's tool wraps every string that came in a message in
+# fence_untrusted().
+# ================================================================================================================================
+_ADDR_RE = re.compile(r"^[^@\s<>,;\"]{1,200}@[a-z0-9][a-z0-9.-]{0,250}\.[a-z]{2,}$")
+_DOM_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{0,250}\.[a-z]{2,}$")
+
+
+async def correspondence(pool: asyncpg.Pool, caller: Caller, with_: str, mailbox=None, since=None, limit: int = 25) -> dict:
+    """Conversations with an address or a domain across the mailboxes the caller may open (or the one named): subject, participants, dates,
+    mailbox, counts, snippet — never a body. Newest first. A mailbox that is not the caller's own is logged (`mcp.read`) once per call."""
+    limit = max(1, min(100, int(limit or 25)))
+    ask = str(with_ or "").strip().lower()
+    if "@" in ask:
+        if not _ADDR_RE.match(ask):
+            return bad("with is an address (name@example.com) or a domain (example.com)")
+        cond, arg = "$1 = ANY (t.participants)", ask
+    elif _DOM_RE.match(ask):
+        cond, arg = "EXISTS (SELECT 1 FROM unnest(t.participants) x WHERE split_part(x, '@', 2) = $1)", ask
+    else:
+        return bad("with is an address (name@example.com) or a domain (example.com)")
+    start = _log_since(since)
+    if start is False:
+        return bad("since is an ISO 8601 date or time")
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        mid = None
+        if mailbox not in (None, ""):
+            mid = await _mailbox_id(con, mailbox)
+            if mid is None:
+                return not_found()
+        rows = await con.fetch(
+            f"""SELECT t.id AS thread_id, t.mailbox_id, b.address AS mailbox_address, t.subject, t.participants, t.first_message_at, t.last_message_at,
+                       t.message_count, t.snippet
+                  FROM mcp_threads t JOIN mcp_mailboxes b ON b.id = t.mailbox_id
+                 WHERE {cond} AND ($2::bigint IS NULL OR t.mailbox_id = $2) AND ($3::timestamptz IS NULL OR t.last_message_at >= $3)
+                 ORDER BY t.last_message_at DESC, t.id DESC LIMIT $4""", arg, mid, start, limit)
+        owners = {r["id"]: r["owner_member_id"] for r in await con.fetch("SELECT id, owner_member_id FROM mcp_mailboxes WHERE id = ANY ($1::bigint[])", list({r["mailbox_id"] for r in rows}))}
+        for m, owner in owners.items():
+            if owner != caller.member_id:
+                await _log_read(con, caller, int(m), "correspondence")
+    return {"ok": True, "with": ask, "conversations": [{"thread_id": r["thread_id"], "mailbox_id": r["mailbox_id"], "mailbox": r["mailbox_address"], "subject": r["subject"],
+                                                       "participants": list(r["participants"] or []), "first_message_at": r["first_message_at"],
+                                                       "last_message_at": r["last_message_at"], "message_count": r["message_count"], "snippet": r["snippet"]} for r in rows]}
+
+
+async def find_correspondents(pool: asyncpg.Pool, caller: Caller, mailbox, q: str = "", known_only: bool = False, limit: int = 25) -> dict:
+    """Resolver: a mailbox's correspondents (the wall in mcp_correspondents) — address, name, first and last contact, sent and received, known, internal."""
+    limit = max(1, min(100, int(limit or 25)))
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        mid = await _mailbox_id(con, mailbox)
+        if mid is None:
+            return not_found()
+        rows = await con.fetch(
+            """SELECT address, name, first_seen_at, last_seen_at, sent_count, received_count, is_internal, known_at, known_how FROM mcp_correspondents
+                WHERE mailbox_id = $1 AND ($2 = '' OR address ILIKE ml_like($2) OR name ILIKE ml_like($2)) AND (NOT $3 OR known_at IS NOT NULL)
+                ORDER BY last_seen_at DESC, id DESC LIMIT $4""", mid, (q or "").strip(), bool(known_only), limit)
+        if await con.fetchval("SELECT owner_member_id IS DISTINCT FROM $2 FROM mcp_mailboxes WHERE id = $1", mid, caller.member_id):
+            await _log_read(con, caller, mid, "find_correspondents")
+    return {"ok": True, "mailbox_id": mid, "correspondents": [{"address": r["address"], "name": r["name"], "first_seen": r["first_seen_at"], "last_seen": r["last_seen_at"],
+                                                              "sent": r["sent_count"], "received": r["received_count"], "known": r["known_at"] is not None,
+                                                              "known_how": r["known_how"], "internal": r["is_internal"]} for r in rows]}
+
+
+async def find_members(pool: asyncpg.Pool, caller: Caller, q: str = "", kind: str | None = None, limit: int = 25) -> dict:
+    """Resolver: the directory's mirror — member_id, display_name, kind (person · agent), and a person's email (no other contact detail)."""
+    limit = max(1, min(100, int(limit or 25)))
+    if kind is not None and kind not in ("person", "agent"):
+        return bad("kind is person or agent")
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        rows = await con.fetch(
+            """SELECT member_id, display_name, kind, email FROM mcp_members
+                WHERE ($1 = '' OR display_name ILIKE ml_like($1) OR email ILIKE ml_like($1)) AND ($2::text IS NULL OR kind = $2)
+                ORDER BY lower(display_name), member_id LIMIT $3""", (q or "").strip(), kind, limit)
+    return {"ok": True, "members": [dict(r) for r in rows]}
+
+
+TOOLS.update({"correspondence": correspondence, "find_correspondents": find_correspondents, "find_members": find_members})

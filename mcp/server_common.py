@@ -27,9 +27,9 @@ log = logging.getLogger("ml_mcp")
 # every answer a k7.read in the mailbox's access log) — Phase 4 adds its name here beside app_roles, reading the consumer from
 # X-OS-Consumer / X-OS-Consumer-Agent (K26). An agent reads what its own member id may open (design §3) — the run facts name the
 # member (and K38's requested_by, for the Mail Expert's ai_read rule); the views' wall does the rest.
-KERNEL_TOOLS = {"app_roles"}
+KERNEL_TOOLS = {"app_roles", "correspondence_index"}
 # A share that is the KERNEL's alone (a person or an agent never lists or calls it) goes here when one exists.
-KERNEL_ONLY: set[str] = set()
+KERNEL_ONLY: set[str] = {"correspondence_index"}
 
 # run id -> (facts, fetched_at). A run's grants do not change while it runs; a short TTL bounds a mistake.
 _facts_cache: dict[int, tuple[dict, float]] = {}

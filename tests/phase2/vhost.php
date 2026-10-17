@@ -37,8 +37,11 @@ $r = page($j, '/templates/new');
 ok($r['code'] === 200 && str_contains($r['body'], 'id="template-form"'), '/templates/new reaches its screen (slice 6 built it)');
 $r = page($j, '/templates/7/edit');
 ok($r['code'] === 404 && str_contains($r['body'], 'No such canned reply'), '/templates/{template}/edit reaches its screen (slice 6 built it: its own 404)');
-foreach (["/m/$priya/people/jon%40acme.example",
-          '/notifications', '/settings/notifications'] as $p) {
+$r = page($j, "/m/$priya/people/jon%40acme.example");
+ok($r['code'] === 404 && str_contains($r['body'], 'has not exchanged mail'), '/m/{mailbox}/people/{correspondent} reaches its screen (slice 8 built it: no such correspondent, its own 404)');
+$r = page($j, "/m/$priya/people");
+ok($r['code'] === 200 && str_contains($r['body'], 'id="correspondents-content"'), '/m/{mailbox}/people reaches its screen (slice 8 built it)');
+foreach (['/notifications', '/settings/notifications'] as $p) {
     $r = page($j, $p);
     ok($r['code'] === 200 && str_contains($r['body'], 'builds this screen'), "$p reaches its screen's placeholder");
 }

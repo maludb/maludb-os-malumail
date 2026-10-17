@@ -260,6 +260,13 @@ customer key nor the sealing secret** — the proof checks it.
 - A mailbox settings key must be added in `ml_mailbox_settings_save()` (a migration) as well as `settings-save.php`.
 - `deliver()` in a proof must wait until the thread id holds still: the mail service re-threads a message after first indexing it.
 
+## Slice 8 (2026-10-17, correspondents, autocomplete and the K7 share BUILT) — `docs/build-specs/correspondents.md`
+- `bash tests/phase3/slice8/run.sh` (php -S) and `ML_APP=apache …`: scratch `ml_dev8`; `checks.php` 72, `tools.py` 32, `k7.py` 57 (the share through `mcp/share_correspondence.py` as the kernel's call would reach it), `browser.mjs` 42. `ML_S8_HOLD=1` leaves the servers up (never pipe it into `tail`); a second `checks.php` run on a held database fails (counts).
+- **The share is the one thing that leaves for another application**: `correspondence_index(pool, consumer, consumer_agent, params)` takes the consumer the KERNEL named (K26 headers) and reads only `with`, `since`, `limit` from the arguments (never `as_agent`); no named consumer → refused, nothing read; one `k7.read` per mailbox with rows, by `ml_log_k7_read` (consumer, agent, count, the DOMAIN asked — never a subject or address). The mailbox rule is SQL (`ml_correspondence_index`: owner's switch, active, unsuspended, never sensitive); the wall's two implementations are untouched.
+- A message is received ONCE PER KEY (`ml_correspondent_received_for`, db/021), never the mailbox's own mail.
+- People and the correspondent page read `mcp_correspondents` / `mcp_threads`; autocomplete is `ml_complete()` at `send` (a viewer: 404) and writes no log.
+- The composer's listbox lives in `compose.js` (capture-phase keydown so Enter on a suggestion never reaches the chip handler).
+
 ## Numbers
 Ports `APP_INTERNAL_PORT=8199`, `MCP_RECORDS_PORT=8852`, `MCP_ACTIVITY_PORT=8853`, `ML_MAILER_PORT=8854`, `ML_IMAGES_PORT=8855`;
 scratch 9201 (the app), 9202 (the fake kernel), 9203 (the fake MaluDB + MaluMail REST), 9204–9205 (the MCP servers), 9206 (the

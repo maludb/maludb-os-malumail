@@ -176,3 +176,35 @@ itself (slice 5); contact photos.
   the trigram index on correspondents' names.
 - **maludb-os.json `shares[]`**: `correspondence_index`'s description gains "since" and "at most 256 kB, truncated beyond".
 - **The tool surface**: `correspondence_index`'s arguments already name `since`; its answer gains `truncated`.
+
+## Built and proven (2026-10-17)
+
+Built by a Sonnet 5.5 worker; verified by the planning model.
+
+**Built**: both screens (`html/m/people.php`, `person.php`), the autocomplete door (`complete.php`) and its listbox in the composer
+(`html/assets/js/compose.js`: 150 ms debounce, two characters, arrows / Enter / Escape / tap, `role=combobox`), `app/features/mail/correspondents.php`, the
+views `app/views/mail/people*.php`, `person*.php`, `complete.php`, a "People" link in the rail, the three records tools (`correspondence`,
+`find_correspondents`, `find_members` in `mcp/records_server.py`) and the share's handler `mcp/share_correspondence.py`; **db/021**.
+
+**Proven** (`tests/phase3/slice8/run.sh`, php -S and `ML_APP=apache`): checks.php 72 (list, filters, cursor over 5,003 rows, chips, the wall, `mailbox.view` once
+per half hour, upkeep through the real mail service, the door), tools.py 32, k7.py 57, browser.mjs 42; `db/proof/slice8_correspondents.sql` 34 (in `schema.sh`).
+
+**Found and fixed**
+1. The sync counted a sender once per ROW, so the same message in Inbox and Archive counted twice, and the mailbox's own mail in a non-Sent folder counted as
+   received: db/021 adds `mail_message_keys.correspondent_counted_at` and `ml_correspondent_received_for(message)` (once per key, never the mailbox's own address);
+   `services/mailer/store.py` calls it.
+2. `ml_log_k7_read` accepted any consumer text and any agent id (a bad id was a foreign-key error): db/021 refuses a consumer that is not an application key and
+   records an agent that is not a member as none.
+3. The handler fails closed: no named consumer (the kernel's header) reads nothing and writes nothing; `as_agent` in the arguments is never read; `limit` 0 is 1.
+4. `KERNEL_TOOLS` / `KERNEL_ONLY` in `mcp/server_common.py` now name `correspondence_index` (the kernel's token alone); Phase 4 mounts the tool.
+5. Neither implementation of the wall was changed; the 576-case equality proof stands.
+
+**Decisions taken here (within the spec)**
+1. The share's `subject` and `snippet` ARE carried for a person's mailbox once its owner opted in (design §3: "the answer carries subject, participants, dates and a
+   200-character snippet"); never a body. The log row never carries them.
+2. An answer that drew on no mailbox writes no `k7.read` row (rows are per mailbox drawn on). OPEN FOR THE OWNER: an empty answer still tells a consumer "nothing with
+   X in the shared mailboxes"; logging a zero-count row per shared mailbox would record that too.
+3. The directory source of autocomplete shows members' addresses (people and agents) whether or not a mailbox sits behind them — the directory is the business's.
+4. A viewer's (`view`) autocomplete is 404, as a missing mailbox. The People screens read through `mcp_correspondents` / `mcp_threads` (the wall and the sensitive rule are in the views).
+5. A domain given to the share is not filtered for public providers (only the company view is, decision 2).
+6. The cursor is `<unix µs>.<id>` on `last_seen_at` / `last_message_at`.

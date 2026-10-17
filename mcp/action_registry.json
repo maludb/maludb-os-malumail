@@ -1,6 +1,6 @@
 {
     "generated_from": "docs/malumail-action-manifest.md",
-    "generated_at": "2026-10-17T00:09:06+00:00",
+    "generated_at": "2026-10-17T08:25:02+00:00",
     "screens": {
         "home": {
             "screen": "home",
@@ -410,7 +410,7 @@
                 "known",
                 "outside"
             ],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "correspondent-view": {
@@ -419,7 +419,7 @@
             "section": "Correspondents and the K7 share (slice 8)",
             "when": "what this mailbox has exchanged with one address or its company's domain, as conversations",
             "params": [],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "notifications": {

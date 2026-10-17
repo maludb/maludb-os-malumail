@@ -181,8 +181,8 @@ class Store:
                 if inserted:
                     new_ids.append(int(rid))
                     if correspondents and r["from_address"]:
-                        await c.execute("SELECT ml_correspondent_received($1, $2, $3, $4)", mailbox_id, r["from_address"], r["from_name"],
-                                        r["received_at"])
+                        # once per message KEY (db/021): the same message in a second folder or after a re-sync counts no more
+                        await c.execute("SELECT ml_correspondent_received_for($1)", int(rid))
         return new_ids
 
     async def dispatch_decide(self, message_ids: list[int]) -> None:

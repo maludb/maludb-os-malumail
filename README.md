@@ -73,6 +73,8 @@ zone, brought back unread by the worker with a chip (an agent's mailbox wakes th
 
 **Slice 7, delegation and access, is built** (2026-10-17): each mailbox's Access page (who can open it and why), sharing with a person, a department or an agent, a Mail admin's break-glass access with a reason and an expiry (the owner told at once), revoke, the access log and the mailbox settings with the owner's two privacy switches; the worker removes expired rows and logs it. `tests/phase3/slice7/run.sh` proves it under php -S and Apache. Next: slice 8.
 
+**Slice 8, correspondents, autocomplete and the K7 share, is built** (2026-10-17): a mailbox's People (filters, Known and Outside chips), the correspondent page with the company tab, recipient suggestions in the composer, and the handler of the `correspondence_index` share (the owner's switch, never a sensitive conversation, every answer in the access log). `tests/phase3/slice8/run.sh` proves it under php -S and Apache. Next: slice 9.
+
 ## Documents
 
 - [docs/malumail-design.md](docs/malumail-design.md) — the Phase 0 design fitted to the Business OS: why the webmail talks

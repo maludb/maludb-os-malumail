@@ -98,6 +98,7 @@ require_once __DIR__ . '/features/mail/search.php';       // search, labels and 
 require_once __DIR__ . '/features/mail/labels.php';
 require_once __DIR__ . '/features/mail/folders.php';
 require_once __DIR__ . '/features/mail/templates.php';
+require_once __DIR__ . '/features/mail/correspondents.php'; // correspondents and the autocomplete door (slice 8)
 require_once __DIR__ . '/features/compose/queries.php';  // writing: drafts, attachments, Send, identities (slice 4)
 require_once __DIR__ . '/features/compose/compose.php';  // writing: the prefill, the quote, the subject and recipient rules
 require_once __DIR__ . '/features/compose/present.php';
