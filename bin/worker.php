@@ -18,7 +18,7 @@ declare(strict_types=1);
  * PHASE 0: every pass but `key_usage_prune` is a STUB that changes nothing and answers 0 — the slice whose data it touches fills it in
  * (design §10): `dispatches`, `held_expiry` slice 5's; `snoozes` slice 6's; `break_glass_expiry` slice
  * 7's; `notify_outbox`, `clerk_inputs` slice 9's. Each stub names its slice. REAL from the kit: `key_usage_prune`
- * (ml_prune_key_usage, db/005); real since slice 2: `index_catch_up`; since slice 5: `dispatches`, `held_expiry`; since slice 6: `snoozes`.
+ * (ml_prune_key_usage, db/005); real since slice 2: `index_catch_up`; since slice 5: `dispatches`, `held_expiry`; since slice 6: `snoozes`; since slice 7: `break_glass_expiry` (permission rows past their date).
  */
 if (PHP_SAPI !== 'cli') { fwrite(STDERR, "CLI only.\n"); exit(1); }
 require_once dirname(__DIR__) . '/app/bootstrap.php';
@@ -324,8 +324,15 @@ function worker_pass_snoozes(PDO $pdo, int $limit, DateTimeImmutable $now): arra
     }
     return $out;
 }
-/** SLICE 7 — break-glass permission rows past expires_at (at most 30 days): revoked, logged permission.revoke, the owner told. */
-function worker_pass_break_glass_expiry(PDO $pdo, int $limit, DateTimeImmutable $now): array { return ['revoked' => 0, 'stub' => 'slice 7']; }
+/**
+ * SLICE 7 — permission rows past expires_at (an emergency row lasts at most 30 days; an ordinary share may carry a date too): deleted by
+ * ml_permissions_expire() (db/012), which writes one `permission.expire` row each (source system, the mailbox, the principal and level — ids
+ * only). ml_mailbox_level() already ignores an expired row, so the pass only tidies and leaves the trail.
+ */
+function worker_pass_break_glass_expiry(PDO $pdo, int $limit, DateTimeImmutable $now): array
+{
+    return ['revoked' => (int) $pdo->query('SELECT ml_permissions_expire()')->fetchColumn()];
+}
 /** SLICE 9 — notification_outbox: queued email (MaluMail's REST send) and text (K6) rows sent, failed ones retried with backoff. */
 function worker_pass_notify_outbox(PDO $pdo, int $limit, DateTimeImmutable $now): array { return ['sent' => 0, 'stub' => 'slice 9']; }
 /** SLICE 9 — the Mail Clerk's inputs at clerk_note_at on weekdays: held mail older than a day, unscreened mail, mailboxes near quota, sync failures — counts for its note, never mail text. */

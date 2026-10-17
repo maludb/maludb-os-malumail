@@ -49,7 +49,8 @@ $item = static function (string $id, string $url, string $icon, string $label, s
                     <a class="nxl-link<?= $here === $lurl ? ' active' : '' ?>" href="<?= e($lurl) ?>" hx-get="<?= e($lurl) ?>" hx-target="#page-content" hx-swap="innerHTML" hx-push-url="<?= e($lurl) ?>" title="<?= e($l['label']) ?>">
                         <span class="nxl-micon"><i class="feather-tag"<?= !empty($l['colour']) ? ' style="color:' . e($l['colour']) . '"' : '' ?>></i></span><span class="nxl-mtext text-truncate"><?= e($l['label']) ?></span></a></li>
             <?php endforeach; ?>
-            <?php foreach ([['folders', 'Folders', 'feather-folder-plus'], ['labels', 'Labels', 'feather-tag']] as [$mid, $mlabel, $micon]): $murl = '/m/' . $id . '/' . $mid; ?>
+            <?php foreach ([['folders', 'Folders', 'feather-folder-plus'], ['labels', 'Labels', 'feather-tag'], ['access', 'Access', 'feather-users'], ['settings', 'Settings', 'feather-settings']] as [$mid, $mlabel, $micon]):
+                if ($mid === 'settings' && ($b['my_level'] ?? '') !== 'full') { continue; } $murl = '/m/' . $id . '/' . $mid; ?>
                 <?= $item('manage-' . $mid, $murl, $micon, e($mlabel), '', $here === $murl) ?>
             <?php endforeach; ?>
             </ul></li>

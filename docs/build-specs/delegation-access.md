@@ -125,3 +125,30 @@ None for the owner.
 - db/012: `ml_permissions_expire()` writes one `activity_log` row (`permission.expire`, `source 'system'`, `mailbox_id`, the principal)
   per row it deletes.
 - The tool surface: `mailbox_access_log` — "the owner, the Mail admins and, on an agent's or shared mailbox, its `full` holders".
+
+
+## Built and proven (2026-10-17)
+
+Built by a Sonnet 5.5 worker: the four screens (`mailbox-access`, `access-grant-new`, `mailbox-access-log`, `mailbox-settings`), the three actions
+(`mail_permission_grant`, `mail_permission_revoke`, `mail_mailbox_settings_save`), the worker's `break_glass_expiry` pass made real, the tools
+`mailbox_access`, `mailbox_access_log` (records) and `mailbox_trail` (activity). Registry: 41/45 screens, 63/67 actions built.
+
+**Proven** (php -S and `ML_APP=apache`, both identical): `tests/phase3/slice7/run.sh` checks 138, tools 26, browser 29; `tests/phase0/schema.sh`
+now 43 more checks in `db/proof/slice7_access.sql`.
+
+**Found and fixed**
+1. `ml_mailbox_settings_save()` refused `page_size` (declared by the manifest, read by the list) and did not type the yes/no keys: db/020 re-creates it
+   with the same signature and rules (who may save and switch is unchanged) adding `page_size` 25/50/100 and boolean checks.
+2. `mcp_mailbox_access_log` named no consumer for a K7 read: db/020 appends a `consumer` column (from the row's own `after`); its filter is untouched.
+3. Neither implementation of the wall (`ml_mailbox_level()`, db/017's set form) was changed, so the 576-case equality proof stands unchanged.
+4. A Mail admin's tool read of a person's mailbox (`mailbox_access`, `mailbox_trail`) needs sight without a level: `_mailbox_id_seen()` in
+   `mcp/records_server.py` (mcp_mailboxes already admits a Mail admin); the views still decide the rows.
+5. Phase 0's worker check and Phase 2's placeholder checks followed the built screens (the placeholder checks now use `people/{correspondent}`).
+
+**Decisions taken here (within the spec)**
+1. A Mail admin on a person's mailbox may open Access, the log and Give emergency access, never its settings (404, the schema's rule).
+2. Break-glass expiry is a date (default 7 days, at most 30; a bare date means the end of that day); the reason must be at least ten characters.
+3. `mailbox_trail` (activity) is the owner's and the Mail admins' only; `mailbox_access_log` (records) also admits an agent or shared mailbox's `full` holders.
+4. The rail links Access to everyone and Settings to `full` holders; `page_size` is a setting of the form.
+
+**Slice 3 Apache flake**: not reproduced in this session (two Apache runs green); the earlier review's fix (polling the log) stands.

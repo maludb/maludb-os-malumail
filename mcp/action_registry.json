@@ -1,6 +1,6 @@
 {
     "generated_from": "docs/malumail-action-manifest.md",
-    "generated_at": "2026-10-16T20:11:04+00:00",
+    "generated_at": "2026-10-17T00:09:06+00:00",
     "screens": {
         "home": {
             "screen": "home",
@@ -362,7 +362,7 @@
             "section": "Delegation and access (slice 7)",
             "when": "who can open this mailbox and at what level, and why (owner, a row, a department, Mail admin, the Clerk); revoke",
             "params": [],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "access-grant-new": {
@@ -376,7 +376,7 @@
                 "agent",
                 "level"
             ],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "mailbox-access-log": {
@@ -388,7 +388,7 @@
                 "since",
                 "who"
             ],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "mailbox-settings": {
@@ -397,7 +397,7 @@
             "section": "Delegation and access (slice 7)",
             "when": "this mailbox's settings: undo seconds, conversation view, images, density, shortcuts; on a person's mailbox, **Let the Mail Expert read my mail when I ask** and **Share with applications** (both off by default)",
             "params": [],
-            "built": false,
+            "built": true,
             "stub": false
         },
         "correspondents": {
@@ -2643,7 +2643,7 @@
             "who": "`mail.use` · full · or `access.audit` for break-glass",
             "agent": false,
             "record_id": "the permission row",
-            "built": false
+            "built": true
         },
         "mail_permission_revoke": {
             "action": "mail_permission_revoke",
@@ -2670,7 +2670,7 @@
             "who": "`mail.use` · full · or `access.audit`",
             "agent": false,
             "record_id": "the permission row",
-            "built": false
+            "built": true
         },
         "mail_mailbox_settings_save": {
             "action": "mail_mailbox_settings_save",
@@ -2739,7 +2739,7 @@
             "who": "`mail.use` · full",
             "agent": false,
             "record_id": "the mailbox",
-            "built": false
+            "built": true
         },
         "mail_notification_read": {
             "action": "mail_notification_read",

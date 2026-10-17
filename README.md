@@ -71,6 +71,8 @@ nests), from the list, the conversation or a whole search; snoozing a conversati
 zone, brought back unread by the worker with a chip (an agent's mailbox wakes the agent); a mailbox's IMAP folders made, renamed and deleted
 (never with mail in them); canned replies, shared or one's own. `tests/phase3/slice6/run.sh` proves it under php -S and Apache. Next: slice 7.
 
+**Slice 7, delegation and access, is built** (2026-10-17): each mailbox's Access page (who can open it and why), sharing with a person, a department or an agent, a Mail admin's break-glass access with a reason and an expiry (the owner told at once), revoke, the access log and the mailbox settings with the owner's two privacy switches; the worker removes expired rows and logs it. `tests/phase3/slice7/run.sh` proves it under php -S and Apache. Next: slice 8.
+
 ## Documents
 
 - [docs/malumail-design.md](docs/malumail-design.md) — the Phase 0 design fitted to the Business OS: why the webmail talks

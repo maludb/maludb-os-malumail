@@ -38,11 +38,14 @@ ok($r['code'] === 200 && str_contains($r['body'], 'id="template-form"'), '/templ
 $r = page($j, '/templates/7/edit');
 ok($r['code'] === 404 && str_contains($r['body'], 'No such canned reply'), '/templates/{template}/edit reaches its screen (slice 6 built it: its own 404)');
 foreach (["/m/$priya/people/jon%40acme.example",
-          "/m/$priya/access/new", "/m/$priya/access-log",
           '/notifications', '/settings/notifications'] as $p) {
     $r = page($j, $p);
     ok($r['code'] === 200 && str_contains($r['body'], 'builds this screen'), "$p reaches its screen's placeholder");
 }
+$r = page($j, "/m/$priya/access/new");
+ok($r['code'] === 200 && str_contains($r['body'], 'id="access-grant-new-content"'), "/m/{mailbox}/access/new reaches its screen (slice 7 built it)");
+$r = page($j, "/m/$priya/access-log");
+ok($r['code'] === 200 && str_contains($r['body'], 'id="mailbox-access-log-content"'), "/m/{mailbox}/access-log reaches its screen (slice 7 built it)");
 ok(page($j, '/admin/mailboxes/new')['code'] === 403 && page($j, '/admin/mailboxes/12')['code'] === 403 && page($j, '/admin/aliases/3')['code'] === 403, 'the admin\'s canonical URLs resolve (403 for Priya, by the right)');
 ok(page($j, '/pick/member')['code'] === 200, '/pick/{kind} reaches the picker');
 ok(page($j, '/nosuchscreen')['code'] === 404 && page($j, '/m/' . $priya . '/nosuch')['code'] === 404, 'an unknown path: 404');

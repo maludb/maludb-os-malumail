@@ -137,9 +137,9 @@ ok(str_contains(page($jd, '/oversight')['body'], 'id="oversight-empty"'), 'Overs
 $r = page($jp, '/admin/mailboxes');
 ok($r['code'] === 403 && str_contains($r['body'], 'super-admin'), 'a Mail user is refused the admin in the schema\'s sentence');
 ok(page($jm, '/admin/mailboxes')['code'] === 403, 'Marco (the admin role, no super-admin) is refused too');
-$r = req('POST', "/m/$priya/access-log", ['jar' => $jp, 'form' => ['csrf_token' => csrf_of(page($jp, '/my/trail')['body'])]]);
+$r = req('POST', "/m/$priya/people/jon%40acme.example", ['jar' => $jp, 'form' => ['csrf_token' => csrf_of(page($jp, '/my/trail')['body'])]]);
 ok($r['code'] === 501, 'a POST to a placeholder: 501');
-$r = req('GET', "/m/$priya/access-log", ['jar' => $jp] + $json);
+$r = req('GET', "/m/$priya/people/jon%40acme.example", ['jar' => $jp] + $json);
 ok($r['code'] === 501 && (json_decode($r['body'], true)['error']['code'] ?? '') === 'not_built', 'JSON to a placeholder: 501 not_built');
 ok(page($jp, '/no/such/page')['code'] === 404 && page($jp, "/m/$priya/nonsense")['code'] === 404, 'a path that is no screen: 404');
 ok(req('GET', "/m/$priya/v/inbox")['code'] === 302, 'anonymous: sent to the launcher (302)');

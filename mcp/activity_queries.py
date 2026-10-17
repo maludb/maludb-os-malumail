@@ -6,6 +6,7 @@ records views, so the wall decides exactly as for the screens: decisions on held
 
   review_trail(mailbox, since, limit)   the decisions on held mail: who, what, how long after holding
   agent_activity(agent, since, limit)   per agent: sent, held, rejected, edited, refused, dispatches
+  mailbox_trail(mailbox, since, limit)  (slice 7) who opened a mailbox, not its owner — the owner's and the Mail admins'
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ import datetime as dt
 
 import asyncpg
 
-from records_server import Caller, _log_read, _mailbox_id, _scoped, bad, not_found
+from records_server import Caller, _log_read, _mailbox_id, _mailbox_id_seen, _scoped, bad, not_found
 
 
 def _since(since) -> dt.datetime | None:
@@ -85,4 +86,29 @@ async def agent_activity(pool: asyncpg.Pool, caller: Caller, agent=None, since=N
     return {"ok": True, "since": start, "agents": [dict(r) for r in rows]}
 
 
-TOOLS = {"review_trail": review_trail, "agent_activity": agent_activity}
+async def mailbox_trail(pool: asyncpg.Pool, caller: Caller, mailbox, since=None, limit: int = 50) -> dict:
+    """Who opened a mailbox (not its owner), when, through what (A1): its owner's and the Mail admins' — `below_level` for anyone else, even a
+    full holder of an agent's mailbox (the records tool mailbox_access_log is the wider one). Read from mcp_mailbox_access_log; ids and kinds, never mail."""
+    limit = max(1, min(200, int(limit or 50)))
+    if since not in (None, "") and _since(since) is None:
+        return bad("since is an ISO 8601 date or time")
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        mid = await _mailbox_id_seen(con, mailbox)
+        if mid is None:
+            return not_found()
+        b = await con.fetchrow("SELECT kind, owner_member_id FROM mcp_mailboxes WHERE id = $1", mid)
+        if not (b["owner_member_id"] == caller.member_id or await con.fetchval("SELECT ml_has_right('access.audit')")):
+            return {"ok": False, "error": {"code": "below_level", "message": "Only its owner and the Mail admins read who opened a mailbox.", "retry": False}}
+        rows = await con.fetch(
+            """SELECT a.occurred_at, m.display_name AS actor, a.action, a.source, a.consumer
+                 FROM mcp_mailbox_access_log a LEFT JOIN mcp_members m ON m.member_id = a.actor_member_id
+                WHERE a.mailbox_id = $1 AND ($2::timestamptz IS NULL OR a.occurred_at >= $2) ORDER BY a.id DESC LIMIT $3""", mid, _since(since), limit)
+        if b["owner_member_id"] != caller.member_id:
+            await _log_read(con, caller, mid, "mailbox_trail")
+    return {"ok": True, "mailbox_id": mid, "opened": [{"at": r["occurred_at"], "by": r["actor"], "did": r["action"],
+                                                       "through": "another application" if r["action"] == "k7.read" else ("a tool" if r["action"] == "mcp.read" or r["source"] in ("mcp", "agent", "assistant") else "the webmail"),
+                                                       "consumer": r["consumer"]} for r in rows]}
+
+
+TOOLS = {"review_trail": review_trail, "agent_activity": agent_activity, "mailbox_trail": mailbox_trail}

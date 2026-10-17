@@ -43,10 +43,10 @@ $form = static fn (string $action, string $inner, string $confirm = '', string $
                         <div class="d-flex align-items-center gap-2 mb-1" id="mailbox-overseer-<?= (int) $o['member_id'] ?>"><i class="feather-user"></i><?= e($o['display_name']) ?>
                             <?php if ((int) $o['member_id'] === (int) $b['primary_overseer_id']): ?><span class="badge bg-soft-primary text-primary">primary</span><?php endif; ?></div>
                     <?php endforeach; ?>
-                    <div class="fs-12 mt-2"><?= hx_link('/m/' . $id . '/access', 'Who can open it — the Access page', '', 'id="mailbox-access-link"') ?></div>
                 </div>
             </div>
             <?php endif; ?>
+            <div class="fs-12 mb-3"><?= hx_link('/m/' . $id . '/access', 'Who can open it — the Access page', '', 'id="mailbox-access-link"') ?></div>
         </div>
         <div class="col-12 col-xl-6">
             <div class="card mb-3" id="mailbox-update"><div class="card-header"><h5 class="card-title mb-0">Settings</h5></div><div class="card-body">

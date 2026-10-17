@@ -369,7 +369,9 @@ for ($i = 0; $i < 50 && $mcpN < 1; $i++) {
     $mcpN = (int) one("SELECT count(*) FROM activity_log WHERE action = 'mcp.read' AND mailbox_id = $E AND actor_member_id = 26");
     if ($mcpN < 1) { usleep(200000); }
 }
-ok($mcpN >= 1, 'an agent-mailbox read through the records queries (door.py) wrote mcp.read', "rows seen: $mcpN");
+ok($mcpN >= 1, 'an agent-mailbox read through the records queries (door.py) wrote mcp.read', "rows seen: $mcpN; every mcp.read: "
+   . json_encode(q("SELECT id, mailbox_id, actor_member_id, after->>'tool' AS tool, occurred_at FROM activity_log WHERE action = 'mcp.read' ORDER BY id"))
+   . "; E=$E max id " . last_activity_id());
 ok(count(q("SELECT 1 FROM activity_log WHERE after::text ILIKE '%Ship the Q4%' OR after::text ILIKE '%floor plan is attached%'")) === 0, 'no body text in any activity row');
 
 finish();

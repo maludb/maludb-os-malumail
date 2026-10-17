@@ -253,6 +253,13 @@ customer key nor the sealing secret** — the proof checks it.
 - **Never in a log payload**: a label, folder, template or subject name — ids, counts, the wake time. Canned replies are a person's alone
   (`require_human()` and the schema again); `compose?template=` fills the composer.
 
+## Slice 7 (2026-10-17, delegation and access BUILT) — `docs/build-specs/delegation-access.md`
+- `bash tests/phase3/slice7/run.sh` (php -S) and `ML_APP=apache …`: scratch `ml_dev7`; `checks.php` 138 (share, break-glass, log, expiry, revoke, settings, agents refused in the page and in SQL), `tools.py` 26, `browser.mjs` 29 (picker, red card, hx-confirm). `ML_S7_HOLD=1` leaves the servers up.
+- **Every access page starts from `ac_context()`** (`app/features/access/queries.php`): the wall's row plus the caller's standing (owner, decider, Mail admin) and which form they get. The schema decides every grant/revoke/switch; the pages only ask first and say why.
+- db/020 changes neither implementation of the wall; keep it so, or change both and extend db/017's equality proof.
+- A mailbox settings key must be added in `ml_mailbox_settings_save()` (a migration) as well as `settings-save.php`.
+- `deliver()` in a proof must wait until the thread id holds still: the mail service re-threads a message after first indexing it.
+
 ## Numbers
 Ports `APP_INTERNAL_PORT=8199`, `MCP_RECORDS_PORT=8852`, `MCP_ACTIVITY_PORT=8853`, `ML_MAILER_PORT=8854`, `ML_IMAGES_PORT=8855`;
 scratch 9201 (the app), 9202 (the fake kernel), 9203 (the fake MaluDB + MaluMail REST), 9204–9205 (the MCP servers), 9206 (the

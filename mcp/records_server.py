@@ -55,6 +55,17 @@ async def _mailbox_id(con: asyncpg.Connection, mailbox) -> int | None:
     return int(row["id"]) if row else None
 
 
+async def _mailbox_id_seen(con: asyncpg.Connection, mailbox) -> int | None:
+    """A mailbox named by id or address that the caller SEES in mcp_mailboxes — at any level, a Mail admin's sight of a person's mailbox included
+    (slice 7: who can open it and who looked are the Mail admins' to read without holding a level on it). The tools that use it answer from views
+    that decide again who reads what."""
+    if isinstance(mailbox, int) or (isinstance(mailbox, str) and mailbox.isdigit()):
+        row = await con.fetchrow("SELECT id FROM mcp_mailboxes WHERE id = $1", int(mailbox))
+    else:
+        row = await con.fetchrow("SELECT id FROM mcp_mailboxes WHERE address = lower($1)", str(mailbox or "").strip())
+    return int(row["id"]) if row else None
+
+
 async def _log_read(con: asyncpg.Connection, caller: Caller, mailbox_id: int, tool: str) -> None:
     await con.execute("SELECT ml_log_mcp_read($1, $2, $3, $4)", mailbox_id, tool, caller.run_id, caller.token_id)
 
@@ -936,3 +947,85 @@ async def records_search(pool: asyncpg.Pool, caller: Caller, q: str, limit: int 
 
 
 TOOLS.update({"mail_search": mail_search, "find_labels": find_labels, "find_templates": find_templates, "records_search": records_search})
+
+
+async def mailbox_access(pool: asyncpg.Pool, caller: Caller, mailbox) -> dict:
+    """Who can open a mailbox and why (mcp_mailbox_permissions — the view is the wall): its owner, the rows (person, department, agent) with who granted
+    them, emergency (break-glass) rows with reason and expiry, the Mail admins (an agent's mailbox), the Clerk. A reader below the people who decide
+    sees their own standing only. Reasons are people's words, not mail."""
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        mid = await _mailbox_id_seen(con, mailbox)
+        if mid is None:
+            return not_found()
+        b = await con.fetchrow("SELECT b.address, b.kind, b.owner_member_id, b.my_level, o.display_name AS owner_name FROM mcp_mailboxes b "
+                               "LEFT JOIN mcp_members o ON o.member_id = b.owner_member_id WHERE b.id = $1", mid)
+        rows = await con.fetch(
+            """SELECT p.id, p.principal_kind, p.principal_id, p.level, p.created_at, p.expires_at, p.break_glass, p.reason,
+                      CASE p.principal_kind WHEN 'department' THEN d.name ELSE m.display_name END AS principal,
+                      g.display_name AS granted_by,
+                      (p.principal_kind = 'agent' AND p.principal_id = (SELECT clerk_member_id FROM mcp_settings)) AS is_clerk
+                 FROM mcp_mailbox_permissions p
+                 LEFT JOIN mcp_members m ON p.principal_kind IN ('member', 'agent') AND m.member_id = p.principal_id
+                 LEFT JOIN mcp_departments d ON p.principal_kind = 'department' AND d.department_id = p.principal_id
+                 LEFT JOIN mcp_members g ON g.member_id = p.granted_by
+                WHERE p.mailbox_id = $1 AND (p.expires_at IS NULL OR p.expires_at > now())
+                ORDER BY p.break_glass DESC, ml_level_rank(p.level) DESC, p.created_at""", mid)
+        if b["owner_member_id"] != caller.member_id:
+            await _log_read(con, caller, mid, "mailbox_access")
+        out = {"mailbox_id": mid, "address": b["address"], "kind": b["kind"], "your_level": b["my_level"],
+               "owner": b["owner_name"] if b["kind"] != "shared" else None,
+               "rows": [{"permission": r["id"], "principal_kind": r["principal_kind"], "principal_id": r["principal_id"], "principal": r["principal"],
+                         "level": r["level"], "granted_by": r["granted_by"], "granted_at": r["created_at"], "expires_at": r["expires_at"],
+                         "break_glass": r["break_glass"], "reason": r["reason"] if r["break_glass"] else None, "is_clerk": r["is_clerk"]} for r in rows]}
+        if b["kind"] == "agent":
+            out["by_role"] = [{"who": "every Mail admin", "level": "full", "why": "a Mail admin administers every agent's mailbox"}]
+        return {"ok": True, **out}
+
+
+def _log_since(since):
+    if since in (None, ""):
+        return None
+    try:
+        d = dt.datetime.fromisoformat(str(since))
+    except ValueError:
+        return False
+    return d if d.tzinfo else d.replace(tzinfo=dt.timezone.utc)
+
+
+async def mailbox_access_log(pool: asyncpg.Pool, caller: Caller, mailbox, since=None, who=None, limit: int = 50) -> dict:
+    """Every look at a mailbox by anyone but its owner (mcp_mailbox_access_log — its owner, the Mail admins, and on an agent's or shared mailbox its
+    full holders): who, what, when, through what door. `below_level` for anyone else."""
+    limit = max(1, min(200, int(limit or 50)))
+    start = _log_since(since)
+    if start is False:
+        return bad("since is an ISO 8601 date or time")
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        mid = await _mailbox_id_seen(con, mailbox)
+        if mid is None:
+            return not_found()
+        b = await con.fetchrow("SELECT kind, owner_member_id FROM mcp_mailboxes WHERE id = $1", mid)
+        allowed = (b["kind"] == "person" and b["owner_member_id"] == caller.member_id) or await con.fetchval("SELECT ml_has_right('access.audit')") \
+            or (b["kind"] != "person" and await con.fetchval("SELECT ml_is_decider($1, $2)", mid, caller.member_id))
+        if not allowed:
+            return {"ok": False, "error": {"code": "below_level", "message": "Only its owner, the Mail admins and — on an agent's or shared mailbox — the people with full access read who looked.", "retry": False}}
+        who_id = None
+        if who not in (None, ""):
+            who_id = await con.fetchval("SELECT member_id FROM mcp_members WHERE member_id::text = $1 OR display_name ILIKE $1", str(who))
+            if who_id is None:
+                return not_found("person")
+        rows = await con.fetch(
+            """SELECT a.id, a.occurred_at, a.actor_member_id, m.display_name AS actor, a.source, a.action, a.consumer
+                 FROM mcp_mailbox_access_log a LEFT JOIN mcp_members m ON m.member_id = a.actor_member_id
+                WHERE a.mailbox_id = $1 AND ($2::bigint IS NULL OR a.actor_member_id = $2) AND ($3::timestamptz IS NULL OR a.occurred_at >= $3)
+                ORDER BY a.id DESC LIMIT $4""", mid, who_id, start, limit)
+        if b["owner_member_id"] != caller.member_id:
+            await _log_read(con, caller, mid, "mailbox_access_log")
+        what = {"mailbox.view": "opened the list", "message.open": "opened a conversation", "message.part": "opened an attachment",
+                "message.raw": "opened the original", "mcp.read": "read it through a tool", "k7.read": "read it for another application",
+                "permission.break_glass": "was given emergency access"}
+        return {"ok": True, "mailbox_id": mid, "looks": [{"at": r["occurred_at"], "who": r["actor"], "did": r["action"], "what": what.get(r["action"], r["action"]),
+                                                          "through": "another application" if r["action"] == "k7.read" else ("a tool" if r["action"] == "mcp.read" or r["source"] in ("mcp", "agent", "assistant") else "the webmail"),
+                                                          "consumer": r["consumer"]} for r in rows]}
+

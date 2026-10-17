@@ -1561,3 +1561,4 @@ questions in one sitting and changed none:
   - **The proof:** `tests/phase3/slice6/run.sh` — checks 192 / 192, tools 31, browser 65 / 65 under php -S / Apache; the schema proof 12 more.
 
   **NEXT:** slice 7 (Sonnet 5.5 workers, D16). **People's existing mailboxes wait on MM1.**
+- **2026-10-17, SLICE 7 BUILT — delegation and access** (`docs/build-specs/delegation-access.md`): Access, the grant and break-glass forms, the access log and the mailbox settings; db/020 (page_size and typed settings; the access log names its K7 consumer) — the wall itself unchanged; `tests/phase3/slice7/run.sh` 138 + 26 + 29 under php -S and Apache.
