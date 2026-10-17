@@ -11,8 +11,8 @@ second-guess or widen. Per conversation: subject, participants, first and last m
 characters and the conversation's own URL (the consumer's person opens it only if MaluMail's wall lets them). At most 256 kB (K7's cap): rows
 past it are cut and `truncated` says so.
 
-Every answer that drew on a mailbox writes ONE `k7.read` row per mailbox (ml_log_k7_read, db/014/021): the consumer, its agent, the count and the
-DOMAIN asked about — never a subject, an address or a snippet. The mailbox's owner and the Mail admins read those rows in the access log.
+Every answer writes ONE `k7.read` row per mailbox the share covers (ml_log_k7_read, db/014/021/022), the count 0 where nothing came from it — so a
+question that found nothing is on record too: the consumer, its agent, the count and the DOMAIN asked about — never a subject, an address or a snippet. The mailbox's owner and the Mail admins read those rows in the access log.
 """
 
 from __future__ import annotations
@@ -86,6 +86,6 @@ async def correspondence_index(pool: asyncpg.Pool, consumer: str | None, consume
         counts: dict[int, int] = {}
         for it in out:
             counts[it["mailbox"]] = counts.get(it["mailbox"], 0) + 1
-        if counts:
-            await con.execute("SELECT ml_log_k7_read($1::bigint[], $2, $3, $4::integer[], $5)", list(counts.keys()), consumer, agent, list(counts.values()), domain)
+        # every answer, empty or not: db/022 writes one row per mailbox the share covers, its count 0 when nothing came from it
+        await con.execute("SELECT ml_log_k7_read($1::bigint[], $2, $3, $4::integer[], $5)", list(counts.keys()), consumer, agent, list(counts.values()), domain)
     return {"ok": True, "schema": SCHEMA, "truncated": truncated, "conversations": out}

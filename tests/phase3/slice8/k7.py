@@ -146,7 +146,10 @@ async def main():
     want = {}
     for c in r["conversations"]:
         want[c["mailbox"]] = want.get(c["mailbox"], 0) + 1
-    check({x["mailbox_id"]: x["after"]["count"] for x in rows} == want and len(rows) == len(want), "one k7.read row per mailbox the answer drew on, with its count", rows)
+    covered = {int(x) for x in sql("SELECT id FROM mailboxes WHERE share_with_apps AND active AND suspended_at IS NULL").splitlines()}
+    got = {x["mailbox_id"]: x["after"]["count"] for x in rows}
+    check(len(rows) == len(got) and set(got) == covered | set(want) and all(got[m] == want.get(m, 0) for m in got),
+          "one k7.read row per mailbox the share covers, with the count drawn from it (0 where nothing came)", rows)
     check(all(x["source"] == "application" and x["actor_member_id"] == 40 and x["after"]["consumer"] == "sales_crm" and x["after"]["consumer_agent"] == 40 and x["after"]["domain"] == DOMAIN for x in rows),
           "…naming the consumer, its agent and the domain asked about")
     txt = json.dumps(rows)
@@ -164,10 +167,13 @@ async def main():
     await share({"with": ASK}, agent=True)
     last = sql("SELECT coalesce(actor_member_id::text, 'none') FROM activity_log WHERE action = 'k7.read' ORDER BY id DESC LIMIT 1")
     check(last == "none", "…and a boolean is not an agent id")
-    r = await share({"with": "nobody@nowhere-k7.example"})
     n = n_k7()
-    await share({"with": "nobody@nowhere-k7.example"})
-    check(n_k7() == n, "an answer that drew on no mailbox writes no row (nothing of any mailbox was read out)")
+    r = await share({"with": "nobody@nowhere-k7.example"})
+    empty = sql("SELECT count(*) || '|' || coalesce(max((after->>'count')::int), -1) FROM activity_log WHERE action = 'k7.read' AND after->>'domain' = 'nowhere-k7.example'")
+    check(r["conversations"] == [] and n_k7() - n == len(covered) and empty == f"{len(covered)}|0",
+          "an answer that found nothing is logged too: a row with count 0 in every mailbox the share covers", empty)
+    check(not sql("SELECT 1 FROM activity_log a JOIN mailboxes b ON b.id = a.mailbox_id WHERE a.action = 'k7.read' AND NOT b.share_with_apps LIMIT 1"),
+          "…and never in a mailbox not shared with applications")
 
     print("the owner reads it in the access log; others do not")
     async def log_as(member):

@@ -78,7 +78,7 @@ stand-in of the kernel's K7 call):
 - **Answer** (`os.malumail-correspondence/1`): `[{thread_id, mailbox, mailbox_address, subject, participants, first_message_at,
   last_message_at, message_count, snippet ≤ 200, url}]`, `url` = `APP_URL/m/{mailbox}/t/{thread}` — the consumer's person opens it
   only if MaluMail's wall lets them (otherwise 404, the wall unchanged).
-- **The access log**: one `k7.read` row **per mailbox the answer drew on**, with the consumer, the consumer's agent, the count and
+- **The access log**: one `k7.read` row **per mailbox the share covers** (db/022, the owner 2026-10-17; the count 0 where nothing came), with the consumer, the consumer's agent, the count and
   the domain asked about (never the subject) — through `ml_log_k7_read()` (`db/014_reading_search.sql`), the records role's only other write. The
   mailbox's owner and the Mail admins see it in the access log (slice 7).
 - **Never**: a sensitive conversation, a mailbox not shared with applications, an inactive or suspended mailbox, more than the
@@ -202,8 +202,9 @@ per half hour, upkeep through the real mail service, the door), tools.py 32, k7.
 **Decisions taken here (within the spec)**
 1. The share's `subject` and `snippet` ARE carried for a person's mailbox once its owner opted in (design §3: "the answer carries subject, participants, dates and a
    200-character snippet"); never a body. The log row never carries them.
-2. An answer that drew on no mailbox writes no `k7.read` row (rows are per mailbox drawn on). OPEN FOR THE OWNER: an empty answer still tells a consumer "nothing with
-   X in the shared mailboxes"; logging a zero-count row per shared mailbox would record that too.
+2. **Decided by the owner 2026-10-17 (db/022):** every answer writes a `k7.read` row in EVERY mailbox the share covers (shared with applications, active, not
+   suspended), the count 0 where nothing came from it — an empty answer still tells a consumer "nothing with X in the shared mailboxes", so it is on record too.
+   Decision 1 (subject and snippet for a person's opted-in mailbox) confirmed by the owner the same day.
 3. The directory source of autocomplete shows members' addresses (people and agents) whether or not a mailbox sits behind them — the directory is the business's.
 4. A viewer's (`view`) autocomplete is 404, as a missing mailbox. The People screens read through `mcp_correspondents` / `mcp_threads` (the wall and the sensitive rule are in the views).
 5. A domain given to the share is not filtered for public providers (only the company view is, decision 2).

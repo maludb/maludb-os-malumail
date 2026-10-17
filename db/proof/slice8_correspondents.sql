@@ -73,13 +73,24 @@ RESET ROLE;
 INSERT INTO ids SELECT 'mb_' || split_part(address, '@', 1), id FROM mailboxes;
 SET ROLE malumail_records_ro;
 SELECT ml_log_k7_read(ARRAY[(SELECT id FROM ids WHERE k = 'mb_team')], 'sales_crm', 9, ARRAY[3], 'Partner.example');
-SELECT ml_log_k7_read(ARRAY[(SELECT id FROM ids WHERE k = 'mb_bot')], 'sales_crm', 4242, ARRAY[0], NULL);
 RESET ROLE;
-SELECT pg_temp.check((SELECT count(*) FROM activity_log WHERE action = 'k7.read') = 2, 'one k7.read row per mailbox named');
+-- db/022: a row for every mailbox the share covers (team and bot here; Kim's person mailbox is not shared), the count 0 where nothing came
+SELECT pg_temp.check((SELECT array_agg(mailbox_id ORDER BY mailbox_id) FROM activity_log WHERE action = 'k7.read')
+                     = (SELECT array_agg(id ORDER BY id) FROM mailboxes WHERE share_with_apps AND active AND suspended_at IS NULL), 'one k7.read row per mailbox the share covers (db/022)');
 SELECT pg_temp.check((SELECT actor_member_id = 9 AND after->>'consumer' = 'sales_crm' AND (after->>'consumer_agent')::bigint = 9 AND (after->>'count')::int = 3 AND after->>'domain' = 'partner.example'
                         FROM activity_log WHERE action = 'k7.read' AND mailbox_id = (SELECT id FROM mailboxes WHERE address = 'team@s8.example')), 'the row names the consumer, its agent (a real one), the count and the domain asked about');
+SELECT pg_temp.check((SELECT (after->>'count')::int = 0 AND after->>'consumer' = 'sales_crm' AND after->>'domain' = 'partner.example'
+                        FROM activity_log WHERE action = 'k7.read' AND mailbox_id = (SELECT id FROM mailboxes WHERE address = 'bot@s8.example')), 'a covered mailbox nothing came from is logged with count 0 (db/022)');
+SELECT pg_temp.check(NOT EXISTS (SELECT 1 FROM activity_log WHERE action = 'k7.read' AND mailbox_id = (SELECT id FROM mailboxes WHERE address = 'kim@s8.example')), 'a mailbox not shared with applications gets no row');
+DELETE FROM activity_log WHERE action = 'k7.read';
+SET ROLE malumail_records_ro;
+SELECT ml_log_k7_read(ARRAY[(SELECT id FROM ids WHERE k = 'mb_bot')], 'sales_crm', 4242, ARRAY[0], NULL);
+SELECT ml_log_k7_read('{}'::bigint[], 'sales_crm', NULL, '{}'::integer[], 'nowhere.example');
+RESET ROLE;
 SELECT pg_temp.check((SELECT actor_member_id IS NULL AND after->>'consumer_agent' IS NULL AND after->>'domain' IS NULL
-                        FROM activity_log WHERE action = 'k7.read' AND mailbox_id = (SELECT id FROM mailboxes WHERE address = 'bot@s8.example')), 'an agent that is no member is recorded as none');
+                        FROM activity_log WHERE action = 'k7.read' AND mailbox_id = (SELECT id FROM mailboxes WHERE address = 'bot@s8.example') AND after->>'domain' IS NULL), 'an agent that is no member is recorded as none');
+SELECT pg_temp.check((SELECT count(*) = (SELECT count(*) FROM mailboxes WHERE share_with_apps AND active AND suspended_at IS NULL) AND max((after->>'count')::int) = 0
+                        FROM activity_log WHERE action = 'k7.read' AND after->>'domain' = 'nowhere.example'), 'an answer that drew on nothing still writes a row, count 0, in every covered mailbox (db/022)');
 SELECT pg_temp.check(NOT EXISTS (SELECT 1 FROM activity_log WHERE action = 'k7.read' AND after::text ~* '(subject|snippet|hello|again)'), 'a k7.read row carries no subject, snippet or word of mail');
 SELECT pg_temp.check(NOT has_function_privilege('malumail_rw', 'ml_log_k7_read(bigint[], text, bigint, integer[], text)', 'EXECUTE'), 'the web application cannot write a K7 row; the read servers alone do');
 
