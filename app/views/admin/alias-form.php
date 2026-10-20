@@ -5,6 +5,7 @@ $screen = $new ? 'admin-alias-new' : 'admin-alias-view';
 <?= view('shared/header.php', ['id' => $screen, 'title' => $new ? 'New forwarding address' : $a['address'],
     'crumbs' => [[app_name(), '/'], ['Admin', '/admin'], ['Forwarding', '/admin/aliases'], [$new ? 'New' : $a['address'], null]], 'back' => ['/admin/aliases', 'Forwarding']]) ?>
 <div class="main-content" id="<?= $screen ?>-content">
+    <?= view('admin/partials/switch-banner.php') ?>
     <?= view('shared/banner.php', ['notice' => $notice ?? null]) ?>
     <?php if ($new && $domains === []): ?>
         <div class="alert alert-warning">No domain is served yet. <?= hx_link('/admin/domains', 'Serve a domain', 'alert-link') ?> first.</div>

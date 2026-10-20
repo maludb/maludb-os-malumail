@@ -11,6 +11,8 @@ ml_log_mcp_read() — once per tool call per mailbox.
   mailbox_overview(mailbox)               ml_mailbox_counts()
   mail_list(mailbox, view, folder, label, unread_only, before, limit)     ml_mail_list()
   find_folders(mailbox, q, limit)         resolver: a mailbox's folders
+  mailbox_health(state, limit)            slice 10: sync state, quota, credential and last error per mailbox — ml_sync_health() for a Mail admin,
+                                          mcp_mailboxes for everyone else; counts and states, never mail
 """
 
 from __future__ import annotations
@@ -118,6 +120,39 @@ async def mailbox_get(pool: asyncpg.Pool, caller: Caller, mailbox) -> dict:
         if b["owner_member_id"] == caller.member_id or await con.fetchval("SELECT ml_is_mail_admin()"):
             out.update(ai_read=b["ai_read"], share_with_apps=b["share_with_apps"])
         return {"ok": True, "mailbox": out}
+
+
+async def mailbox_health(pool: asyncpg.Pool, caller: Caller, state: str | None = None, limit: int = 50) -> dict:
+    """Which mailboxes are near quota, failing to sync, suspended or paused (design question 16): every mailbox for a Mail admin (ml_sync_health(),
+    which also carries the last error), the mailboxes the caller opens for everyone else (mcp_mailboxes; no last error). Administrative facts only."""
+    limit = max(1, min(200, int(limit or 50)))
+    if state is not None and state not in ("near_quota", "failing", "suspended", "paused"):
+        return bad("state is near_quota, failing, suspended or paused")
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        if await con.fetchval("SELECT ml_is_mail_admin()"):
+            rows = await con.fetch(
+                """SELECT h.mailbox_id, h.address, h.kind, h.sync_state, h.last_sync_at, h.quota_used_bytes, h.quota_bytes, h.credential_status,
+                          h.last_error, h.last_error_at, (b.suspended_at IS NOT NULL) AS suspended,
+                          COALESCE((SELECT p.paused FROM mcp_agent_mail_policies p WHERE p.mailbox_id = h.mailbox_id), false) AS paused
+                     FROM ml_sync_health() h JOIN mcp_mailboxes b ON b.id = h.mailbox_id ORDER BY h.address""")
+        else:
+            rows = await con.fetch(
+                """SELECT b.id AS mailbox_id, b.address, b.kind, b.sync_state, b.last_sync_at, b.quota_used_bytes, b.quota_bytes,
+                          b.credential_status, NULL::text AS last_error, NULL::timestamptz AS last_error_at, (b.suspended_at IS NOT NULL) AS suspended,
+                          COALESCE((SELECT p.paused FROM mcp_agent_mail_policies p WHERE p.mailbox_id = b.id), false) AS paused
+                     FROM mcp_mailboxes b WHERE b.my_level <> 'none' ORDER BY b.address""")
+    out = []
+    for r in rows:
+        near = r["quota_bytes"] and r["quota_used_bytes"] is not None and r["quota_used_bytes"] >= 0.9 * r["quota_bytes"]
+        failing = r["sync_state"] == "failed" or r["credential_status"] in ("failed", "revoked")
+        if state == "near_quota" and not near or state == "failing" and not failing or state == "suspended" and not r["suspended"] or state == "paused" and not r["paused"]:
+            continue
+        out.append({"mailbox_id": r["mailbox_id"], "address": r["address"], "kind": r["kind"], "sync_state": r["sync_state"], "last_sync_at": r["last_sync_at"],
+                    "quota_used_bytes": r["quota_used_bytes"], "quota_bytes": r["quota_bytes"], "near_quota": bool(near),
+                    "credential": r["credential_status"] or "none", "last_error": r["last_error"], "last_error_at": r["last_error_at"],
+                    "suspended": r["suspended"], "paused": r["paused"]})
+    return {"ok": True, "mailboxes": out[:limit]}
 
 
 async def mailbox_overview(pool: asyncpg.Pool, caller: Caller, mailbox) -> dict:

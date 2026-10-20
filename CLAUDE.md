@@ -275,6 +275,13 @@ customer key nor the sealing secret** — the proof checks it.
 - **The theme opens header dropdowns on hover** (jQuery, no native event): load a dropdown's content on `mouseenter` and `click` as well as `show.bs.dropdown`.
 - Texts: the kernel offers no "has a verified phone" query; the page uses the directory's phone and the send's refusal ends a row `skipped`.
 
+## Slice 10 (2026-10-20, home, admin and settings BUILT — the last of Phase 3) — `docs/build-specs/home-admin.md`
+- `bash tests/phase3/slice10/run.sh` (php -S) and `ML_APP=apache …`: scratch `ml_dev10`, the IMAP fixture on for Priya (live, text-indexed), Ada and the shared mailbox seeded failing; `checks.php` 81, `tools.py` 12, `browser.mjs` 29. `ML_S10_HOLD=1` leaves the servers up (never pipe it into `tail`).
+- **Every admin page carries `admin/partials/switch-banner.php`** (a new admin view adds it); `admin_switches()` lives in `app/features/admin/admin.php`, the rest in `overview.php`. Settings are saved through `ml_settings_save()`'s allow-list only — a new column is writable only when a migration names it there AND `ADMIN_SETTING_FIELDS` does.
+- **Never put `hx-select` (or `hx-target="this"`) on a container whose children post HTMX forms**: it is inherited and empties their answers. The 30-second refresh is a `?rows=1` partial.
+- **Words, not codes**: a mail turn's decision shows through `ADMIN_DISPATCH_WHY` (all fourteen of `ml_dispatch_decide()`'s); a new decision in SQL gets its words there.
+- The mail service's `/v1/status` (all) is a Mail admin's; the sync page shows only counts, states, errors and a mailbox's address — never a subject or correspondent.
+
 ## Numbers
 Ports `APP_INTERNAL_PORT=8199`, `MCP_RECORDS_PORT=8852`, `MCP_ACTIVITY_PORT=8853`, `ML_MAILER_PORT=8854`, `ML_IMAGES_PORT=8855`;
 scratch 9201 (the app), 9202 (the fake kernel), 9203 (the fake MaluDB + MaluMail REST), 9204–9205 (the MCP servers), 9206 (the

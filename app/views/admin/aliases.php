@@ -7,6 +7,7 @@ $link = static function (array $over) use ($f): string {
 <?= view('shared/header.php', ['id' => 'admin-aliases', 'title' => 'Forwarding', 'crumbs' => [[app_name(), '/'], ['Admin', '/admin'], ['Forwarding', null]],
     'action' => hx_link('/admin/aliases/new', '<i class="feather-plus me-1"></i>New forwarding address', 'btn btn-primary btn-sm btn-touch', 'id="admin-aliases-new-btn"')]) ?>
 <div class="main-content" id="admin-aliases-content">
+    <?= view('admin/partials/switch-banner.php') ?>
     <?= view('shared/banner.php', ['notice' => $notice]) ?>
     <?php if (!$reached): ?><div class="alert alert-warning" id="admin-aliases-unreached">MaluMail did not answer for every domain, so this shows what was last read.</div><?php endif; ?>
     <div class="d-flex flex-wrap gap-1 mb-3" id="admin-aliases-chips">

@@ -8,6 +8,7 @@ $link = static function (array $over) use ($f): string {
 <?= view('shared/header.php', ['id' => 'admin-mailboxes', 'title' => 'Mailboxes', 'crumbs' => [[app_name(), '/'], ['Admin', '/admin'], ['Mailboxes', null]],
     'action' => hx_link('/admin/mailboxes/new', '<i class="feather-plus me-1"></i>New mailbox', 'btn btn-primary btn-sm btn-touch', 'id="admin-mailboxes-new-btn"')]) ?>
 <div class="main-content" id="admin-mailboxes-content">
+    <?= view('admin/partials/switch-banner.php') ?>
     <form method="get" action="/admin/mailboxes" class="d-flex flex-wrap gap-2 mb-3" hx-get="/admin/mailboxes" hx-target="#page-content" hx-push-url="true" id="admin-mailboxes-filter">
         <input type="search" name="q" value="<?= e($f['q']) ?>" class="form-control form-control-sm btn-touch" style="max-width:16rem" placeholder="Address, name or owner" id="admin-mailboxes-q">
         <input type="hidden" name="kind" value="<?= e($f['kind']) ?>"><input type="hidden" name="state" value="<?= e($f['state']) ?>"><input type="hidden" name="domain" value="<?= e($f['domain']) ?>">

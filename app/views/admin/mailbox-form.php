@@ -22,6 +22,7 @@ $overseers = static function (string $prefix): string {
 <?= view('shared/header.php', ['id' => 'admin-mailbox-new', 'title' => 'New mailbox', 'crumbs' => [[app_name(), '/'], ['Admin', '/admin'], ['Mailboxes', '/admin/mailboxes'], ['New', null]],
     'back' => ['/admin/mailboxes', 'Mailboxes']]) ?>
 <div class="main-content" id="admin-mailbox-new-content">
+    <?= view('admin/partials/switch-banner.php') ?>
     <?php if ($domains === []): ?>
         <div class="alert alert-warning" id="admin-mailbox-new-no-domain">No domain is served yet. <?= hx_link('/admin/domains', 'Serve a domain', 'alert-link') ?> first.</div>
     <?php else: ?>

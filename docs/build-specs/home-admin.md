@@ -203,3 +203,28 @@ kernel's hires, grants and duties (the OS).
   GRANT EXECUTE to `malumail_rw`; `ml_sync_health()` also to `malumail_records_ro` for `mailbox_health`.
 - **Tool surface**: `mailbox_health` reads `ml_sync_health()` for a Mail admin and `mcp_mailboxes` for everyone else.
 - **mail-service.md** (this fork's own): `POST /v1/status` (all) added.
+
+
+## Built and proven (2026-10-20)
+
+Built: `/admin` (seven cards: domains with any SPF/DKIM/DMARC not verified in red, mailboxes by kind with suspended and not connected, forwarding with "N go outside", sync, held mail with the
+oldest's age, the agents' budget today, the switches), `/admin/sync` (a ledger row per mailbox that stacks into a card below 768 px; filters failing, syncing, credential failed; Re-sync and
+Re-index text swap their row; the rows refresh every 30 s through `?rows=1`), `/admin/settings` (the form in fieldsets that asks first, the budget with today's figure, the two switches, MM3 with
+its name typed back, the Clerk's hour, the notice form with its version and "N of M" acknowledgements), `/admin/agents` (a card per agent mailbox, the turns as a ledger, Retry), the five actions,
+the red switch banner on EVERY admin page (the six slice 1 views carry it too), `POST /v1/status` on the mail service, and `mailbox_health` in `mcp/records_server.py`. No migration:
+db/013's five functions were enough. Registry: 45/45 screens, 67/67 actions built.
+
+**Proven** (`tests/phase3/slice10/run.sh`, php -S and `ML_APP=apache`, identical): checks 81, tools 12, browser 29.
+
+**Found and fixed**
+1. An `hx-select` on the rows' container is inherited by every button and link inside it and emptied Re-sync's answer; the refresh is now `?rows=1` returning the rows alone.
+2. Phase 2's last two placeholder checks (a POST and JSON to `/admin/settings`) follow whether any screen is still unbuilt; with none left the JSON one asserts the built screen's data.
+3. At review (the planning model): the agents' page printed a mail turn's decision code ("Why: internal_unproven"); `ADMIN_DISPATCH_WHY` words all fourteen of `ml_dispatch_decide()`'s decisions (the unscreened four as slice 5 words them), with a check.
+
+**Decisions taken here (within the spec)**
+1. Filters: `failing` = sync state failed, or an error left standing on a mailbox that is not live; `syncing` = new or syncing; `failed` = the credential failed or was revoked.
+2. `POST /v1/status` answers every mailbox's watcher and back-off to a Mail admin (settings.manage) and nothing else; PHP joins it onto `ml_sync_health()`.
+3. Saving the notice does not acknowledge it for the saver: the Mail admin is sent to /notice like everyone ("everyone acknowledges again").
+4. The kernel's agent and run pages are linked as `<OS_URL>/agents/<id>` and `<OS_URL>/ai/runs/<run>` (OS_URL, else the launcher's host with `os.` for `app.`); the kernel's route names are assumed, not read.
+5. `mailbox_health` writes no `mcp.read`: it answers administrative columns only (like the screen), unlike `mailbox_get`.
+6. A form's unchecked box is sent as `no` by a hidden input, so "left out stays as it was" never blurs with "switched off".

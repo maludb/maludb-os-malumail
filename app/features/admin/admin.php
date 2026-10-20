@@ -426,3 +426,10 @@ function admin_confirm_outside(PDO $pdo, array $destinations): array
     }
     return $outside;
 }
+
+/** The two business-wide switches and the MM3 flag, for the banner every admin page carries while a switch is on. */
+function admin_switches(PDO $pdo): array
+{
+    $r = $pdo->query('SELECT hold_all_agents, hold_all_external, mm3_identity_enforced FROM ml_settings WHERE id = 1')->fetch();
+    return ['hold_all_agents' => (bool) $r['hold_all_agents'], 'hold_all_external' => (bool) $r['hold_all_external'], 'mm3' => (bool) $r['mm3_identity_enforced']];
+}

@@ -94,3 +94,5 @@ zone, brought back unread by the worker with a chip (an agent's mailbox wakes th
 
 `webmail.<domain>`; ports 8199 (application), 8852 / 8853 (records and activity MCP), 8854 (the mail service, loopback);
 database `<tenant>_malumail`.
+
+**Slice 10, home, admin and settings, is built** (2026-10-20, the last of Phase 3: 45/45 screens, 67/67 actions): the Mail admin's overview, sync health with Re-sync and Re-index, the settings with the two switches, MM3, the budget and the monitoring notice, and the agents' page with Retry; a red banner across every admin page while a switch is on. (`tests/phase3/slice10/run.sh`.)

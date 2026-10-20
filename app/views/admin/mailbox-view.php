@@ -9,6 +9,7 @@ $form = static fn (string $action, string $inner, string $confirm = '', string $
 <?= view('shared/header.php', ['id' => 'admin-mailbox-view', 'title' => $b['address'], 'crumbs' => [[app_name(), '/'], ['Admin', '/admin'], ['Mailboxes', '/admin/mailboxes'], [$b['address'], null]],
     'back' => ['/admin/mailboxes', 'Mailboxes']]) ?>
 <div class="main-content" id="admin-mailbox-view-content">
+    <?= view('admin/partials/switch-banner.php') ?>
     <?= view('shared/banner.php', ['notice' => $notice]) ?>
     <?php if ($revealed !== null): ?>
         <div class="alert alert-warning" id="mailbox-revealed" role="status">

@@ -7,6 +7,7 @@ $flag = static function (?bool $v, string $name): string {
 ?>
 <?= view('shared/header.php', ['id' => 'admin-domains', 'title' => 'Domains', 'crumbs' => [[app_name(), '/'], ['Admin', '/admin'], ['Domains', null]]]) ?>
 <div class="main-content" id="admin-domains-content">
+    <?= view('admin/partials/switch-banner.php') ?>
     <?= view('shared/banner.php', ['notice' => $notice]) ?>
     <?php if (!$reached): ?>
         <div class="alert alert-warning" id="admin-domains-unreached">MaluMail did not answer, so this shows the served domains as last read.</div>

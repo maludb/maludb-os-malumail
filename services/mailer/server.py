@@ -10,6 +10,7 @@ secret key and MaluMail's customer key. It listens on loopback, 127.0.0.1:ML_MAI
                                         an authentication failure trips the circuit breaker (store.trip_breaker)
   POST /v1/mailboxes/{id}/sync          slice 2: queue a re-read for the mailbox's watcher (folder, full, text) — settings.manage or full
   POST /v1/mailboxes/{id}/status        slice 2: where the mailbox's sync stands (mail-service.md §9) — view on it, or settings.manage
+  POST /v1/status                       slice 10: every mailbox's watcher (notify, idle, down) and back-off, and the passes — settings.manage
   POST /v1/mailboxes/{id}/quota         slice 2: GETQUOTAROOT read now (the stored figures when the mailbox has no watcher) — view
   POST /v1/mailboxes/{id}/fetch         slice 3: one message — the header summary, the part list with decoded sizes, and by `form`:
                                         html (the sanitiser's fields, the part and image links minted here), text (the agent's extracted
@@ -295,6 +296,20 @@ def build_app(cfg: Config) -> Starlette:
         result["watcher"] = state["sync"].watcher_state(mailbox_id)
         result["backoff_seconds"] = backoff.wait(mailbox_id, time.time())
         return JSONResponse({"ok": True, "result": result})
+
+    async def status_all(request: Request):
+        """Slice 10 (home-admin.md): the watchers of every mailbox, for the Mail admin's sync page — counts and states, never mail."""
+        got = await signed(request)
+        if isinstance(got, JSONResponse):
+            return got
+        actor, _args = got
+        store: Store = state["store"]
+        if not await store.member_may(actor, "settings.manage"):
+            return refuse(403, "forbidden", "Only a Mail admin reads the sync health of every mailbox.")
+        ids = [int(r["id"]) for r in await store.pool.fetch("SELECT id FROM mailboxes ORDER BY id")]
+        now = time.time()
+        boxes = {str(i): {"watcher": state["sync"].watcher_state(i), "backoff_seconds": backoff.wait(i, now)} for i in ids}
+        return JSONResponse({"ok": True, "result": {"mailboxes": boxes, "passes": passes}})
 
     async def quota_call(request: Request):
         got = await mailbox_call(request, "view")
@@ -938,6 +953,7 @@ def build_app(cfg: Config) -> Starlette:
         Route("/v1/mailboxes/{mailbox:int}/probe", probe, methods=["POST"]),
         Route("/v1/mailboxes/{mailbox:int}/sync", sync_call, methods=["POST"]),
         Route("/v1/mailboxes/{mailbox:int}/status", status_call, methods=["POST"]),
+        Route("/v1/status", status_all, methods=["POST"]),
         Route("/v1/mailboxes/{mailbox:int}/quota", quota_call, methods=["POST"]),
         Route("/v1/mailboxes/{mailbox:int}/fetch", fetch_call, methods=["POST"]),
         Route("/v1/mailboxes/{mailbox:int}/part", part_call, methods=["POST"]),
