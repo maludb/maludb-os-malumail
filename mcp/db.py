@@ -31,6 +31,12 @@ request_is_kernel: contextvars.ContextVar[bool] = contextvars.ContextVar("is_ker
 request_run_id: contextvars.ContextVar[int | None] = contextvars.ContextVar("run_id", default=None)
 # The raw bearer the caller presented (a run token is shown to the kernel's run-facts call).
 request_token: contextvars.ContextVar[str] = contextvars.ContextVar("token", default="")
+# The person behind an agent's run (K38's requested_by_member_id, set by the gate from the kernel's run facts; None = the agent reads as itself).
+request_on_behalf: contextvars.ContextVar[int | None] = contextvars.ContextVar("on_behalf", default=None)
+# What the kernel's headers say on a K7 share call (K26): the consuming application, its expert agent, and the request being answered.
+request_consumer: contextvars.ContextVar[str | None] = contextvars.ContextVar("consumer", default=None)
+request_consumer_agent: contextvars.ContextVar[int | None] = contextvars.ContextVar("consumer_agent", default=None)
+request_kernel_request_id: contextvars.ContextVar[str | None] = contextvars.ContextVar("kernel_request_id", default=None)
 
 
 _ENV_KEYS = ("DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD", "MCP_RECORDS_DB_USER", "MCP_RECORDS_DB_PASSWORD",

@@ -258,7 +258,7 @@ su("UPDATE outbound_email SET status = 'cancelled' WHERE id = $q1");            
 policy("send_mode = 'hold_all'");
 [$c, $j] = asend($E, ['colleague@business.example']);
 $h3 = (int) ($j['record_id'] ?? 0);
-su("UPDATE outbound_email SET held_at = now() - interval '2 days' WHERE id = $h3");
+su("UPDATE outbound_email SET held_at = timestamptz '2026-10-20 07:30:00+00' - interval '2 days' WHERE id = $h3");      // two days before the worker's clock below, not before the real one
 su("UPDATE mailboxes SET quota_bytes = 100, quota_used_bytes = 93 WHERE id = $E");
 $ua = arrive('ada', 'SECRETSUBJECT for ada');
 $decA = one("SELECT ml_dispatch_decide($ua)");

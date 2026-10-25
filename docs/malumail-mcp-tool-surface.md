@@ -199,3 +199,70 @@ rows carrying `id_field` and `label_field` when given `q` alone (and the `mailbo
 `app_roles` and the share) and 7 activity tools. The design's estimate was "32 records tools and 7 activity tools"; the
 difference is `domains_list`, `find_members`/`find_departments` as resolvers, and the share counted as a tool
 (`docs/phase1-consistency.md`).
+
+
+## Built and proven (2026-10-21)
+
+**Built (Phase 4, a Sonnet 5.5 worker).** The two servers the surface describes, all 36 records tools (the share and `app_roles` among them) and all 7 activity tools, FastMCP over
+streamable HTTP on 127.0.0.1, `stateless_http` (a request's token is its own, never the first request's of a session): `mcp/records_mcp.py` and `mcp/activity_mcp.py` (the units run
+these), the plumbing in `mcp/ml_tools.py` (the parameter base, the caller, the error table, the resolvers' plain list, THE FENCE) and `mcp/server_common.py` (the run-facts gate, K38's person
+behind a run, K26's consumer headers); the queries stay in `mcp/records_server.py` and `mcp/activity_queries.py` — the screens' own SQL, so a screen and a tool never disagree — with five
+tools added to them (`find_aliases`, `find_departments`, `domains_list`, `my_notifications`, `notice_status`; the activity server's `member_activity`, `record_history`, `activity_search`,
+`recent_activity`). One migration, `db/023_mcp_servers.sql`: the kit's `mcp_admit_agent()` and `mcp_member_kind()` (db/011 never carried them; an agent's run token could not resolve),
+`mcp_activity_log` (the activity server's one window), the activity role's grants, and `ml_aliases_visible()`. `maludb-os.json`'s grants were already the surface's (the proof holds them to it).
+
+**Proven** (`tests/phase4/run.sh`, scratch `ml_dev11`, ports 9204 / 9208): world 5, gate 73, tools 143, activity 29, registry 66, coverage 27 under php -S; world 5, gate 77 (+4 through the
+vhost's own `/mcp/records` and `/mcp/activity`, K26's headers crossing the proxy), tools 143, activity 29, registry 66, coverage 27 under `ML_APP=apache`. `db/proof/slice11_mcp_servers.sql` 37.
+- *the gate*: no / forged / revoked / expired tokens refused; a person's token lists 35 records tools (the share is the kernel's) and 7 activity tools; the Expert in a person's turn at triage, `ai_read`
+  off = `not_found`, only the owner's person mailbox; any other agent the lesser of the two; an agent's own run; a requester who is an agent reads as the agent alone; a person with no role =
+  `on_behalf_of`; an evaluation run reads; the kernel's token lists and calls `app_roles` and `correspondence_index` only and the consumer is the headers' (an `as_agent` argument dropped); the
+  first contact of an unadmitted agent; the kernel stopped = an agent lists and calls nothing while a person still reads;
+- *the walls*: `find_mailboxes` for eight callers equals `ml_mailbox_level()` / `ml_level_as()` row for row; 24 tools asked for another person's mailbox by id and by address answer a missing
+  one's words; no search finds what the wall hides; a sensitive conversation is never an agent's;
+- *the fence*: every answer of 17 tool calls (a person's and the Expert's) scanned — every planted string (a subject, a body, a display name, an attachment's name, extracted attachment text,
+  a header, a held message, the share's subject) is inside one `<untrusted-mail>` block; a closing tag planted in the text is broken; hidden text flagged and never shown; a link whose words name
+  another host listed with its real host and counted; only `fence_untrusted()` builds the block;
+- *the access log*: `mcp.read` once per call per mailbox that is not the caller's own (two calls two rows, a conversation of many messages one, a search across mailboxes one in each, none for
+  one's own mailbox or a refusal), under the agent's name with the person it acted for; no payload holds a word of mail;
+- *the errors*: `bad_query`, `not_found`, `below_level`, `moved`, `on_behalf_of` each produced; `mailer_down` with `partial: true` against a stopped mail service (the index's lines still fenced),
+  and recovery; `not_yours` is reserved and no tool answers it;
+- *paging*: 55 conversations walked by `before` in pages of 7, and a search in pages of 9, without repeat or gap;
+- *the registry*: the kernel's own loader (`/var/www/mcp/application_actions.py`, read only) registers all 67 actions under K55's names; every resolve entity is answered by the live records
+  server through the kernel's own resolver; eleven whole actions are driven through the kernel's tool (names resolved, the hook asked before the handler, `needs_confirmation`, a pause posting
+  nothing), and a post is replayed against the real handler; every tool in `maludb-os.json` exists; coverage: every tool called and every question 1–21 and A1–A6 answered.
+
+**Found and fixed**
+1. `db/011` never carried `mcp_admit_agent()` / `mcp_member_kind()`, which `mcp/db.py` and the gate call: an agent's run token could not be resolved at all (db/023).
+2. The activity role could read none of the views `activity_queries.py` joins, and had no window on `activity_log`: db/023 grants the views and adds `mcp_activity_log` with the wall in SQL.
+3. `find_aliases` has no view for a non-admin (`mcp_aliases` is the Mail admins'): `ml_aliases_visible()`.
+4. The kernel's resolver sends `q` alone — never the mailbox the call names — so the five per-mailbox resolvers (`find_folders`, `find_labels`, `find_threads`, `find_identities`,
+   `find_correspondents`) could not resolve a name: `mailbox` is optional on them now (every mailbox the caller may open, each one logged) and an exact name wins (one row), a record in several
+   mailboxes is one row.
+5. The queries answered `{ok, folders: [...]}`; the kernel reads a plain list (or `rows`): the resolvers answer the list.
+6. `message_headers` had no index answer to give when the mail service did not answer (`partial: true`): it carries the index's head now, as `message_read` does.
+7. The records server read the mail service's port and key from `os.environ` only; installed it has them in `config/.env` (`db.ENV` is the fallback).
+8. A server module whose session is stateful would have carried the first request's token into later ones; both servers are `stateless_http`.
+9. Test time bomb found while re-running the chain (not this change): `tests/phase3/slice9/checks.php` made a held message "two days old" against the REAL clock while the worker is told it is
+   2026-10-20 07:30, so the Clerk's "held over a day" line vanished on any other day; the row is now dated two days before the worker's own clock. Slice 8 under Apache failed once ("a person's send
+   makes every recipient known", `known_only`) and passed on the rerun — a timing flake of the mail service's upkeep, not of the tools (open).
+10. The queries named a message by its index row (`mail_messages.id`) while the surface — and every action that takes `message` — means the message KEY (`mail_message_keys.id`; the two coincide until
+   a move or a second copy): an agent that passed `thread_read`'s `message` to `mail_reply` would have named another message. The tools translate at the one place the two meet (`ml_tools.key_to_row()`
+   / `rows_to_keys()`): a `message` goes in as a key and comes out as a key; an index row id is `not_found`. The proof makes the keys differ from the rows (500000 and up).
+11. `tests/phase2/servers.sh` rendered the activity port as the records port (9204 twice) and `tests/setup_dev.sh` gave it 9205, the internal Apache's: it is 9208.
+
+**Decisions taken here (within the surface)**
+1. `find_correspondents` rows carry `mailbox_id` only when no mailbox was named (slice 8's proof holds the row to the surface's shape). The tools' answers keep the queries' shapes (`{ok, conversations, before}` …); only the resolvers answer a plain list. Every error is `{ok: false, error: {code, message, retry}}` with a code of the
+   table: the mail service's `unavailable` / `busy` / `not_live` are `mailer_down` (retry), its `forbidden` is `not_found`, `bad_request` / `too_large` are `bad_query`; a parameter that fails
+   validation is `bad_query` naming the fields, never echoing the value.
+2. Fenced: `subject`, `snippet`, `text`, `summary_line`, `from_name`, `body`, `excerpt`, `purpose`, link `text` and `href`, `attachment_names`, `name` (an attachment's, a correspondent's), every
+   header value but our filters' verdicts and bare addresses. Addresses are data and stay bare. A link's `host` that is not a host name is replaced by `(invalid host)`.
+3. The activity server reads the local log through `mcp_activity_log`, not the MaluDB memory (the memory has no wall; the same rows are shipped there by `activity_ingest.py`) — the decision
+   Boards, Spaces and Shareholder Intelligence made. A Mail admin reads the ADMINISTRATION of any mailbox (alias, domain, policy, permission, mailbox.create/…) and never a person's mail acts.
+4. The activity tools write the same `mcp.read` row when they read a mailbox's events that is not the caller's own.
+5. `mailbox_overview` for an agent's mailbox keeps `held` and `unscreened`; for any other it drops them. `domains_list` answers `below_level` to a person who is not a Mail admin.
+6. `limit` is 1–100 and out of range is `bad_query` (the surface says 1–100); `mailbox_access_log`, `mailbox_trail` and the activity lists default to 50.
+7. A folder or label NAME resolves through the kernel only when one mailbox the caller opens has it; with several mailboxes the kernel says "several match" and lists them — the agent passes the id
+   `find_folders` / `find_labels` gave, with the `mailbox`.
+
+**Every earlier suite re-run** (php -S and `ML_APP=apache`, one after another): `tests/phase0/run.sh` 101, `tests/phase0/schema.sh` (db/023 + `slice11_mcp_servers.sql` 37 among twelve proofs), `tests/phase1/check_specs.sh` 98,
+`tests/mailer/run.sh` 80, `tests/phase2/run.sh` 78 + 44 + 28 (Apache 78 + 48 + 28), slices 1–10 each green under both servers (slice 2 and 9 after the fixes above; slice 8 as noted).

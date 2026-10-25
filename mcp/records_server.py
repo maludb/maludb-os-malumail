@@ -72,6 +72,25 @@ async def _log_read(con: asyncpg.Connection, caller: Caller, mailbox_id: int, to
     await con.execute("SELECT ml_log_mcp_read($1, $2, $3, $4)", mailbox_id, tool, caller.run_id, caller.token_id)
 
 
+async def _log_reads(con: asyncpg.Connection, caller: Caller, mailbox_ids, tool: str) -> None:
+    """One mcp.read per mailbox that is not the caller's own, once per tool call — never per row (design §3)."""
+    ids = sorted({int(i) for i in mailbox_ids if i is not None})
+    if not ids:
+        return
+    owners = {r["id"]: r["owner_member_id"] for r in await con.fetch("SELECT id, owner_member_id FROM mcp_mailboxes WHERE id = ANY($1::bigint[])", ids)}
+    for i in ids:
+        if owners.get(i) != caller.member_id:
+            await _log_read(con, caller, i, tool)
+
+
+async def _opt_mailbox(con: asyncpg.Connection, mailbox):
+    """(ok, id): a mailbox named, only when the caller opens it; (True, None) when none is named — the resolvers search every mailbox the caller may open."""
+    if mailbox in (None, ""):
+        return True, None
+    mid = await _mailbox_id(con, mailbox)
+    return mid is not None, mid
+
+
 async def find_mailboxes(pool: asyncpg.Pool, caller: Caller, q: str = "", kind: str | None = None, limit: int = 25) -> dict:
     limit = max(1, min(100, int(limit or 25)))
     if kind is not None and kind not in ("person", "agent", "shared"):
@@ -218,28 +237,25 @@ async def mail_list(pool: asyncpg.Pool, caller: Caller, mailbox, view: str = "in
     return {"ok": True, "mailbox_id": mid, "conversations": out, "before": out[-1]["cursor"] if (more and out) else None}
 
 
-async def find_folders(pool: asyncpg.Pool, caller: Caller, mailbox, q: str = "", limit: int = 25) -> dict:
+async def find_folders(pool: asyncpg.Pool, caller: Caller, mailbox=None, q: str = "", limit: int = 25) -> dict:
+    """Resolver: folders of the mailbox named — or, when the kernel's resolver sends `q` alone, of every mailbox the caller may open."""
     limit = max(1, min(100, int(limit or 25)))
     async with pool.acquire() as con, con.transaction():
         await _scoped(con, caller)
-        mid = await _mailbox_id(con, mailbox)
-        if mid is None:
+        ok, mid = await _opt_mailbox(con, mailbox)
+        if not ok:
             return not_found()
         rows = await con.fetch(
-            """SELECT id AS folder_id, name, special_use, messages_unseen AS unread, messages_total AS total FROM mcp_folders
-                WHERE mailbox_id = $1 AND ($2 = '' OR name ILIKE '%' || $2 || '%') ORDER BY special_use NULLS LAST, name LIMIT $3""",
+            """SELECT id AS folder_id, mailbox_id, name, special_use, messages_unseen AS unread, messages_total AS total FROM mcp_folders
+                WHERE ($1::bigint IS NULL OR mailbox_id = $1) AND ($2 = '' OR name ILIKE '%' || $2 || '%')
+                ORDER BY special_use NULLS LAST, name, mailbox_id LIMIT $3""",
             mid, (q or "").strip(), limit)
+        await _log_reads(con, caller, [r["mailbox_id"] for r in rows], "find_folders")
     return {"ok": True, "folders": [dict(r) for r in rows]}
 
 
 TOOLS = {"find_mailboxes": find_mailboxes, "mailbox_get": mailbox_get, "mailbox_overview": mailbox_overview, "mail_list": mail_list,
          "find_folders": find_folders}
-
-
-if __name__ == "__main__":
-    # Phase 4 wires the server (server_common.serve, the bearer gate, fence_untrusted()); until then this file is the tools' queries.
-    print("malumail-records-mcp: the tools' queries are written (slice 2); Phase 4 serves them.", file=sys.stderr)
-    sys.exit(0)
 
 
 # ================================================================================================================================
@@ -273,7 +289,8 @@ ATTACHMENT_TYPES = {"pdf": ("application/pdf",), "image": ("image/",), "document
 
 def _mailer_env() -> tuple[str, bytes]:
     from services.mailer.config import environment
-    e = environment()
+    import db as _db
+    e = {**_db.ENV, **environment()}                 # config/.env is where the installed server finds the door's port and key; the environment (and the proofs' scratch files) win
     return f"http://127.0.0.1:{int(e.get('ML_MAILER_PORT') or 0)}", (e.get("ML_MAILER_KEY") or "").encode()
 
 
@@ -289,6 +306,13 @@ async def _mailer(path: str, caller: Caller, args: dict, timeout: float = 40.0) 
         return r.status_code, r.json()
     except ValueError:
         return r.status_code, {"ok": False, "error": {"code": "unavailable", "message": "The mail service answered something it should not have."}}
+
+
+def _partial(err: dict, **index: object) -> dict:
+    """The index's answer with a mail service error: `mailer_down` says `partial: true` and carries what the index knew (the surface's error table)."""
+    if (err.get("error") or {}).get("code") in ("unavailable", "busy", "not_live"):
+        return {**err, "partial": True, **index}
+    return err
 
 
 def _mailer_error(status: int, doc: dict) -> dict:
@@ -315,25 +339,23 @@ def _message_head(r) -> dict:
             "folder": r["special_use"], "unread": not r["seen"], "starred": r["flagged"], "attachment_names": list(r["attachment_names"] or [])}
 
 
-async def find_threads(pool: asyncpg.Pool, caller: Caller, mailbox, q: str = "", limit: int = 25) -> dict:
+async def find_threads(pool: asyncpg.Pool, caller: Caller, mailbox=None, q: str = "", limit: int = 25) -> dict:
     """Resolver: conversations of a mailbox by words of their subject, participants or snippet (a message is never resolved by name —
     an agent passes ids from here or from mail_search)."""
     limit = max(1, min(100, int(limit or 25)))
     async with pool.acquire() as con, con.transaction():
         await _scoped(con, caller)
-        mid = await _mailbox_id(con, mailbox)
-        if mid is None:
+        ok, mid = await _opt_mailbox(con, mailbox)
+        if not ok:
             return not_found()
         words = (q or "").strip()
         rows = await con.fetch(
-            """SELECT t.id AS thread_id, t.subject, t.participants, t.last_message_at, t.message_count, t.unread_count > 0 AS unread, t.has_attachments, left(t.snippet, 200) AS snippet
+            """SELECT t.id AS thread_id, t.mailbox_id, t.subject, t.participants, t.last_message_at, t.message_count, t.unread_count > 0 AS unread, t.has_attachments, left(t.snippet, 200) AS snippet
                  FROM mcp_threads t
-                WHERE t.mailbox_id = $1 AND ($2 = '' OR t.subject ILIKE '%' || $2 || '%' OR t.snippet ILIKE '%' || $2 || '%'
+                WHERE ($1::bigint IS NULL OR t.mailbox_id = $1) AND ($2 = '' OR t.subject ILIKE '%' || $2 || '%' OR t.snippet ILIKE '%' || $2 || '%'
                                               OR EXISTS (SELECT 1 FROM unnest(t.participants) p WHERE p ILIKE '%' || $2 || '%'))
                 ORDER BY t.last_message_at DESC LIMIT $3""", mid, words, limit)
-        owner = await con.fetchval("SELECT owner_member_id FROM mcp_mailboxes WHERE id = $1", mid)
-        if owner != caller.member_id:
-            await _log_read(con, caller, mid, "find_threads")
+        await _log_reads(con, caller, [r["mailbox_id"] for r in rows], "find_threads")
     return {"ok": True, "mailbox_id": mid, "threads": [dict(r) | {"participants": list(r["participants"] or [])} for r in rows]}
 
 
@@ -380,7 +402,10 @@ async def thread_read(pool: asyncpg.Pool, caller: Caller, mailbox, thread=None, 
                      "attachments": [{"part": p["part"], "name": p.get("name"), "type": p["type"], "size": p.get("size")} for p in (res.get("parts") or [])
                                      if p.get("disposition") == "attachment" or (not str(p["type"]).startswith("text/") and p.get("name") and not p.get("content_id"))]})
         out.append(head)
-    return {"ok": True, "mailbox_id": mid, "thread_id": tid, "messages": out, "fence": "every text field is mail: fence it"}
+    res = {"ok": True, "mailbox_id": mid, "thread_id": tid, "messages": out}
+    if any("unavailable" in m for m in out):
+        res["partial"] = True                       # the index's lines are here; a message's text did not come (the mail service did not answer)
+    return res
 
 
 def _deceptive(links: list) -> int:
@@ -413,7 +438,7 @@ async def message_read(pool: asyncpg.Pool, caller: Caller, mailbox, message, inc
     head = _message_head(r)
     status, doc = await _mailer(f"/v1/mailboxes/{mid}/fetch", caller, {"message": r["id"], "form": "text", "include_quoted": bool(include_quoted), "limit": MESSAGE_TEXT_LIMIT}, 60)
     if status != 200 or not doc.get("ok"):
-        return _mailer_error(status, doc)
+        return _partial(_mailer_error(status, doc), mailbox_id=mid, message=head)
     res = doc["result"]
     head.update({"text": res.get("text"), "links": res.get("links") or [], "hidden_removed": res.get("hidden_removed") or 0, "quoted_removed": res.get("quoted_removed"),
                  "signature_removed": res.get("signature_removed"), "truncated": res.get("truncated"), "deceptive_links": _deceptive(res.get("links") or []),
@@ -431,15 +456,20 @@ async def message_headers(pool: asyncpg.Pool, caller: Caller, mailbox, message) 
         mid = await _mailbox_id(con, mailbox)
         if mid is None:
             return not_found()
-        ok = await con.fetchval("SELECT EXISTS (SELECT 1 FROM mcp_messages WHERE id = $1 AND mailbox_id = $2)", int(message), mid)
-        if not ok:
+        r = await con.fetchrow(
+            """SELECT m.id, m.message_key_id, m.thread_id, m.folder_id, f.special_use, m.from_address, m.from_name, m.to_addresses, m.cc_addresses, m.subject,
+                      m.sent_at, m.received_at, m.seen, m.flagged, m.has_attachments, m.attachment_names, m.dmarc_pass, m.spam_score, m.from_outside,
+                      m.automated, m.local_submission, m.snippet, m.uidvalidity, f.uidvalidity AS folder_uidvalidity
+                 FROM mcp_messages m JOIN mcp_folders f ON f.id = m.folder_id WHERE m.id = $1 AND m.mailbox_id = $2""", int(message), mid)
+        if r is None:
             return not_found("message")
+        head_of_index = _message_head(r)
         owner = await con.fetchval("SELECT owner_member_id FROM mcp_mailboxes WHERE id = $1", mid)
         if owner != caller.member_id:
             await _log_read(con, caller, mid, "message_headers")
     status, doc = await _mailer(f"/v1/mailboxes/{mid}/fetch", caller, {"message": int(message), "form": "headers"})
     if status != 200 or not doc.get("ok"):
-        return _mailer_error(status, doc)
+        return _partial(_mailer_error(status, doc), mailbox_id=mid, message=head_of_index)
     res = doc["result"]
     return {"ok": True, "mailbox_id": mid, "message": int(message), "headers": res.get("summary") or {},
             "parts": [{"part": p["part"], "name": p.get("name"), "type": p["type"], "size": p.get("size"), "disposition": p.get("disposition")} for p in (res.get("parts") or [])]}
@@ -584,20 +614,22 @@ async def attachment_read(pool: asyncpg.Pool, caller: Caller, mailbox, message, 
 
 # ---- slice 4 writing (writing.md): find_identities (a resolver), outbox_list ------------------------------------------------------------
 
-async def find_identities(pool: asyncpg.Pool, caller: Caller, mailbox, q: str = "", limit: int = 25) -> dict:
+async def find_identities(pool: asyncpg.Pool, caller: Caller, mailbox=None, q: str = "", limit: int = 25) -> dict:
     """The addresses a mailbox sends as (own + aliases MaluMail delivers to it), for anyone who may view it: a resolver for `identity`."""
     limit = max(1, min(100, int(limit or 25)))
     async with pool.acquire() as con, con.transaction():
         await _scoped(con, caller)
-        mid = await _mailbox_id(con, mailbox)
-        if mid is None:
+        ok, mid = await _opt_mailbox(con, mailbox)
+        if not ok:
             return not_found()
         rows = await con.fetch(
-            """SELECT id, address, display_name, kind, reply_to, is_default, signature_text IS NOT NULL AS has_signature
-                 FROM mcp_identities WHERE mailbox_id = $1 AND ($2 = '' OR address ILIKE '%' || $2 || '%' OR coalesce(display_name, '') ILIKE '%' || $2 || '%')
+            """SELECT id, mailbox_id, address, display_name, kind, reply_to, is_default, signature_text IS NOT NULL AS has_signature
+                 FROM mcp_identities WHERE ($1::bigint IS NULL OR mailbox_id = $1) AND ($2 = '' OR address ILIKE '%' || $2 || '%' OR coalesce(display_name, '') ILIKE '%' || $2 || '%')
                 ORDER BY is_default DESC, address LIMIT $3""", mid, (q or "").strip(), limit)
-    return {"ok": True, "mailbox_id": mid, "identities": [{"identity_id": r["id"], "address": r["address"], "display_name": r["display_name"], "kind": r["kind"],
-                                                            "reply_to": r["reply_to"], "is_default": r["is_default"], "has_signature": r["has_signature"]} for r in rows]}
+        await _log_reads(con, caller, [r["mailbox_id"] for r in rows], "find_identities")
+    return {"ok": True, "mailbox_id": mid, "identities": [{"identity_id": r["id"], "mailbox_id": r["mailbox_id"], "address": r["address"], "display_name": r["display_name"],
+                                                            "kind": r["kind"], "reply_to": r["reply_to"], "is_default": r["is_default"],
+                                                            "has_signature": r["has_signature"]} for r in rows]}
 
 
 async def outbox_list(pool: asyncpg.Pool, caller: Caller, mailbox, status: str | None = None, since=None, limit: int = 25) -> dict:
@@ -922,19 +954,20 @@ async def mail_search(pool: asyncpg.Pool, caller: Caller, q: str, mailbox=None, 
     return {"ok": True, "conversations": out, "unknown_operators": unknown, "capped": seen >= SEARCH_WALK, "before": out[-1]["cursor"] if (more and out) else None}
 
 
-async def find_labels(pool: asyncpg.Pool, caller: Caller, mailbox, q: str = "", limit: int = 25) -> dict:
-    """Resolver: a mailbox's labels with the number of conversations carrying each."""
+async def find_labels(pool: asyncpg.Pool, caller: Caller, mailbox=None, q: str = "", limit: int = 25) -> dict:
+    """Resolver: a mailbox's labels with the number of conversations carrying each (every mailbox the caller may open when none is named)."""
     limit = max(1, min(100, int(limit or 25)))
     async with pool.acquire() as con, con.transaction():
         await _scoped(con, caller)
-        mid = await _mailbox_id(con, mailbox)
-        if mid is None:
+        ok, mid = await _opt_mailbox(con, mailbox)
+        if not ok:
             return not_found()
         rows = await con.fetch(
-            """SELECT g.id AS label_id, g.label, g.colour, count(DISTINCT m.thread_id) AS conversations
+            """SELECT g.id AS label_id, g.mailbox_id, g.label, g.colour, count(DISTINCT m.thread_id) AS conversations
                  FROM mcp_labels g LEFT JOIN mcp_message_labels l ON l.tag_id = g.id LEFT JOIN mcp_messages m ON m.message_key_id = l.message_key_id AND m.mailbox_id = g.mailbox_id
-                WHERE g.mailbox_id = $1 AND g.archived_at IS NULL AND ($2 = '' OR g.label ILIKE '%' || $2 || '%')
-                GROUP BY g.id, g.label, g.colour ORDER BY lower(g.label) LIMIT $3""", mid, (q or "").strip(), limit)
+                WHERE ($1::bigint IS NULL OR g.mailbox_id = $1) AND g.archived_at IS NULL AND ($2 = '' OR g.label ILIKE '%' || $2 || '%')
+                GROUP BY g.id, g.mailbox_id, g.label, g.colour ORDER BY lower(g.label), g.mailbox_id LIMIT $3""", mid, (q or "").strip(), limit)
+        await _log_reads(con, caller, [r["mailbox_id"] for r in rows], "find_labels")
     return {"ok": True, "mailbox_id": mid, "labels": [dict(r) for r in rows]}
 
 
@@ -1114,21 +1147,20 @@ async def correspondence(pool: asyncpg.Pool, caller: Caller, with_: str, mailbox
                                                        "last_message_at": r["last_message_at"], "message_count": r["message_count"], "snippet": r["snippet"]} for r in rows]}
 
 
-async def find_correspondents(pool: asyncpg.Pool, caller: Caller, mailbox, q: str = "", known_only: bool = False, limit: int = 25) -> dict:
+async def find_correspondents(pool: asyncpg.Pool, caller: Caller, mailbox=None, q: str = "", known_only: bool = False, limit: int = 25) -> dict:
     """Resolver: a mailbox's correspondents (the wall in mcp_correspondents) — address, name, first and last contact, sent and received, known, internal."""
     limit = max(1, min(100, int(limit or 25)))
     async with pool.acquire() as con, con.transaction():
         await _scoped(con, caller)
-        mid = await _mailbox_id(con, mailbox)
-        if mid is None:
+        ok, mid = await _opt_mailbox(con, mailbox)
+        if not ok:
             return not_found()
         rows = await con.fetch(
-            """SELECT address, name, first_seen_at, last_seen_at, sent_count, received_count, is_internal, known_at, known_how FROM mcp_correspondents
-                WHERE mailbox_id = $1 AND ($2 = '' OR address ILIKE ml_like($2) OR name ILIKE ml_like($2)) AND (NOT $3 OR known_at IS NOT NULL)
+            """SELECT mailbox_id, address, name, first_seen_at, last_seen_at, sent_count, received_count, is_internal, known_at, known_how FROM mcp_correspondents
+                WHERE ($1::bigint IS NULL OR mailbox_id = $1) AND ($2 = '' OR address ILIKE ml_like($2) OR name ILIKE ml_like($2)) AND (NOT $3 OR known_at IS NOT NULL)
                 ORDER BY last_seen_at DESC, id DESC LIMIT $4""", mid, (q or "").strip(), bool(known_only), limit)
-        if await con.fetchval("SELECT owner_member_id IS DISTINCT FROM $2 FROM mcp_mailboxes WHERE id = $1", mid, caller.member_id):
-            await _log_read(con, caller, mid, "find_correspondents")
-    return {"ok": True, "mailbox_id": mid, "correspondents": [{"address": r["address"], "name": r["name"], "first_seen": r["first_seen_at"], "last_seen": r["last_seen_at"],
+        await _log_reads(con, caller, [r["mailbox_id"] for r in rows], "find_correspondents")
+    return {"ok": True, "mailbox_id": mid, "correspondents": [({"mailbox_id": r["mailbox_id"]} if mid is None else {}) | {"address": r["address"], "name": r["name"], "first_seen": r["first_seen_at"], "last_seen": r["last_seen_at"],
                                                               "sent": r["sent_count"], "received": r["received_count"], "known": r["known_at"] is not None,
                                                               "known_how": r["known_how"], "internal": r["is_internal"]} for r in rows]}
 
@@ -1148,3 +1180,67 @@ async def find_members(pool: asyncpg.Pool, caller: Caller, q: str = "", kind: st
 
 
 TOOLS.update({"correspondence": correspondence, "find_correspondents": find_correspondents, "find_members": find_members})
+
+
+# ================================================================================================================================
+# PHASE 4 — the tools no slice made real: find_aliases, find_departments, domains_list, my_notifications, notice_status.
+# ================================================================================================================================
+async def find_aliases(pool: asyncpg.Pool, caller: Caller, domain: str | None = None, q: str = "", outside_only: bool = False, limit: int = 25) -> dict:
+    """Forwarding addresses and where they deliver, outside destinations flagged (question 15): every alias for a Mail admin, otherwise those delivering to a
+    mailbox the caller holds `full` on (ml_aliases_visible(), db/023)."""
+    limit = max(1, min(100, int(limit or 25)))
+    dom = str(domain or "").strip().lower()
+    if dom and not _DOM_RE.match(dom):
+        return bad("domain is a domain name (example.com)")
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        rows = await con.fetch(
+            """SELECT id, address, destinations, active, synced_at, forwards_outside FROM ml_aliases_visible()
+                WHERE ($1 = '' OR split_part(address, '@', 2) = $1) AND ($2 = '' OR address ILIKE '%' || $2 || '%' OR EXISTS (SELECT 1 FROM unnest(destinations) d WHERE d ILIKE '%' || $2 || '%'))
+                  AND (NOT $3 OR forwards_outside) ORDER BY address LIMIT $4""", dom, (q or "").strip(), bool(outside_only), limit)
+    return {"ok": True, "aliases": [{"alias_id": r["id"], "address": r["address"], "destinations": list(r["destinations"] or []), "active": r["active"],
+                                     "forwards_outside": r["forwards_outside"], "synced_at": r["synced_at"]} for r in rows]}
+
+
+async def find_departments(pool: asyncpg.Pool, caller: Caller, q: str = "", limit: int = 25) -> dict:
+    """Resolver: the directory's departments."""
+    limit = max(1, min(100, int(limit or 25)))
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        rows = await con.fetch("SELECT department_id, name FROM mcp_departments WHERE ($1 = '' OR name ILIKE '%' || $1 || '%') ORDER BY lower(name), department_id LIMIT $2",
+                               (q or "").strip(), limit)
+    return {"ok": True, "departments": [dict(r) for r in rows]}
+
+
+async def domains_list(pool: asyncpg.Pool, caller: Caller) -> dict:
+    """The served domains, internal or not, SPF/DKIM/DMARC as last read — a Mail admin's (a person's own AI tool; no agent is granted it)."""
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        if not await con.fetchval("SELECT ml_is_mail_admin()"):
+            return {"ok": False, "error": {"code": "below_level", "message": "Only a Mail admin reads the domains.", "retry": False}}
+        rows = await con.fetch("SELECT domain, served, internal, spf_ok, dkim_ok, dmarc_ok, flags_read_at FROM mcp_domains ORDER BY domain")
+    return {"ok": True, "domains": [dict(r) for r in rows]}
+
+
+async def my_notifications(pool: asyncpg.Pool, caller: Caller, unread_only: bool = False, limit: int = 25) -> dict:
+    """The caller's own notices (a person's; an agent has none). No notice carries a word of mail (notifications.md)."""
+    limit = max(1, min(100, int(limit or 25)))
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        rows = await con.fetch("SELECT id, kind, mailbox_id, record_type, record_id, title, body, read_at, created_at FROM mcp_notifications "
+                               "WHERE (NOT $1 OR read_at IS NULL) ORDER BY created_at DESC, id DESC LIMIT $2", bool(unread_only), limit)
+    return {"ok": True, "notifications": [dict(r) for r in rows]}
+
+
+async def notice_status(pool: asyncpg.Pool, caller: Caller) -> dict:
+    """The monitoring notice's current version and text, and whether the caller acknowledged it (question 19)."""
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        s = await con.fetchrow("SELECT notice_version, notice_text, notice_updated_at, notice_acknowledged_by_me FROM mcp_settings")
+    if s is None:
+        return not_found("notice")
+    return {"ok": True, "notice": {"version": s["notice_version"], "text": s["notice_text"], "updated_at": s["notice_updated_at"], "acknowledged": bool(s["notice_acknowledged_by_me"])}}
+
+
+TOOLS.update({"find_aliases": find_aliases, "find_departments": find_departments, "domains_list": domains_list, "my_notifications": my_notifications,
+              "notice_status": notice_status})

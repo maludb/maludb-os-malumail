@@ -96,3 +96,5 @@ zone, brought back unread by the worker with a chip (an agent's mailbox wakes th
 database `<tenant>_malumail`.
 
 **Slice 10, home, admin and settings, is built** (2026-10-20, the last of Phase 3: 45/45 screens, 67/67 actions): the Mail admin's overview, sync health with Re-sync and Re-index, the settings with the two switches, MM3, the budget and the monitoring notice, and the agents' page with Retry; a red banner across every admin page while a switch is on. (`tests/phase3/slice10/run.sh`.)
+
+**Phase 4, the two MCP servers, is built** (2026-10-21): 36 records tools (the share and `app_roles` among them) and 7 activity tools over FastMCP on 127.0.0.1, every answer through the run-facts gate (the Mail Expert capped at triage, any other agent the lesser of the two, a requester with no role refused) and the fence (every string that came in a message inside one `<untrusted-mail>` block); the registry proven through the kernel's own loader. (`tests/phase4/run.sh`; db/023.) Next: Phase 5, the owner's.

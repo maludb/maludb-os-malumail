@@ -10,7 +10,7 @@
 #    scratch sealing key pair — the public half in that file, the secret half in its stand-in for /etc/malumail/mailer.env
 #    (<env>-mailer.env, mode 600) — app/bootstrap.php reads $ML_DEV_ENV instead of config/.env when it is set (never in production).
 #    Nothing here is committed or installed, and nothing here reaches MaluMail: the mail hosts point at the loopback fixtures.
-#    Ports 9201 (the app), 9202 (the fake kernel), 9203 (the fake MaluDB + MaluMail REST), 9204–9205 (the MCP servers, Phase 4),
+#    Ports 9201 (the app), 9202 (the fake kernel), 9203 (the fake MaluDB + MaluMail REST), 9204 and 9208 (the MCP servers, Phase 4),
 #    9206 (the mail service), 9207 (the image door).
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -58,7 +58,7 @@ MCP_ACTIVITY_DB_USER=malumail_activity_ro
 MCP_ACTIVITY_DB_PASSWORD=$PW_ACT
 APP_INTERNAL_PORT=9201
 MCP_RECORDS_PORT=9204
-MCP_ACTIVITY_PORT=9205
+MCP_ACTIVITY_PORT=9208
 ML_MAILER_PORT=9206
 ML_IMAGES_PORT=9207
 ML_MAILER_KEY=$MAILER_KEY

@@ -15,7 +15,7 @@ import datetime as dt
 
 import asyncpg
 
-from records_server import Caller, _log_read, _mailbox_id, _mailbox_id_seen, _scoped, bad, not_found
+from records_server import Caller, _log_read, _log_reads, _mailbox_id, _mailbox_id_seen, _scoped, bad, not_found
 
 
 def _since(since) -> dt.datetime | None:
@@ -111,4 +111,102 @@ async def mailbox_trail(pool: asyncpg.Pool, caller: Caller, mailbox, since=None,
                                                        "consumer": r["consumer"]} for r in rows]}
 
 
-TOOLS = {"review_trail": review_trail, "agent_activity": agent_activity, "mailbox_trail": mailbox_trail}
+# ---- Phase 4: the four trail tools no slice made real (A3, A4, A6) ----------------------------------------------------------------
+# Read from mcp_activity_log (db/023): the rows activity_ingest.py ships to the tenant's MaluDB as `activity` episodes, behind the same wall the
+# mailboxes have — a mailbox's rows for whoever may open it, its administration for the Mail admins, a row about no mailbox for its actor.
+# A payload carries ids, counts, levels and domains, never mail; a subject excerpt of an agent's or shared mailbox only — fenced by the tool.
+NOISE = ("screen.view", "mailbox.view", "mcp.read", "k7.read", "share.read")
+WORDS = {
+    "mailbox.create": "created the mailbox", "mailbox.connect": "connected the mailbox", "mailbox.password_reset": "reset the mailbox's password", "mailbox.pause": "paused the agent's mail",
+    "mailbox.resume": "resumed the agent's mail", "mailbox.quota": "changed the quota", "mailbox.reactivate": "reactivated the mailbox", "mailbox.suspend": "suspended the mailbox",
+    "mailbox.settings": "changed the mailbox's settings", "mailbox.update": "changed the mailbox", "mailbox.reindex": "asked to re-index the text", "mailbox.resync": "asked to re-sync",
+    "alias.create": "made a forwarding address", "alias.update": "changed a forwarding address", "alias.delete": "removed a forwarding address",
+    "permission.grant": "gave access", "permission.revoke": "took access away", "permission.break_glass": "was given emergency access", "policy.set": "changed the agent's mail policy",
+    "outbound.send": "sent a message", "outbound.hold": "held a message for review", "review.approve": "approved a held message", "review.reject": "rejected a held message",
+    "review.edit": "edited and sent a held message", "message.move": "moved mail", "message.archive": "archived mail", "message.label": "labelled mail", "message.trash": "moved mail to the trash",
+}
+
+
+def _row(r) -> dict:
+    return {"at": r["occurred_at"], "by": r["actor"], "actor_member_id": r["actor_member_id"], "action": r["action"], "did": WORDS.get(r["action"], r["action"].replace(".", " ").replace("_", " ")),
+            "through": r["source"], "entity_type": r["entity_type"], "entity_id": r["entity_id"], "mailbox_id": r["mailbox_id"], "run_id": r["agent_run_id"],
+            "before": r["before"], "after": r["after"]}
+
+
+_COLS = """l.occurred_at, l.actor_member_id, COALESCE(m.display_name, CASE WHEN l.actor_member_id IS NULL THEN 'the system' ELSE 'someone' END) AS actor, l.source, l.action,
+           l.entity_type, l.entity_id, l.mailbox_id, l.agent_run_id, l.before, l.after"""
+
+
+async def _trail(con, caller: Caller, tool: str, where: str, args: list, limit: int) -> list:
+    rows = await con.fetch(
+        f"""SELECT {_COLS} FROM mcp_activity_log l LEFT JOIN mcp_members m ON m.member_id = l.actor_member_id
+             WHERE l.action <> ALL ($1::text[]) AND {where} ORDER BY l.log_id DESC LIMIT {limit}""", list(NOISE), *args)
+    await _log_reads(con, caller, [r["mailbox_id"] for r in rows], tool)
+    return [_row(r) for r in rows]
+
+
+async def member_activity(pool: asyncpg.Pool, caller: Caller, member, since=None, limit: int = 50) -> dict:
+    """What a person or an agent did in mail — sends, files, decisions — in the mailboxes the caller may open (A3)."""
+    limit = max(1, min(200, int(limit or 50)))
+    if since not in (None, "") and _since(since) is None:
+        return bad("since is an ISO 8601 date or time")
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        who = None
+        if str(member).strip().lower() == "me":
+            who = caller.member_id
+        else:
+            who = await con.fetchval("SELECT member_id FROM mcp_members WHERE member_id::text = $1 OR display_name ILIKE $1 ORDER BY (member_id::text = $1) DESC, member_id LIMIT 1", str(member))
+        if who is None:
+            return not_found("person")
+        rows = await _trail(con, caller, "member_activity", "l.actor_member_id = $2 AND ($3::timestamptz IS NULL OR l.occurred_at >= $3)", [who, _since(since)], limit)
+    return {"ok": True, "member_id": int(who), "events": rows}
+
+
+RECORD_TYPES = {"mailbox": "mailbox", "alias": "alias", "policy": "agent_mail_policy", "permission": "mailbox_permission", "domain": "domain", "outbound": "outbound_email"}
+
+
+async def record_history(pool: asyncpg.Pool, caller: Caller, record_type: str, record_id, limit: int = 50) -> dict:
+    """One record's changes, by whom and when (A4): a mailbox, an alias, an agent mailbox's policy (by the mailbox's id), a permission, a domain, a message in the outbox."""
+    limit = max(1, min(200, int(limit or 50)))
+    if record_type not in RECORD_TYPES:
+        return bad("record_type is " + ", ".join(RECORD_TYPES))
+    try:
+        rid = int(record_id)
+    except (TypeError, ValueError):
+        return bad("record_id is the record's number")
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        rows = await _trail(con, caller, "record_history", "l.entity_type = $2 AND l.entity_id = $3", [RECORD_TYPES[record_type], rid], limit)
+        if not rows:
+            return not_found("record")
+    return {"ok": True, "record_type": record_type, "record_id": rid, "history": rows}
+
+
+async def activity_search(pool: asyncpg.Pool, caller: Caller, q: str, since=None, limit: int = 25) -> dict:
+    """The guarded search over the trail (A6): words, each of which must be in the action, the actor's name or the payload's words; never SQL."""
+    limit = max(1, min(100, int(limit or 25)))
+    words = [w for w in str(q or "").lower().split() if w][:6]
+    if not words or any(len(w) < 2 for w in words):
+        return bad("q is words of two letters or more: an action (permission), a person's name, a domain")
+    if since not in (None, "") and _since(since) is None:
+        return bad("since is an ISO 8601 date or time")
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        cond = " AND ".join(f"(l.action ILIKE ${i + 3} OR m.display_name ILIKE ${i + 3} OR l.after::text ILIKE ${i + 3} OR l.before::text ILIKE ${i + 3})" for i in range(len(words)))
+        pats = ["%" + w.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%" for w in words]
+        rows = await _trail(con, caller, "activity_search", f"($2::timestamptz IS NULL OR l.occurred_at >= $2) AND {cond}", [_since(since), *pats], limit)
+    return {"ok": True, "events": rows}
+
+
+async def recent_activity(pool: asyncpg.Pool, caller: Caller, limit: int = 50) -> dict:
+    """The latest events in the mailboxes the caller may open (A6)."""
+    limit = max(1, min(200, int(limit or 50)))
+    async with pool.acquire() as con, con.transaction():
+        await _scoped(con, caller)
+        rows = await _trail(con, caller, "recent_activity", "true", [], limit)
+    return {"ok": True, "events": rows}
+
+
+TOOLS = {"review_trail": review_trail, "agent_activity": agent_activity, "mailbox_trail": mailbox_trail, "member_activity": member_activity,
+         "record_history": record_history, "activity_search": activity_search, "recent_activity": recent_activity}

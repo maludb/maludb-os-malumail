@@ -97,7 +97,7 @@ import os, sys
 root, out = sys.argv[1], sys.argv[2]
 v = open(root + '/deploy/apache-malumail.conf').read()
 for k, val in {'APP_FQDN': 'webmail.subello.com', 'DOMAIN': 'subello.com', 'APP_KEY': 'malumail', 'APP_DIR': root, 'APP_INTERNAL_PORT': os.environ.get('P_INTERNAL', '9205'),
-               'MCP_RECORDS_PORT': '9204', 'MCP_ACTIVITY_PORT': '9204', 'ML_MAILER_PORT': os.environ.get('P_MAILER', '9206'), 'ML_IMAGES_PORT': '9207'}.items():
+               'MCP_RECORDS_PORT': '9204', 'MCP_ACTIVITY_PORT': '9208', 'ML_MAILER_PORT': os.environ.get('P_MAILER', '9206'), 'ML_IMAGES_PORT': '9207'}.items():
     v = v.replace('{{%s}}' % k, val)
 assert '{{' not in v, 'unfilled placeholder in the vhost template'
 v = v.replace('<VirtualHost *:80>', '<VirtualHost *:%s>' % os.environ.get('P_APP', '9201'))
